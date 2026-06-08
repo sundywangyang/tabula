@@ -577,6 +577,8 @@ function DetailsView({
     overscan: 12,
   });
 
+
+
   return (
     <div className="details-view">
       <div className="file-list-header">

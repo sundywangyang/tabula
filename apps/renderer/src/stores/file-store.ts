@@ -563,6 +563,23 @@ export const useFileStore = create<FileStore>((set, get) => {
 
     // ============ 目录 ============
     loadDir: async (paneId, path) => {
+      // 无 active tab 时自动建一个 tab 再加载
+      const layout = useLayoutStore.getState();
+      const paneNode = findPaneInLayout(layout.rootLayout, paneId);
+      if (paneNode?.type === 'pane' && !paneNode.activeTabId) {
+        const tabId = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const title = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+        useLayoutStore.getState().pane.openTab(paneId, {
+          id: tabId,
+          type: 'folder',
+          title,
+          path,
+          pinned: false,
+          closable: true,
+          history: [path],
+          historyIndex: 0,
+        });
+      }
       get().ensurePane(paneId);
       set((s) => ({
         panes: {
@@ -660,7 +677,7 @@ export const useFileStore = create<FileStore>((set, get) => {
         set({
           viewMode: (all.defaultView ?? 'details') as ViewMode,
           sortBy: (all.sortBy ?? 'name') as SortField,
-          sortDir: (all.sortDir ?? 'asc') as SortDir,
+          sortDir: (all.sortDir !== undefined ? all.sortDir : 'asc') as SortDir,
           showHidden: all.showHidden ?? false,
           showExtensions: all.showExtensions ?? true,
         });
@@ -1563,7 +1580,7 @@ export const useFileStore = create<FileStore>((set, get) => {
 
     // ============ P3: 批量 copy / move 入口 ============
     performBulk: async (sources, destDir, mode) => {
-      if (sources.length === 0) return { ok: true, moved: 0 };
+           if (sources.length === 0) return { ok: true, moved: 0 };
       // 不能把目录粘贴到自己或子目录(简单防呆:检测 destDir 是否在 sources 之下)
       // v1:不防呆,交给用户
       // 先扫冲突
@@ -1571,11 +1588,34 @@ export const useFileStore = create<FileStore>((set, get) => {
       const autoResolved: { source: string; dest: string; overwrite: boolean }[] = [];
       for (const src of sources) {
         if (!src) continue;
-        const srcName = basename(src);
-        if (!srcName) continue;
+               const srcName = basename(src);
+        if (!srcName) {
+          continue;
+        }
         const dest = joinPath(destDir, srcName);
         if (dest === src) {
-          // 同源同目标(把自己粘回自己)→ 跳过
+          // 同源同目标:move 直接跳过;copy 在同目录需生成新名(加 -copy)
+          if (mode === 'move') {
+            continue;
+          }
+          // copy:在同目录生成带序号的副本名
+          const dotIdx = srcName.lastIndexOf('.');
+          const base = dotIdx > 0 ? srcName.slice(0, dotIdx) : srcName;
+          const ext = dotIdx > 0 ? srcName.slice(dotIdx) : '';
+          let copyName = base + ' - 副本' + ext;
+          let copyDest = joinPath(destDir, copyName);
+          let counter = 2;
+          while ((await window.tabula.fs.exists(copyDest)) && counter <= 99) {
+            copyName = base + ' - 副本 (' + counter + ')' + ext;
+            copyDest = joinPath(destDir, copyName);
+            counter++;
+          }
+          const exists = await window.tabula.fs.exists(copyDest);
+          if (exists) {
+            get().showToast('无法生成不重名的副本', 'error', 3000);
+            continue;
+          }
+          autoResolved.push({ source: src, dest: copyDest, overwrite: false });
           continue;
         }
         const exists = await window.tabula.fs.exists(dest);
@@ -1614,7 +1654,7 @@ export const useFileStore = create<FileStore>((set, get) => {
         let success = 0;
         let firstError: string | null = null;
         for (const op of autoResolved) {
-          if (mode === 'copy') {
+                   if (mode === 'copy') {
             const r = await window.tabula.fs.copy({
               sources: [op.source],
               destination: destDir,

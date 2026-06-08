@@ -54,6 +54,10 @@ export const IpcChannels = {
   WIN_OPEN_WITH_TAB: 'win:open-with-tab',   // P2 v2:拖出 tab 到新窗口
   WIN_GET_BOOT_PATH: 'win:get-boot-path',   // P2 v2:新窗口启动时询问初始路径
   WIN_CLOSE: 'win:close',
+  WIN_CLOSE_CURRENT: 'win:close-current',
+  WIN_MINIMIZE: 'win:minimize',
+  WIN_MAXIMIZE: 'win:maximize',
+  WIN_IS_MAXIMIZED: 'win:is-maximized',
   WIN_LIST: 'win:list',
   WIN_FOCUS: 'win:focus',
 

@@ -7,6 +7,7 @@
  *
  * P2: openPathBar 需要 paneId(每个 pane 独立打开路径栏,这里取 active pane)
  */
+import { useMemo } from 'react';
 import { useFileStore, type ViewMode } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
@@ -31,8 +32,9 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
   // P5: 收藏
   const currentPath = useFileStore((s) => s.panes[paneId]?.currentPath ?? '');
-  const isFavorite = useFavoritesStore((s) =>
-    currentPath ? s.favorites.some((f) => f.path === currentPath) : false,
+  const isFavorite = useMemo(
+    () => (currentPath ? useFavoritesStore.getState().favorites.some((f) => f.path === currentPath) : false),
+    [currentPath],
   );
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const handleToggleFavorite = () => {

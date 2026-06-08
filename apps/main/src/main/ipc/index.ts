@@ -4,6 +4,8 @@
  * 所有 ipcMain.handle 集中在这里,主进程 API 入口。
  */
 import { ipcMain, dialog, shell, app } from 'electron';
+import { promises as fs } from 'node:fs';
+import { join, basename } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
 import type { AppConfig, FsErrorCode, UpdateStatus } from '@tabula/bridge';
 import type { WindowManager } from '../window/window-manager';
@@ -61,8 +63,33 @@ export function registerIpcHandlers(ctx: IpcContext) {
   ipcMain.handle(IpcChannels.FS_RENAME, (_e, oldPath: string, newPath: string) =>
     fsService.rename(oldPath, newPath),
   );
-  ipcMain.handle(IpcChannels.FS_MOVE, (_e, req) => fsService.move(req));
-  ipcMain.handle(IpcChannels.FS_COPY, (_e, req) => fsService.copy(req));
+  ipcMain.handle(IpcChannels.FS_MOVE, (_e, req) => {
+    // eslint-disable-next-line no-console
+    console.error('[ipc] FS_MOVE req=', req);
+    return fsService.move(req);
+  });
+  ipcMain.handle(IpcChannels.FS_COPY, async (_e, req) => {
+    // Inline copy to avoid any req object mutation edge cases
+    const sources: string[] = req.sources;
+    const destination: string = req.destination;
+    const overwrite: boolean = req.overwrite ?? false;
+    // eslint-disable-next-line no-console
+    console.error('[ipc-cp] sources=', sources, 'destination=', destination);
+    for (const src of sources) {
+      const dest = join(destination, basename(src));
+      // eslint-disable-next-line no-console
+      console.error('[ipc-cp] copying', src, '->', dest);
+      try {
+        await fs.cp(src, dest, { recursive: true, force: overwrite });
+      } catch (err) {
+        const e = err as NodeJS.ErrnoException;
+        // eslint-disable-next-line no-console
+        console.error('[ipc-cp] ERROR:', e.code, e.message);
+        return { ok: false, error: { code: e.code ?? 'UNKNOWN', message: e.message, path: src } };
+      }
+    }
+    return { ok: true, data: undefined };
+  });
   ipcMain.handle(IpcChannels.FS_MKDIR, (_e, p: string, name?: string) =>
     fsService.mkdir(p, name),
   );
@@ -134,6 +161,28 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
   ipcMain.handle(IpcChannels.WIN_CLOSE, (_e, id: string) => {
     ctx.windowManager.getWindow(id)?.close();
+  });
+  // 关闭当前窗口（渲染进程自己调用）
+  ipcMain.handle(IpcChannels.WIN_CLOSE_CURRENT, (e) => {
+    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    win?.close();
+  });
+  ipcMain.handle(IpcChannels.WIN_MINIMIZE, (e) => {
+    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    win?.minimize();
+  });
+  ipcMain.handle(IpcChannels.WIN_MAXIMIZE, (e) => {
+    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    if (!win) return;
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  });
+  ipcMain.handle(IpcChannels.WIN_IS_MAXIMIZED, (e) => {
+    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    return win?.isMaximized() ?? false;
   });
   ipcMain.handle(IpcChannels.WIN_LIST, () => {
     return ctx.windowManager.getAllWindows().map((w) => w.id.toString());

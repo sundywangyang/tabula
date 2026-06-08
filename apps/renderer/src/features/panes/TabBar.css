@@ -150,3 +150,12 @@
   cursor: not-allowed;
   opacity: 0.4;
 }
+
+/* 关闭当前窗格按钮 */
+.pane-close-btn {
+  display: inline-flex !important;
+  margin-left: auto;
+  margin-right: 2px;
+  align-self: center;
+  flex-shrink: 0;
+}

@@ -38,6 +38,8 @@ export function TabBar({
 }) {
   const activateTab = useLayoutStore((s) => s.pane.activateTab);
   const closeTab = useLayoutStore((s) => s.pane.closeTab);
+  const mergePane = useLayoutStore((s) => s.pane.mergePane);
+  const countPanes = useLayoutStore((s) => s.countPanes);
   const focusPane = useLayoutStore((s) => s.pane.focusPane);
   const moveTab = useLayoutStore((s) => s.pane.moveTab);
   const tabDrag = useLayoutStore((s) => s.tabDrag);
@@ -243,6 +245,19 @@ export function TabBar({
           </div>
         );
       })}
+
+      {/* 关闭当前窗格按钮 — 多窗格时显示 */}
+      {countPanes() > 1 && (
+        <button
+          type="button"
+          className="tab-close pane-close-btn"
+          onClick={() => mergePane(paneId)}
+          title="关闭当前窗格 (Ctrl+Alt+Shift+\)"
+          aria-label="关闭当前窗格"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

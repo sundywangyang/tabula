@@ -246,7 +246,14 @@ export function PaneView({
       )}
 
       <div className="pane-content">
-        {isTrash ? (
+        {/* 空窗格(无 tabs):显示引导提示 */}
+        {pane.activeTabId === null ? (
+          <div className="pane-empty-state">
+            <div className="pane-empty-icon">📂</div>
+            <div className="pane-empty-title">暂无打开的文件夹</div>
+            <div className="pane-empty-hint">双击任意文件夹或在地址栏输入路径开始浏览</div>
+          </div>
+        ) : isTrash ? (
           <TrashPane paneId={paneId} />
         ) : (
           <>

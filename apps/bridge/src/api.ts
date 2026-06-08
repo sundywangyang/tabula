@@ -151,6 +151,10 @@ export interface TabulaAPI {
     /** P2 v2: 新窗口启动时调用,获取由 openWithTab 传入的初始路径 */
     getBootPath(): Promise<string | null>;
     close(windowId: string): Promise<void>;
+    closeCurrent(): Promise<void>;
+    minimize(): Promise<void>;
+    maximize(): Promise<void>;
+    isMaximized(): Promise<boolean>;
     list(): Promise<AppWindowState[]>;
     focus(windowId: string): Promise<void>;
   };

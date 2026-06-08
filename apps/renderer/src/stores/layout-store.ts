@@ -375,24 +375,11 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           const tab = p.tabs[idx];
           if (!tab.closable) return p; // 不可关
           const newTabs = p.tabs.filter((t) => t.id !== tabId);
-          if (newTabs.length === 0) {
-            // 空 pane:保留一个 placeholder tab(closable=false)
-            const placeholder: Tab = {
-              id: `tab-placeholder-${paneId}`,
-              type: 'folder',
-              title: '空',
-              pinned: true,
-              closable: false,
-              history: [],
-              historyIndex: -1,
-            };
-            return { ...p, tabs: [placeholder], activeTabId: placeholder.id };
-          }
           // 激活相邻 tab(优先选右边的)
-          let nextActive = p.activeTabId;
+          let nextActive: string | null = p.activeTabId;
           if (p.activeTabId === tabId) {
             const newIdx = Math.min(idx, newTabs.length - 1);
-            nextActive = newTabs[newIdx].id;
+            nextActive = newTabs[newIdx]?.id ?? null;
           }
           return { ...p, tabs: newTabs, activeTabId: nextActive };
         });
@@ -455,75 +442,89 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
       },
 
       mergePane: (paneId) => {
-        // 简单实现:把 pane 内的 tabs 全部移到兄弟 pane(同 split 下另一个 pane),
-        // 然后从父 split 移除。
-        // 找到包含 paneId 的 split 父节点
         const root = get().rootLayout;
         const ctx = get().findPaneContext(root, paneId, null, 0);
-        if (!ctx) return;
-        if (ctx.parent.type !== 'split') {
-          // 顶层就是单个 pane,merge 无效
+        if (!ctx) {
           return;
         }
-        const split = ctx.parent;
+        if (ctx.parent.type !== 'split') {
+          // 顶层单个 pane，merge 无意义
+          return;
+        }
+        const split = ctx.parent as Extract<LayoutNode, { type: 'split' }>;
         const idxInSplit = ctx.index;
         const sibIdx = idxInSplit === 0 ? 1 : 0;
         if (sibIdx >= split.children.length) return;
-        const sib = split.children[sibIdx];
-        if (!sib) return;
-        if (sib.type !== 'pane') {
-          // 兄弟不是 pane(嵌套 split) — 用兄弟的 first pane 替代
-          const firstPaneId = findFirstPane(sib);
-          if (!firstPaneId) return;
-          // 把 paneId 的 tabs 移到 firstPaneId
-          const paneNode = findPane(root, paneId);
-          if (paneNode?.type !== 'pane') return;
-          const newRoot = mapPane(root, firstPaneId, (p) => ({
-            ...p,
-            tabs: [...p.tabs, ...paneNode.tabs],
-            activeTabId: p.activeTabId ?? paneNode.tabs[0]?.id ?? null,
-          }));
-          // 删除 paneId 节点
-          const pruned = removePaneFromTree(newRoot, paneId);
-          // 同步 activePaneId
-          const nextActive = paneId === get().activePaneId ? firstPaneId : get().activePaneId;
-          setState({ rootLayout: pruned, activePaneId: nextActive });
-          useFileStore.getState().removePaneData(paneId);
-          return;
+        const sib = split.children[sibIdx]!;
+
+        // 找到要关闭 pane 的 tabs
+        const closingPane = findPane(root, paneId);
+        if (!closingPane || closingPane.type !== 'pane') return;
+        const closingTabs = (closingPane as Extract<LayoutNode, { type: 'pane' }>).tabs;
+
+        // 找到接收 tabs 的 pane
+        let targetPane: Extract<LayoutNode, { type: 'pane' }> | null = null;
+        let targetPaneId: string | null = null;
+        if (sib.type === 'pane') {
+          targetPane = sib as Extract<LayoutNode, { type: 'pane' }>;
+          targetPaneId = sib.id;
+        } else {
+          const firstId = findFirstPane(sib);
+          if (!firstId) return;
+          const found = findPane(sib, firstId);
+          if (found?.type === 'pane') {
+            targetPane = found as Extract<LayoutNode, { type: 'pane' }>;
+            targetPaneId = firstId;
+          }
         }
-        // 兄弟是 pane — 合并 tabs
-        const paneNode = findPane(root, paneId);
-        if (paneNode?.type !== 'pane') return;
-        const newRoot = mapPane(root, sib.id, (p) => ({
-          ...p,
-          tabs: [...p.tabs, ...paneNode.tabs],
-          activeTabId: p.activeTabId ?? paneNode.tabs[0]?.id ?? null,
-        }));
-        const pruned = removePaneFromTree(newRoot, paneId);
-        const nextActive = paneId === get().activePaneId ? sib.id : get().activePaneId;
-        setState({ rootLayout: pruned, activePaneId: nextActive });
-        useFileStore.getState().removePaneData(paneId);
+        if (!targetPane || !targetPaneId) return;
+
+        // 构建新 children：把 closing pane 的 tabs 合并到 target pane，然后移除 closing pane
+        const remainingChildren = split.children.filter((_, i) => i !== idxInSplit);
+        // 更新 target pane 的 tabs
+        const mergedTabs = [...targetPane.tabs, ...closingTabs];
+        const mergedTargetPane: Extract<LayoutNode, { type: 'pane' }> = {
+          ...targetPane,
+          tabs: mergedTabs,
+          activeTabId: targetPane.activeTabId ?? closingTabs[0]?.id ?? null,
+        };
+
+        // 把 split.children 里的 target pane 替换成 merged 版本
+        const updatedChildren = remainingChildren.map((child) =>
+          child.id === targetPaneId ? mergedTargetPane : child,
+        );
+
+        // 如果只剩 1 个 child：展平（split 消失）
+        // 如果剩 2+ 个 child：保留 split
+        const newSplitChildren: LayoutNode[] = updatedChildren;
+
+        // 在 root 中替换这个 split
+        const newRoot = replaceNode(root, split.id!, {
+          ...split,
+          children: newSplitChildren,
+        });
+
+        // 如果 split 现在只有 1 个 child，再做一次 flatten（顶级直接替换）
+        const updatedSplit = findNode(newRoot, split.id!);
+        if (updatedSplit && updatedSplit.type === 'split' && updatedSplit.children.length === 1) {
+          const sole = updatedSplit.children[0]!;
+          const newRoot2 = replaceNode(newRoot, split.id!, sole);
+          setState({ rootLayout: newRoot2, activePaneId: paneId === get().activePaneId ? targetPaneId : get().activePaneId });
+          useFileStore.getState().removePaneData(paneId);
+        } else {
+          setState({ rootLayout: newRoot, activePaneId: paneId === get().activePaneId ? targetPaneId : get().activePaneId });
+          useFileStore.getState().removePaneData(paneId);
+        }
       },
 
       closeActivePane: () => {
         const cur = get().activePaneId;
         if (!cur) return;
-        // 如果是最后一个 pane,退化成"单个 pane + 单个 placeholder"
+        // 如果是最后一个 pane,清空 tabs(activeTabId 设为 null)
         if (countPanesInTree(get().rootLayout) <= 1) {
           const root = get().rootLayout;
           if (root.type === 'pane') {
-            // 关掉最后一个 pane:清空 tabs,放 placeholder
-            const placeholder: Tab = {
-              id: `tab-placeholder-${root.id}`,
-              type: 'folder',
-              title: '空',
-              pinned: true,
-              closable: false,
-              history: [],
-              historyIndex: -1,
-            };
-            const newRoot: LayoutNode = { ...root, tabs: [placeholder], activeTabId: placeholder.id };
-            setState({ rootLayout: newRoot });
+            setState({ rootLayout: { ...root, tabs: [], activeTabId: null } });
           }
           return;
         }
@@ -664,24 +665,12 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           return;
         }
 
-        // 跨 pane:从源 pane 抽出 tab,空 pane 加 placeholder
+        // 跨 pane:从源 pane 抽出 tab,空 pane 允许 tabs=[]+activeTabId=null
         const sourceWithout = (() => {
           const newTabs = fromPane.tabs.filter((t) => t.id !== fromTabId);
-          if (newTabs.length === 0) {
-            const placeholder: Tab = {
-              id: `tab-placeholder-${fromPaneId}`,
-              type: 'folder',
-              title: '空',
-              pinned: true,
-              closable: false,
-              history: [],
-              historyIndex: -1,
-            };
-            return { tabs: [placeholder], activeTabId: placeholder.id };
-          }
           let nextActive = fromPane.activeTabId;
           if (fromPane.activeTabId === fromTabId) {
-            // 选原位置右侧第一个,没有就选最后一个
+            // 选原位置右侧第一个,没有就选最后一个,都没有则 null
             const newIdx = Math.min(fromIdx, newTabs.length - 1);
             nextActive = newTabs[newIdx]?.id ?? newTabs[0]?.id ?? null;
           }
@@ -865,7 +854,7 @@ function removePaneFromTree(node: LayoutNode, paneId: string): LayoutNode {
 function basenameOf(p: string): string {
   if (!p) return '';
   const m = p.match(/[^\\/]+$/);
-  return m ? m[0] : '';
+  return m ? m[0] : p; // 盘符根 C:\ 正则匹配不到时直接返回原路径
 }
 
 // =================== P2 v2: split 节点 id 工具 ===================
@@ -902,5 +891,29 @@ function mapSplitById(
     dir: node.dir,
     sizes: [...node.sizes],
     children: node.children.map((c) => mapSplitById(c, splitNodeId, fn)),
+  };
+}
+
+/** 按 id 查找任意节点(pane 或 split) */
+function findNode(node: LayoutNode, id: string): LayoutNode | null {
+  if (node.id === id) return node;
+  if (node.type === 'pane') return null;
+  for (const child of node.children) {
+    const found = findNode(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** 按 id 替换树中对应节点(保留原树结构,仅替换该节点) */
+function replaceNode(node: LayoutNode, id: string, replacement: LayoutNode): LayoutNode {
+  if (node.id === id) return replacement;
+  if (node.type === 'pane') return node;
+  return {
+    type: 'split',
+    id: node.id ?? makeSplitId(),
+    dir: node.dir,
+    sizes: [...node.sizes],
+    children: node.children.map((c) => replaceNode(c, id, replacement)),
   };
 }

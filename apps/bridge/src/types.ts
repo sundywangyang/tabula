@@ -281,7 +281,7 @@ export interface AppConfig {
   showExtensions: boolean;
   defaultView: 'list' | 'grid' | 'details';
   sortBy: 'name' | 'size' | 'mtime' | 'type';
-  sortDir: 'asc' | 'desc';
+  sortDir: 'asc' | 'desc' | null;
   confirmDelete: boolean;
   openInNewTab: boolean;
   extensionsDir: string;

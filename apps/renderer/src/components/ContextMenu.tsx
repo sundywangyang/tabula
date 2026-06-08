@@ -5,8 +5,9 @@
  * 在文件/文件夹上右键:完整菜单(复制/剪切/粘贴/删除/重命名/属性/打开方式)
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useFileStore } from '../stores/file-store';
+import { useFileStore, makeFolderTab } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useLayoutStore } from '../stores/layout-store';
 import type { FsEntry } from '@tabula/bridge';
 import './ContextMenu.css';
 
@@ -118,8 +119,10 @@ export function ContextMenu({ paneId }: ContextMenuProps) {
           label: '在新标签页打开',
           icon: '🏷',
           action: () => {
-            // TODO: P2 v2 - open in new tab
-            showToast('新标签页打开功能开发中', 'info', 1500);
+            if (targetEntry) {
+              const newTab = makeFolderTab(targetEntry.path, targetEntry.name);
+              useLayoutStore.getState().pane.openTab(paneId, newTab);
+            }
             setVisible(false);
           },
         });

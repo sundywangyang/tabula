@@ -8,6 +8,7 @@
   height: 100%;
   font-size: 12px;
   outline: none;
+  overflow: hidden;
 }
 
 .file-list:focus {
@@ -61,12 +62,15 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  position: relative;
 }
 
 .file-list-body-virtual {
-  contain: layout style;
-  /* 注意: 之前 contain: strict 在某些 Electron 渲染层下会让 ResizeObserver 拿不到高度,
-     改回 layout style(只隔离 layout 和 style,不动 paint),virtualizer 正常工作。 */
+  /* 确保虚拟滚动容器的高度明确约束于滚动区域 */
+  height: 100%;
+  position: relative;
+  align-content: flex-start;
+  flex-shrink: 0;
 }
 
 .file-list-row {

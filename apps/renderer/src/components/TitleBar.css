@@ -68,3 +68,51 @@
   background: var(--bg-hover);
   color: var(--fg-primary);
 }
+
+/* 窗口控制按钮 */
+.title-bar-window-controls {
+  display: flex;
+  align-items: stretch;
+  -webkit-app-region: no-drag;
+  margin-left: auto;
+}
+
+.win-ctrl-btn {
+  width: 46px;
+  height: var(--titlebar-h);
+  border: none;
+  background: transparent;
+  color: var(--fg-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  padding: 0;
+}
+
+.win-ctrl-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.win-ctrl-btn:active {
+  background: var(--bg-active);
+}
+
+/* 关闭按钮 — hover 时变红 */
+.win-ctrl-close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+.win-ctrl-close:active {
+  background: #c42b1c;
+  color: #fff;
+}
+
+/* 最大化按钮 hover 稍亮 */
+.win-ctrl-maximize:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}

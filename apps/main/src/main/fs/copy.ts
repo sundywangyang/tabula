@@ -18,8 +18,15 @@ export async function copy(req: MoveOrCopyRequest): Promise<Result<void>> {
   for (const src of req.sources) {
     try {
       const dest = join(req.destination, basename(src));
+      // eslint-disable-next-line no-console
+      console.error('[fs-copy] copying', JSON.stringify(src), '->', JSON.stringify(dest));
       await fs.cp(src, dest, { recursive: true, force: req.overwrite ?? false });
+      // eslint-disable-next-line no-console
+      console.error('[fs-copy] success:', dest);
     } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      // eslint-disable-next-line no-console
+      console.error('[fs-copy] ERROR code=', e.code, 'msg=', e.message);
       return mapError(err, src);
     }
   }
