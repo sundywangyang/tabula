@@ -222,3 +222,31 @@
   background: var(--danger);
   color: white;
 }
+
+/* 折叠按钮 */
+.sidebar-collapse-btn {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-tertiary);
+  transition: color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--fg-primary);
+}
+
+.sidebar-chevron {
+  font-size: 9px;
+  transition: transform 0.15s ease;
+  display: inline-block;
+  transform: rotate(90deg);
+}
+
+.sidebar-chevron.collapsed {
+  transform: rotate(0deg);
+}

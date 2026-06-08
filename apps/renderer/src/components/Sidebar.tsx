@@ -65,6 +65,7 @@ export function Sidebar({
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState<string>('');
+  const [historyCollapsed, setHistoryCollapsed] = useState(false);
 
   // 拉驱动器列表(组件挂载时一次 + 手动刷新按钮)
   useEffect(() => {
@@ -236,8 +237,15 @@ export function Sidebar({
       {/* 历史 */}
       <div className="sidebar-section">
         <div className="sidebar-header-row">
+          <button
+            className="sidebar-collapse-btn"
+            onClick={() => setHistoryCollapsed((v) => !v)}
+            title={historyCollapsed ? '展开历史' : '折叠历史'}
+          >
+            <span className={`sidebar-chevron ${historyCollapsed ? 'collapsed' : ''}`}>▶</span>
+          </button>
           <span className="sidebar-header">历史</span>
-          {history.length > 0 && (
+          {!historyCollapsed && history.length > 0 && (
             <button
               className="sidebar-header-btn"
               onClick={clearHistory}
@@ -247,7 +255,7 @@ export function Sidebar({
             </button>
           )}
         </div>
-        {history.length === 0 ? (
+        {!historyCollapsed && (history.length === 0 ? (
           <div className="sidebar-empty">暂无历史</div>
         ) : (
           history.slice(0, 20).map((h, idx) => {
@@ -275,7 +283,7 @@ export function Sidebar({
               </button>
             );
           })
-        )}
+        ))}
       </div>
 
       {/* 回收站 (P3) */}
