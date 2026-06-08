@@ -405,6 +405,13 @@ export function App() {
         }
       }
 
+      // Ctrl+Alt+Shift+\:关闭当前 pane(合并到兄弟后关闭)
+      if (isMeta && isAlt && isShift && (key === '\\' || key === '|')) {
+        e.preventDefault();
+        useLayoutStore.getState().pane.mergePane(activePaneId);
+        return;
+      }
+
       // P2 v2 收口:Alt+方向键(单独按 Alt)调整 split 大小,步长 20px。
       // - 命中方向后,沿 layout 树找焦点 pane 的最近祖先 split 节点;
       // - 从 DOM 上的 [data-split-id] 读取容器实际 px 尺寸,调 setSplitSizes。
