@@ -1,7 +1,8 @@
 # Windows 文件夹工具 — 方案设计
 
-> 状态: **v1 方案待确认**
+> 状态: **v1 方案已确认,功能实现 100%(P0~P7)**
 > 决策日期: 2026-06-05
+> 最后更新: 2026-06-08(P2 v2 split-handle 拖动 + P7 v1 快捷键自定义 UI 落地,所有阶段完成)
 > 工作区: `C:\Users\admin\Desktop\WorkSpaces\MinimaxWS\Beta`
 
 ---
@@ -253,6 +254,9 @@ type Tab = {
 | 永久删除 | `Shift+Delete` | |
 | 复制/粘贴/剪切 | `Ctrl+C/V/X` | |
 | 切换主题 | `Ctrl+Shift+T` | |
+| **拖动 split 分隔条** | 鼠标 | 实时调整相邻两 pane 比例,最小 60px(P2 v2 新增) |
+| **双击 split 分隔条** | 鼠标 | 重置当前 split 节点为 50/50(P2 v2 新增) |
+| **调整 split 大小** | `Alt+方向键` | 焦点 pane 所在 split 步进 20px,方向轴不匹配时不响应(P2 v2 新增) |
 
 ---
 
