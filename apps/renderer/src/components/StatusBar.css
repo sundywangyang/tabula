@@ -1,0 +1,122 @@
+.status-bar {
+  height: var(--statusbar-h);
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+
+.status-left,
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-item {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 600px;
+}
+
+.status-divider {
+  color: var(--fg-tertiary);
+  opacity: 0.5;
+}
+
+.status-selected {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.status-clipboard {
+  color: var(--accent);
+  font-weight: 500;
+  background: rgba(99, 102, 241, 0.10);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+}
+
+.status-clipboard-cut {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.status-progress {
+  color: var(--accent);
+  font-style: italic;
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* P4: 过滤状态 */
+.status-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(99, 102, 241, 0.10);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.status-filter strong {
+  color: var(--accent-hover);
+  font-weight: 600;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-filter-clear {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  font-size: 8px;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.status-filter-clear:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--accent-hover);
+}
+
+/* P4: 快捷键提示 */
+.status-hint {
+  color: var(--fg-tertiary);
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.status-hint kbd {
+  display: inline-block;
+  padding: 0 4px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--fg-secondary);
+  line-height: 1.4;
+}

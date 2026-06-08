@@ -1,0 +1,149 @@
+version: 1
+plan:
+  name: 'P6 插件系统 v2'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 8
+  auto_accept: true
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+    strict_mode: false
+tasks:
+  - id: p6-ext-host
+    title: 'P6 v1:Extension Host 进程 + 插件发现/加载/激活'
+    prompt: |
+      ## 背景
+      项目根目录: `C:\Users\admin\Desktop\WorkSpaces\MinimaxWS\Beta`
+
+      P5 收藏+主题已完成。P6 是 Tabula 的核心差异化功能：VS Code 风格插件系统。当前 extension-host.ts 只是一个 stub，P6 v1 要让它真正跑起来。
+
+      ## 实现内容
+
+      **1. Extension Host 进程（apps/main/src/main/ext-host/）:**
+      - 重写 extension-host.ts：启动一个 Node child_process（fork）
+      - child_process 加载插件，运行插件代码
+      - 与 child_process 通信：stdin/stdout JSON-RPC 协议（参考 VS Code）
+      - 主进程 → ext-host：发送 API 调用请求
+      - ext-host → 主进程：发送贡献点注册、面板渲染请求
+
+      **2. 插件发现（initExtensionHost() 启动时）：**
+      - 扫描 `extensions/` 内置扩展目录
+      - 扫描 `electron-store` 中用户安装的扩展目录
+      - 读取每个插件的 package.json，解析 ExtensionManifest
+      - 插件列表存入内存（可通过 `ext:list` IPC 查询）
+
+      **3. 插件激活：**
+      - 按 `activationEvents` 触发：`onStartup` / `onCommand:*` / `onFileSystem:*`
+      - `onStartup` 在 app ready 时全部激活
+      - 激活后调用插件的 `activate()` 函数，传入 ExtensionContext
+
+      **4. ExtensionContext：**
+      ```typescript
+      interface ExtensionContext {
+        subscriptions: Disposable[];
+        commands: { registerCommand(cmd: string, handler: Function): Disposable };
+        panels: { register(panel: PanelDescriptor): Disposable };
+        workspace: { readFile(path: string): Promise<string> };
+        rootPath: string;
+      }
+      ```
+
+      **5. 贡献点注册：**
+      - 命令（commands）：注册到主进程 command palette
+      - 面板（panels）：注册到侧边栏
+      - 预览器（previewers）：关联文件类型到预览组件
+
+      **6. IPC 通道（需在 ipc/index.ts 注册）：**
+      - `ext:list` — 列出已发现插件
+      - `ext:enable` / `ext:disable` — 启用/停用
+      - `ext:install` / `ext:uninstall` — 安装/卸载
+      - `ext:invoke-command` — 调用插件命令
+
+      **技术约束:**
+      - 插件进程完全隔离，崩溃不拖垮主程序
+      - 插件禁止 require('fs')，只能通过 ExtensionContext API
+      - 主进程 nodeIntegration: false，contextIsolation: true 不可改变
+      - 插件与主进程通过 JSON-RPC 通信（stdio）
+
+      **完成后:**
+      - 写 `deliverable.md` 到 `C:\Users\admin\.mavis\plans\plan_p6_v2\outputs\p6-ext-host\deliverable.md`
+    assigned_to: extension-architect
+    verified_by: verifier
+    verify_prompt: |
+      验证 extension host：
+      1. pnpm typecheck 0 错误
+      2. pnpm build 0 错误
+      3. extension-host.ts 有 child_process.fork 或 spawn
+      4. initExtensionHost() 扫描扩展目录
+      5. ExtensionContext 接口存在
+      6. JSON-RPC 通信逻辑存在
+      7. ext:list/enable/disable IPC handlers 注册
+      8. 无 regression
+    timeout_ms: 2400000
+    hang_alert_after_ms: 900000
+
+  - id: p6-sample-ext
+    title: 'P6 v1:示例扩展 — 侧边栏面板'
+    prompt: |
+      ## 背景
+      项目根目录: `C:\Users\admin\Desktop\WorkSpaces\MinimaxWS\Beta`
+
+      P6 ext-host 完成后，实现一个示例扩展展示侧边栏面板功能。
+
+      ## 实现内容
+
+      **示例扩展：文件统计面板**
+      - 插件名：`sample-file-stats`
+      - 显示：在侧边栏面板显示当前目录的文件数量/大小统计
+      - activationEvents: `onStartup`
+      - 贡献点：一个侧边栏面板（panel）
+
+      **扩展结构：**
+      ```
+      extensions/sample-file-stats/
+        package.json    — 插件元数据
+        out/
+          extension.js   — 编译后的插件入口
+      ```
+
+      **package.json 内容：**
+      ```json
+      {
+        "name": "sample-file-stats",
+        "displayName": "文件统计",
+        "version": "1.0.0",
+        "main": "./out/extension.js",
+        "engines": { "app": "^1.0.0" },
+        "activationEvents": ["onStartup"],
+        "contributes": {
+          "panels": [{ "id": "sample-file-stats.panel", "title": "文件统计" }]
+        }
+      }
+      ```
+
+      **插件激活后：**
+      - 调用 `context.panels.register()` 注册面板
+      - 面板渲染当前 pane 的文件统计（调用 `window.tabula.*` IPC）
+      - 订阅 pane 切换事件，刷新统计
+
+      **技术约束:**
+      - 插件代码只能使用 ExtensionContext API，不直接 require('fs')
+      - 插件是 ESM 模块
+
+      **完成后:**
+      - 写 `deliverable.md` 到 `C:\Users\admin\.mavis\plans\plan_p6_v2\outputs\p6-sample-ext\deliverable.md`
+    assigned_to: developer
+    depends_on: [p6-ext-host]
+    verified_by: verifier
+    verify_prompt: |
+      验证示例扩展：
+      1. pnpm typecheck 0 错误
+      2. pnpm build 0 错误
+      3. extensions/sample-file-stats/ 目录存在
+      4. package.json 有正确的 contributes.panels
+      5. 插件激活逻辑存在（register panels）
+      6. 无 regression
+    timeout_ms: 1800000
+    hang_alert_after_ms: 900000

@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'extensions/*'
+allowBuilds:
+  electron: true
+  esbuild: true
+onlyBuiltDependencies: '[electron, esbuild]'

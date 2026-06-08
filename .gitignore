@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+out/
+release/
+*.tsbuildinfo
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.eslintcache
+.parcel-cache/
+
+# Mavis daemon private state
+.mavis/
+
+# OpenCode workspace
+.opencode/
+.claude/
+
+# Local debug artifacts (build logs, pids, smoke-test output)
+.harness/*.log
+.harness/*.err
+.harness/*.out
+.harness/*.pid
+.harness/plans/
+.harness/*.log.*
+.harness/.verifier-*.log
+
+# Mavis team internal reports (worker/verifier deliverables)
+deliverable.md
+deliverable-*.md
+*.verifier.md
+.verifier-*.log

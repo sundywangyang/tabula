@@ -1,0 +1,142 @@
+/**
+ * UpdateNotification 样式
+ */
+
+.update-notif {
+  position: fixed;
+  top: calc(var(--titlebar-h, 32px) + 8px);
+  right: 16px;
+  z-index: 9999;
+  pointer-events: none;
+  animation: update-slide-in 220ms ease-out;
+}
+
+@keyframes update-slide-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.update-notif-card {
+  pointer-events: auto;
+  width: 360px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  position: relative;
+}
+
+.update-notif-icon {
+  font-size: 24px;
+  line-height: 1;
+  color: var(--accent);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.update-notif-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-notif-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+
+.update-notif-notes {
+  font-size: 12px;
+  color: var(--fg-secondary);
+  line-height: 1.5;
+  max-height: 80px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-overlay);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.update-notif-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-overlay);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.update-notif-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #a855f7);
+  transition: width 0.2s ease;
+}
+
+.update-notif-meta {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.update-notif-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.update-notif-primary,
+.update-notif-secondary {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.update-notif-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.update-notif-primary:hover {
+  background: var(--accent-hover);
+}
+
+.update-notif-secondary {
+  background: transparent;
+  color: var(--fg-secondary);
+  border-color: var(--border);
+}
+
+.update-notif-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.update-notif-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.update-notif-close:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}

@@ -1,0 +1,75 @@
+/**
+ * 当前目录搜索栏样式
+ */
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border);
+  animation: search-bar-in 0.12s ease-out;
+}
+
+@keyframes search-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-bar-icon {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+  flex-shrink: 0;
+}
+
+.search-bar-input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  color: var(--fg-primary);
+  font-size: 12px;
+  padding: 3px 8px;
+  min-width: 0;
+}
+
+.search-bar-input:focus {
+  border-color: var(--accent);
+}
+
+.search-bar-input::placeholder {
+  color: var(--fg-tertiary);
+}
+
+.search-bar-clear {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  color: var(--fg-tertiary);
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+
+.search-bar-clear:hover {
+  background: var(--bg-active);
+  color: var(--fg-primary);
+}
+
+.search-bar-hint {
+  font-size: 10px;
+  color: var(--fg-tertiary);
+  flex-shrink: 0;
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@tabula/main",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tabula Electron main process",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tabula/bridge": "workspace:*",
+    "@tabula/core": "workspace:*",
+    "@tabula/ext-api": "workspace:*",
+    "electron-log": "^5.4.4",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.3"
+  }
+}

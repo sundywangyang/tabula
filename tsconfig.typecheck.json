@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "apps/*/src",
+    "apps/*/electron.vite.config.ts",
+    "packages/*/src",
+    "scripts/**/*.ts"
+  ]
+}

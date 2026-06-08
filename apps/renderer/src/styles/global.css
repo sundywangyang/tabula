@@ -1,0 +1,165 @@
+/**
+ * Tabula 全局样式
+ *
+ * 主题系统(P5):
+ * - :root 上没有 data-theme 时,默认为暗色(向后兼容)
+ * - :root[data-theme="dark"] 显式暗色
+ * - :root[data-theme="light"] 浅色
+ * - --accent 由 theme-store 运行时注入(document.documentElement.style.setProperty)
+ * - 切换通过 data-theme 替换 → 整页 CSS 变量重新解析,无 reload
+ */
+
+:root {
+  /* 字体 / 尺寸 (主题无关) */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable', 'Segoe UI',
+    system-ui, 'Microsoft YaHei', '微软雅黑', sans-serif;
+  --font-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --titlebar-h: 32px;
+  --statusbar-h: 24px;
+  --sidebar-w: 220px;
+  --breadcrumb-h: 36px;
+
+  /* 默认重点色;theme-store hydrate 后会用 setProperty 覆盖 */
+  --accent: #6366f1;
+
+  color-scheme: dark;
+}
+
+/* =================== 暗色主题(默认 + 显式 dark)=================== */
+:root,
+:root[data-theme='dark'] {
+  --bg-base: #1a1a1f;
+  --bg-elevated: #22232a;
+  --bg-overlay: #2a2c34;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+
+  --fg-primary: #e6e6ec;
+  --fg-secondary: #a8a8b3;
+  --fg-tertiary: #6c6c78;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --accent-hover: #7c7ff5;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+/* =================== 浅色主题 =================== */
+:root[data-theme='light'] {
+  --bg-base: #fafafc;
+  --bg-elevated: #ffffff;
+  --bg-overlay: #f3f4f8;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.07);
+
+  --fg-primary: #1f1f24;
+  --fg-secondary: #5a5a66;
+  --fg-tertiary: #9090a0;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+
+  --accent-hover: #4f52d4;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --success: #059669;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 主题切换零闪烁:背景色过渡 */
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+input,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--fg-primary);
+  border-radius: var(--radius-sm);
+  outline: none;
+  padding: 4px 8px;
+}
+
+input:focus,
+textarea:focus {
+  border-color: var(--accent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}

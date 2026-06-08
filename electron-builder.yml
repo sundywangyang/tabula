@@ -1,0 +1,56 @@
+appId: com.tabula.files
+productName: Tabula
+copyright: Copyright (c) 2026 Tabula
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - 'out/**/*'
+  - 'package.json'
+  - '!**/*.{md,map,ts}'
+
+asarUnpack:
+  - 'resources/**'
+  - 'out/main/ext-host/**'
+  - 'out/preload/**'
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-Setup.${ext}
+  # 签名预留(P1 加上)
+  # certificateFile: ''
+  # certificatePassword: ''
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Tabula
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.productivity
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: FileManager
+  desktop:
+    Name: Tabula
+    Comment: A modern file manager for Windows, Mac, and Linux
+
+publish:
+  provider: github
+  releaseType: release

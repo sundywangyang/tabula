@@ -1,0 +1,95 @@
+/**
+ * PaneView(叶子节点)专属样式
+ *
+ * 包含:
+ * - TabBar(条)
+ * - pane-toolbar(面包屑)
+ * - Toolbar
+ * - pane-content(FileList)
+ * - P2 v2: 拖出新建窗口的虚线占位
+ */
+
+.pane-view .pane-toolbar {
+  height: var(--breadcrumb-h);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.pane-view .pane-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* =================== P2 v2: 拖动相关样式 =================== */
+
+/* tab-bar-wrap 用来挂 is-dragging 类,影响内部所有 chip */
+.tab-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pane-view.pane-drag-active {
+  /* 拖动期间,pane 自身不响应 click focus(FileList 已禁止 DnD 嵌套,
+     这里主要是视觉提示) */
+  cursor: default;
+}
+
+/* 拖出新建窗口虚线占位 */
+.pane-drop-zone {
+  position: absolute;
+  pointer-events: none; /* 不挡事件,让父 onDragOver/onDrop 处理 */
+  z-index: 50;
+  border: 2px dashed var(--accent);
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: drop-zone-pulse 1.2s ease-in-out infinite;
+}
+
+.pane-drop-zone-right {
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 100%;
+}
+
+.pane-drop-zone-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 80px;
+}
+
+.pane-drop-zone .drop-zone-label {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-base);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.pane-drop-zone-right .drop-zone-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  padding: 12px 6px;
+}
+
+.pane-drop-zone-bottom .drop-zone-label {
+  /* horizontal default */
+}
+
+@keyframes drop-zone-pulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}

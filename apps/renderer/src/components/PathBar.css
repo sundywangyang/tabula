@@ -1,0 +1,90 @@
+.path-bar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 60px;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+
+.path-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(720px, 90%);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.path-bar-prefix {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.path-bar-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--fg-primary);
+  font: inherit;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+  padding: 4px 0;
+  min-width: 0;
+}
+
+.path-bar-input::placeholder {
+  color: var(--fg-tertiary);
+}
+
+.path-bar-error {
+  color: var(--danger);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.path-bar-hint {
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.path-bar-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.path-bar-btn {
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-secondary);
+  font-size: 11px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.path-bar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.path-bar-btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.path-bar-btn-primary:hover {
+  background: var(--accent-hover);
+  color: white;
+}

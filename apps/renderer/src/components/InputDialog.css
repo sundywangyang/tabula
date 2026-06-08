@@ -1,0 +1,88 @@
+/* 输入对话框 (新建文件夹/文件) */
+.input-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 7000;
+  backdrop-filter: blur(2px);
+}
+
+.input-dialog {
+  width: min(440px, 90vw);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-dialog-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+
+.input-dialog-input {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  color: var(--fg-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.1s;
+}
+
+.input-dialog-input:focus {
+  border-color: var(--accent);
+}
+
+.input-dialog-warning {
+  color: var(--warning);
+  font-size: 11px;
+}
+
+.input-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.input-dialog-btn {
+  height: 30px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--fg-primary);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-strong);
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.input-dialog-btn:hover:not(:disabled) {
+  background: var(--bg-active);
+  border-color: var(--accent);
+}
+
+.input-dialog-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-dialog-btn-primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.input-dialog-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}

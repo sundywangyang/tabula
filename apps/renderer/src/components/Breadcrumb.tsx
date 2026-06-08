@@ -1,0 +1,82 @@
+/**
+ * 面包屑导航
+ * P3: 每个路径段作为拖放目标
+ */
+import { type DragEvent as ReactDragEvent } from 'react';
+import './Breadcrumb.css';
+import { useFileStore } from '../stores/file-store';
+import type { BreadcrumbSegment } from '../stores/file-store';
+
+export function Breadcrumb({
+  segments,
+  onNavigate,
+  onOpenPicker,
+}: {
+  segments: BreadcrumbSegment[];
+  onNavigate: (path: string) => void;
+  onOpenPicker: () => void;
+}) {
+  const dragState = useFileStore((s) => s.dragState);
+  const setDragTarget = useFileStore((s) => s.setDragTarget);
+  const endDrag = useFileStore((s) => s.endDrag);
+  const performBulk = useFileStore((s) => s.performBulk);
+
+  const handleSegDragOver = (e: ReactDragEvent<HTMLButtonElement>, targetPath: string) => {
+    if (!dragState) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const effect: 'move' | 'copy' = e.ctrlKey || e.metaKey ? 'copy' : 'move';
+    e.dataTransfer.dropEffect = effect;
+    setDragTarget(targetPath, 'breadcrumb', effect);
+  };
+
+  const handleSegDrop = async (e: ReactDragEvent<HTMLButtonElement>, targetPath: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const state = useFileStore.getState().dragState;
+    if (!state) {
+      endDrag();
+      return;
+    }
+    const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
+    await performBulk(state.paths, targetPath, mode);
+    endDrag();
+  };
+
+  return (
+    <div className="breadcrumb">
+      <button className="breadcrumb-picker" onClick={onOpenPicker} title="打开文件夹 (Ctrl+O)">
+        📁
+      </button>
+      <div className="breadcrumb-path">
+        {segments.length === 0 ? (
+          <span className="breadcrumb-empty">未选择目录</span>
+        ) : (
+          segments.map((seg, i) => {
+            const isOver =
+              dragState &&
+              dragState.targetKind === 'breadcrumb' &&
+              dragState.targetPath === seg.path;
+            return (
+              <span key={seg.path} className="breadcrumb-segment-wrap">
+                <button
+                  className={`breadcrumb-segment ${isOver ? 'drag-over' : ''}`}
+                  onClick={() => onNavigate(seg.path)}
+                  onDragOver={(e) => handleSegDragOver(e, seg.path)}
+                  onDragLeave={() =>
+                    setDragTarget(null, null, dragState?.effect ?? 'move')
+                  }
+                  onDrop={(e) => void handleSegDrop(e, seg.path)}
+                  title={seg.path}
+                >
+                  {seg.name}
+                </button>
+                {i < segments.length - 1 && <span className="breadcrumb-sep">›</span>}
+              </span>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}

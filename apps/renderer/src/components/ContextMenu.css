@@ -1,0 +1,108 @@
+/**
+ * 右键菜单样式
+ */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 180px;
+  max-width: 280px;
+  background: var(--bg-elevated, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  user-select: none;
+  animation: context-menu-appear 0.1s ease-out;
+}
+
+@keyframes context-menu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text, #333);
+  text-align: left;
+  transition: background-color 0.1s;
+}
+
+.context-menu-item:hover:not(.disabled) {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.context-menu-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.context-menu-item.danger {
+  color: #d32f2f;
+}
+
+.context-menu-item.danger:hover:not(.disabled) {
+  background: #ffebee;
+}
+
+.context-menu-icon {
+  width: 20px;
+  margin-right: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.context-menu-label {
+  flex: 1;
+}
+
+.context-menu-shortcut {
+  margin-left: 16px;
+  font-size: 11px;
+  color: var(--text-muted, #888);
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border, #e0e0e0);
+  margin: 4px 0;
+}
+
+/* Dark theme */
+:root[data-theme="dark"] .context-menu {
+  background: var(--bg-elevated, #2d2d2d);
+  border-color: var(--border, #444);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="dark"] .context-menu-item {
+  color: var(--text, #e0e0e0);
+}
+
+:root[data-theme="dark"] .context-menu-item:hover:not(.disabled) {
+  background: var(--bg-hover, #3d3d3d);
+}
+
+:root[data-theme="dark"] .context-menu-item.danger {
+  color: #ef5350;
+}
+
+:root[data-theme="dark"] .context-menu-item.danger:hover:not(.disabled) {
+  background: #3d2020;
+}
+
+:root[data-theme="dark"] .context-menu-divider {
+  background: var(--border, #444);
+}

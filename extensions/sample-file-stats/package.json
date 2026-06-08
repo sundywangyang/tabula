@@ -1,0 +1,22 @@
+{
+  "name": "sample-file-stats",
+  "displayName": "文件统计",
+  "version": "1.0.0",
+  "description": "示例扩展：在侧边栏面板显示当前目录的文件数量和大小统计",
+  "main": "./out/extension.js",
+  "engines": {
+    "app": "^1.0.0"
+  },
+  "activationEvents": ["onStartup"],
+  "contributes": {
+    "panels": [
+      {
+        "id": "sample-file-stats.panel",
+        "title": "文件统计",
+        "icon": "📊",
+        "location": "left"
+      }
+    ]
+  },
+  "keywords": ["tabula", "extension", "example", "file-stats"]
+}

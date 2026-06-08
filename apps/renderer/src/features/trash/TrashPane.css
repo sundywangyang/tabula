@@ -1,0 +1,201 @@
+.trash-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-base);
+  overflow: hidden;
+  outline: none;
+}
+
+/* 工具栏 */
+.trash-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.trash-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+
+.trash-count {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  margin-left: 4px;
+}
+
+.trash-toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.trash-refresh-btn,
+.trash-empty-btn {
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-overlay);
+  color: var(--fg-secondary);
+  transition: background 0.1s, color 0.1s;
+}
+
+.trash-refresh-btn:hover,
+.trash-empty-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.trash-empty-btn {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.trash-empty-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.trash-empty-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 表头 */
+.trash-header {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 26px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.trash-header .col-name { flex: 1; min-width: 120px; }
+.trash-header .col-size { width: 80px; text-align: right; }
+.trash-header .col-mtime { width: 140px; }
+.trash-header .col-orig-path { flex: 1; min-width: 100px; }
+
+/* 列表 */
+.trash-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.trash-row {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 28px;
+  cursor: default;
+  gap: 4px;
+  border-bottom: 1px solid transparent;
+  user-select: none;
+}
+
+.trash-row:hover {
+  background: var(--bg-hover);
+}
+
+.trash-row.selected {
+  background: var(--bg-active);
+}
+
+.trash-row .col-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.trash-row .col-size {
+  width: 80px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+}
+
+.trash-row .col-mtime {
+  width: 140px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+}
+
+.trash-row .col-orig-path {
+  flex: 1;
+  min-width: 100px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-unknown-path {
+  color: var(--fg-tertiary);
+  font-style: italic;
+}
+
+.row-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--fg-primary);
+}
+
+/* 空状态 */
+.trash-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--fg-tertiary);
+  font-size: 13px;
+}
+
+.trash-empty-icon {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+/* 加载/错误 */
+.trash-pane-loading,
+.trash-pane-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--fg-tertiary);
+  font-size: 13px;
+}
+
+.trash-retry-btn {
+  padding: 4px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-overlay);
+  color: var(--fg-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}

@@ -1,0 +1,342 @@
+/**
+ * 文件列表样式
+ * 支持 list / grid / details 三种视图模式
+ */
+.file-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: 12px;
+  outline: none;
+}
+
+.file-list:focus {
+  /* 让 focus 在视觉上不显眼(键盘导航靠 cursor 高亮) */
+}
+
+.file-list-header,
+.file-list-row {
+  display: grid;
+  grid-template-columns: 1fr 100px 160px 100px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+/* 详情视图:保持 4 列 */
+.file-list-details .file-list-header,
+.file-list-details .file-list-row {
+  grid-template-columns: 1fr 100px 160px 100px;
+}
+
+/* 列表视图:单列 */
+.file-list-list .file-list-header,
+.file-list-list .file-list-row.row-list {
+  grid-template-columns: 1fr;
+  padding: 0 12px;
+}
+
+.file-list-list .col-name-full {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list-header {
+  height: 28px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.file-list-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.file-list-body-virtual {
+  contain: layout style;
+  /* 注意: 之前 contain: strict 在某些 Electron 渲染层下会让 ResizeObserver 拿不到高度,
+     改回 layout style(只隔离 layout 和 style,不动 paint),virtualizer 正常工作。 */
+}
+
+.file-list-row {
+  height: 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: default;
+  color: var(--fg-primary);
+  outline: none;
+}
+
+.file-list-row:hover {
+  background: var(--bg-hover);
+}
+
+.file-list-row.selected {
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--fg-primary);
+}
+
+.file-list-row.cursor {
+  background: rgba(99, 102, 241, 0.32);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.file-list-row.selected.cursor {
+  background: rgba(99, 102, 241, 0.42);
+}
+
+.col {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-size,
+.col-mtime,
+.col-type {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-secondary);
+}
+
+.sort-header {
+  background: transparent;
+  border: none;
+  color: var(--fg-tertiary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  width: 100%;
+}
+
+.sort-header:hover {
+  color: var(--fg-primary);
+}
+
+.sort-header.sort-active {
+  color: var(--fg-primary);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.sort-arrow {
+  font-size: 9px;
+  color: var(--accent);
+}
+
+/* 网格视图 */
+.grid-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-view .file-list-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-cols, 4), 1fr);
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.grid-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: var(--radius-md);
+  cursor: default;
+  text-align: center;
+  min-height: 80px;
+  position: relative;
+  user-select: none;
+}
+
+.grid-cell:hover {
+  background: var(--bg-hover);
+}
+
+.grid-cell.selected {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.grid-cell.cursor {
+  background: rgba(99, 102, 241, 0.32);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.grid-cell.selected.cursor {
+  background: rgba(99, 102, 241, 0.42);
+}
+
+.grid-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.grid-name {
+  font-size: 11px;
+  color: var(--fg-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  padding: 0 4px;
+}
+
+/* 重命名输入 */
+.rename-input-wrap {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rename-input-wrap.grid {
+  width: 100%;
+}
+
+.rename-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-overlay);
+  border: 1px solid var(--accent);
+  color: var(--fg-primary);
+  font: inherit;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.rename-input-wrap.grid .rename-input {
+  font-size: 11px;
+  text-align: center;
+}
+
+.rename-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+/* 加载/空/错 */
+.file-list-loading,
+.file-list-empty,
+.file-list-error {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-tertiary);
+  gap: 12px;
+}
+
+/* ===== P3: 拖放 highlight ===== */
+.file-list-dropping {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: rgba(99, 102, 241, 0.06);
+  transition: background 0.1s, outline-color 0.1s;
+}
+
+.file-list-dropping.file-list-drop-noop {
+  outline-color: var(--fg-tertiary);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.file-list-empty-wrap {
+  cursor: default;
+}
+
+.drop-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--accent);
+  padding: 4px 10px;
+  background: rgba(99, 102, 241, 0.12);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--accent);
+}
+
+.file-list-loading {
+  font-size: 12px;
+}
+
+.empty-icon,
+.error-icon {
+  font-size: 36px;
+  opacity: 0.4;
+}
+
+.error-icon {
+  color: var(--danger);
+  opacity: 0.6;
+}
+
+.error-message {
+  color: var(--danger);
+  font-size: 12px;
+  max-width: 400px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
