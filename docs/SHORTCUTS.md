@@ -5,7 +5,7 @@
 
 ##简介
 
-Tabula 的所有命令都通过统一的 `commandId` 注册,内置26 个命令,**支持用户在「设置 →快捷键」中自定义绑定**(P7 v1 已实现)。本节列出所有内置命令的语义、默认绑定,以及 P2 v2 新增的 split-handle拖动手势与键盘步进。
+Tabula 的所有命令都通过统一的 `commandId` 注册,内置 35+ 个命令,**支持用户在「设置 →快捷键」中自定义绑定**(P7 v1 已实现)。本节列出所有内置命令的语义、默认绑定,以及 P2 v2 新增的 split-handle 拖动手势与键盘步进。
 
 快捷键的**优先级**:
 
@@ -24,9 +24,16 @@ Tabula 的所有命令都通过统一的 `commandId` 注册,内置26 个命令,*
 | 命令 ID | 默认绑定 |行为 |
 |---|---|---|
 | `file.open` | `Ctrl+O` / `Enter` | 在当前 pane打开选中文件或进入子目录 |
-| `file.delete` | `Delete` | 删除到回收站(若按住 `Shift` 则永久删除) |
+| `file.copy` | `Ctrl+C` | 复制选中项到剪贴板 |
+| `file.cut` | `Ctrl+X` | 剪切选中项到剪贴板 |
+| `file.paste` | `Ctrl+V` | 从剪贴板粘贴到当前目录 |
 | `file.rename` | `F2` | 进入内联重命名状态 |
-| `file.refresh` | `F5` |重新扫描当前目录(走 chokidar watch) |
+| `file.refresh` | `F5` | 重新扫描当前目录 |
+| `file.delete` | `Delete` | 删除到回收站 |
+| `file.delete-permanent` | `Shift+Delete` | 永久删除 |
+| `file.duplicate` | `Ctrl+D` | 复制到同级目录 |
+| `file.new-folder` | `Ctrl+Shift+N` | 在当前目录新建文件夹 |
+| `file.select-all` | `Ctrl+A` | 全选 |
 
 ###标签(`tabs.*`)
 
@@ -161,4 +168,4 @@ Renderer: Zustand keybindingStore重新解析 →重新注册 DOM keydown listen
 
 ---
 
-> 本文档随 P2 v2 与 P7 v1 同时落地;后续新增命令时请同步更新本文件 + `apps/bridge/src/api.ts`。
+> 本文档随 P2 v2 与 P7 v1 同时落地;P3 文件操作补全后同步更新了 file.* 节(P3 完成)。后续新增命令时请同步更新本文件 + `apps/bridge/src/api.ts`。

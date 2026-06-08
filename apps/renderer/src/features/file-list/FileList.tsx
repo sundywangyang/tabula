@@ -274,6 +274,12 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         void refresh(paneId);
         return;
       }
+      // Ctrl+Shift+N 新建文件夹
+      if (isMeta && e.shiftKey && !e.altKey && (path === 'n' || path === 'N')) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('tabula:new-folder', { detail: { paneId } }));
+        return;
+      }
       // Delete / Shift+Delete (前者走回收站;后者真删,P3 简化为都走回收站)
       if (path === 'Delete' || (e.shiftKey && (path === 'Delete' || path === 'Del'))) {
         e.preventDefault();
