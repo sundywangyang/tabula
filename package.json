@@ -10,11 +10,11 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build && node scripts/build-ext-host.cjs",
+    "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
-    "package": "electron-vite build && node scripts/build-ext-host.cjs && electron-builder",
-    "package:dir": "electron-vite build && node scripts/build-ext-host.cjs && electron-builder --dir"
+    "package": "electron-vite build && electron-builder",
+    "package:dir": "electron-vite build && electron-builder --dir"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
