@@ -2,7 +2,7 @@
 
 > 状态: **v1 方案已确认,功能实现 100%(P0~P7)**
 > 决策日期: 2026-06-05
-> 最后更新: 2026-06-08(P2 v2 split-handle 拖动 + P7 v1 快捷键自定义 UI 落地,所有阶段完成)
+> 最后更新: 2026-06-08(P2 v2 split-handle 拖动 + P7 v1 快捷键自定义 UI 落地,P3 文件操作补完,所有阶段代码实现完毕)
 > 工作区: `C:\Users\admin\Desktop\WorkSpaces\MinimaxWS\Beta`
 
 ---
