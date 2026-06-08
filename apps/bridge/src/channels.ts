@@ -64,6 +64,7 @@ export const IpcChannels = {
   EXT_INSTALL: 'ext:install',
   EXT_UNINSTALL: 'ext:uninstall',
   EXT_INVOKE_COMMAND: 'ext:invoke-command',
+  EXT_GET_PANELS: 'ext:get-panels',
 
   // 配置
   CFG_GET: 'cfg:get',

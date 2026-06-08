@@ -40,7 +40,7 @@ const LANG_OPTIONS: { value: Language; label: string }[] = [
   { value: 'en-US', label: 'English' },
 ];
 
-type TabId = 'appearance' | 'filelist' | 'operations' | 'language' | 'shortcuts' | 'about';
+type TabId = 'appearance' | 'filelist' | 'operations' | 'language' | 'shortcuts' | 'extensions' | 'about';
 
 interface TabDef {
   id: TabId;
@@ -54,6 +54,7 @@ const TABS: TabDef[] = [
   { id: 'operations', label: '操作', icon: '⚡' },
   { id: 'language', label: '语言', icon: '🌐' },
   { id: 'shortcuts', label: '快捷键', icon: '⌨' },
+  { id: 'extensions', label: '扩展', icon: '🔌' },
   { id: 'about', label: '关于', icon: 'ℹ' },
 ];
 
@@ -318,6 +319,12 @@ export function Settings({ onClose }: SettingsProps) {
 
             {activeTab === 'shortcuts' && <Shortcuts />}
 
+            {activeTab === 'extensions' && (
+              <SettingsSection title="扩展">
+                <ExtensionManager />
+              </SettingsSection>
+            )}
+
             {activeTab === 'about' && (
               <SettingsSection title="关于 & 诊断">
                 <div className="settings-row">
@@ -381,6 +388,80 @@ export function Settings({ onClose }: SettingsProps) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** P6 v1:扩展管理组件 */
+function ExtensionManager() {
+  const [extensions, setExtensions] = useState<
+    Array<{ id: string; name: string; displayName: string; version: string; description?: string; builtin: boolean; enabled: boolean }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const list = await window.tabula.extensions.list();
+        if (!cancelled) setExtensions(list);
+      } catch (e) {
+        if (!cancelled) setError(String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await window.tabula.extensions.enable(id);
+      } else {
+        await window.tabula.extensions.disable(id);
+      }
+      setExtensions((prev) =>
+        prev.map((ext) => (ext.id === id ? { ...ext, enabled } : ext)),
+      );
+    } catch (e) {
+      console.warn('[ExtensionManager] toggle failed', e);
+    }
+  }, []);
+
+  if (loading) return <div className="settings-loading">加载中…</div>;
+  if (error) return <div className="settings-error">{error}</div>;
+  if (extensions.length === 0) {
+    return <div className="settings-empty">暂未安装任何扩展</div>;
+  }
+
+  return (
+    <div className="settings-extension-list">
+      {extensions.map((ext) => (
+        <div key={ext.id} className="settings-extension-item">
+          <div className="settings-extension-info">
+            <div className="settings-extension-name">
+              {ext.displayName || ext.name}
+              {ext.builtin && <span className="settings-extensionBuiltin">内置</span>}
+            </div>
+            <div className="settings-extension-desc">{ext.description ?? ext.id}</div>
+            <div className="settings-extension-meta">v{ext.version}</div>
+          </div>
+          <div className="settings-extension-actions">
+            <button
+              className={`settings-toggle ${ext.enabled ? 'on' : 'off'}`}
+              role="switch"
+              aria-checked={ext.enabled}
+              onClick={() => handleToggle(ext.id, !ext.enabled)}
+              title={ext.enabled ? '禁用' : '启用'}
+            >
+              <span className="settings-toggle-thumb" />
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

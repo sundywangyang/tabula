@@ -8,6 +8,7 @@ import type {
   DownloadProgress,
   DriveInfo,
   ExtensionManifest,
+  ExtensionPanel,
   FileTypeFilter,
   FsEntry,
   KeyCombo,
@@ -162,6 +163,7 @@ export interface TabulaAPI {
     install(path: string): Promise<Result<ExtensionManifest>>;
     uninstall(id: string): Promise<void>;
     invokeCommand(command: string, ...args: unknown[]): Promise<unknown>;
+    getPanels(): Promise<ExtensionPanel[]>;
   };
 
   // 配置

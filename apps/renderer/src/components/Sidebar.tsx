@@ -377,6 +377,9 @@ export function Sidebar({
         </div>
       )}
 
+      {/* P6 v1:扩展面板 — 渲染扩展注册的面板入口 */}
+      <ExtensionPanels />
+
       {/* 右键菜单(自定义渲染,不走浏览器默认) */}
       {ctxMenu && (
         <div
@@ -449,5 +452,51 @@ export function Sidebar({
         </div>
       )}
     </aside>
+  );
+}
+
+/** P6 v1:扩展面板入口 — 渲染扩展注册到侧边栏的面板 */
+function ExtensionPanels() {
+  const [panels, setPanels] = useState<
+    Array<{ id: string; extensionId: string; title: string; icon?: string; location: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const list = await window.tabula.extensions.getPanels();
+        if (!cancelled) setPanels(list);
+      } catch (e) {
+        console.warn('[ExtensionPanels] getPanels failed', e);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (panels.length === 0) return null;
+
+  return (
+    <div className="sidebar-section">
+      <div className="sidebar-header-row">
+        <span className="sidebar-header">扩展</span>
+      </div>
+      {panels.map((panel) => (
+        <button
+          key={panel.id}
+          className="sidebar-item"
+          onClick={() => {
+            // 触发扩展面板命令: <extId>.<panelId>
+            const cmd = `${panel.extensionId}.${panel.id}`;
+            void window.tabula.extensions.invokeCommand(cmd);
+          }}
+          title={`${panel.title} (${panel.extensionId})`}
+        >
+          <span className="sidebar-icon">{panel.icon ?? '🔌'}</span>
+          <span className="sidebar-name">{panel.title}</span>
+        </button>
+      ))}
+    </div>
   );
 }

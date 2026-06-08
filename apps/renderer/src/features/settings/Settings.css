@@ -412,3 +412,67 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* P6 v1: 扩展管理 */
+.settings-extension-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-extension-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-overlay);
+}
+.settings-extension-info {
+  flex: 1;
+  min-width: 0;
+}
+.settings-extension-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-extensionBuiltin {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: white;
+  font-weight: 500;
+}
+.settings-extension-desc {
+  font-size: 12px;
+  color: var(--fg-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-extension-meta {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  margin-top: 2px;
+}
+.settings-empty {
+  color: var(--fg-secondary);
+  font-size: 13px;
+  padding: 12px 0;
+}
+.settings-loading {
+  color: var(--fg-secondary);
+  font-size: 13px;
+  padding: 12px 0;
+}
+.settings-error {
+  color: var(--error);
+  font-size: 13px;
+  padding: 12px 0;
+}

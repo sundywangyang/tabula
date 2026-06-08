@@ -179,6 +179,7 @@ const api: TabulaAPI = {
     install: (path) => ipcRenderer.invoke(IpcChannels.EXT_INSTALL, path),
     uninstall: (id) => ipcRenderer.invoke(IpcChannels.EXT_UNINSTALL, id),
     invokeCommand: (cmd, ...args) => ipcRenderer.invoke(IpcChannels.EXT_INVOKE_COMMAND, cmd, args),
+    getPanels: () => ipcRenderer.invoke(IpcChannels.EXT_GET_PANELS),
   },
 
   config: {

@@ -208,6 +208,15 @@ export interface ExtensionManifest {
   builtin: boolean;
 }
 
+/** 运行时扩展面板(注册到侧边栏) */
+export interface ExtensionPanel {
+  id: string;
+  extensionId: string;
+  title: string;
+  icon?: string;
+  location: 'left' | 'right' | 'bottom';
+}
+
 export interface ExtensionContributions {
   commands?: CommandContribution[];
   panels?: PanelContribution[];

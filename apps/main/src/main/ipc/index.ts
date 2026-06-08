@@ -167,6 +167,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
   ipcMain.handle(IpcChannels.EXT_INVOKE_COMMAND, async (_e, command: string, args: unknown[]) => {
     return extensionHost.invokeCommand(command, ...(args ?? []));
   });
+  ipcMain.handle(IpcChannels.EXT_GET_PANELS, () => extensionHost.getRegisteredPanels());
 
   // =================== Config ===================
   ipcMain.handle(IpcChannels.CFG_GET, (_e, key: keyof AppConfig) => getConfig(key));
