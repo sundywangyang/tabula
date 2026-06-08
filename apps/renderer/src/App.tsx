@@ -25,7 +25,7 @@ import { UpdateNotification } from './features/update/UpdateNotification';
 import { useFileStore } from './stores/file-store';
 import { useLayoutStore } from './stores/layout-store';
 import { useFavoritesStore } from './stores/favorites-store';
-import { useThemeStore } from './stores/theme-store';
+import { useThemeStore, type ThemeMode } from './stores/theme-store';
 import { useSettingsStore } from './stores/settings-store';
 import { useKeymapStore } from './stores/keymap-store';
 import { makeFolderTab } from './stores/file-store';
@@ -473,6 +473,24 @@ export function App() {
       if (isMeta && !isAlt && !isShift && (key === 'v' || key === 'V')) {
         e.preventDefault();
         void pasteToPane(activePaneId);
+        return;
+      }
+
+      // P5: Ctrl+Shift+T 切换主题(ligh/dark/system 循环)
+      if (isMeta && !isAlt && isShift && (key === 't' || key === 'T')) {
+        e.preventDefault();
+        const modes: ThemeMode[] = ['light', 'dark', 'system'];
+        const cur = useThemeStore.getState().mode;
+        const next = modes[(modes.indexOf(cur) + 1) % modes.length];
+        useThemeStore.getState().setMode(next);
+        useSettingsStore.getState().setTheme(next);
+        return;
+      }
+
+      // P7: Ctrl+Shift+I 打开开发者工具
+      if (isMeta && !isAlt && isShift && (key === 'i' || key === 'I')) {
+        e.preventDefault();
+        void window.tabula.app.openDevTools();
         return;
       }
 
