@@ -9,6 +9,7 @@
  */
 import { useFileStore, type ViewMode } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useLayoutStore } from '../stores/layout-store';
 import './Toolbar.css';
 
 const VIEW_MODES: { mode: ViewMode; icon: string; label: string }[] = [
@@ -195,6 +196,31 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <span className="toolbar-icon">{m.icon}</span>
           </button>
         ))}
+      </div>
+
+      <div className="toolbar-divider" />
+
+      {/* P2 v2: 分屏 — 左/右 / 上/下 */}
+      <div className="toolbar-group">
+        <button
+          className="toolbar-btn"
+          onClick={() => {
+            useLayoutStore.getState().pane.splitPane(paneId, 'horizontal');
+          }}
+          title="左右分屏 (Ctrl+\\)"
+        >
+          <span className="toolbar-icon">◫</span>
+          <span className="toolbar-label">分屏</span>
+        </button>
+        <button
+          className="toolbar-btn"
+          onClick={() => {
+            useLayoutStore.getState().pane.splitPane(paneId, 'vertical');
+          }}
+          title="上下分屏 (Ctrl+Shift+\\)"
+        >
+          <span className="toolbar-icon">▭</span>
+        </button>
       </div>
 
       <div className="toolbar-divider" />

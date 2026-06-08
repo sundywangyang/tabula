@@ -24,6 +24,8 @@
  *   pane.replaceTabPath(paneId, tabId, path)  — 改 tab.path/title(用于双击进入)
  *   pane.reorderTabs(paneId, fromIndex, toIndex)  — P2 v2 同 pane 内重排
  *   pane.moveTab(fromPaneId, fromTabId, toPaneId, toIndex)  — P2 v2 跨 pane 移动
+ *   pane.setSplitSizes(splitNodeId, delta, totalPx)  — P2 v2 split-handle 拖动调整
+ *   pane.resetSplitSizes(splitNodeId)  — P2 v2 收尾:双击 split-handle 重置为 50/50
  *   tabDrag.start / setDropTarget / setDropEdge / end
  */
 import { create } from 'zustand';
@@ -91,6 +93,22 @@ interface LayoutStore {
       toPaneId: string,
       toIndex: number,
     ): void;
+    /**
+     * 调整 split 节点中相邻两个 child 的 size 比例。
+     * - splitNodeId: 唯一的 split 节点 id
+     * - delta: 拖动 split-handle 算出的"前一个 child 增减的 px 数"
+     *   正数 = 第一个 child 变大(horizontal 时左变宽,vertical 时上变高)
+     * - totalPx: split 容器在拖动方向的总尺寸(px)
+     *  - sizes 数组保持原 length,百分比按 px 换算
+     *  - 任意 child 不会小于 MIN_SIZE(20),不会大于 (totalPx - MIN_SIZE)
+     */
+    setSplitSizes(splitNodeId: string, delta: number, totalPx: number): void;
+    /**
+     * P2 v2 收尾:把指定 split 节点的 sizes 强制重置为等比。
+     * - 前两个 child 强制 50/50,后续 child 保持原样(应对 N 路 split 罕见 case)
+     * - 由 split-handle 的 onDoubleClick 触发(用户期望"双击恢复默认")
+     */
+    resetSplitSizes(splitNodeId: string): void;
   };
 
   /** P2 v2: tab 拖动状态机 */
@@ -307,7 +325,9 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         const all = (await (window.tabula.config.all as any)()) as Record<string, unknown>;
         const data = all[PERSIST_KEY] as PersistedLayout | undefined;
         if (data && data.rootLayout && data.activePaneId) {
-          set({ rootLayout: data.rootLayout, activePaneId: data.activePaneId, hydrated: true });
+          // P2 v2: 老持久化数据的 split 节点没有 id,这里回填,避免 setSplitSizes 找不到节点
+          const rootLayout = ensureSplitIds(data.rootLayout);
+          set({ rootLayout, activePaneId: data.activePaneId, hydrated: true });
         } else {
           set({ hydrated: true });
         }
@@ -417,6 +437,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         // 新 split 节点,等分
         const splitNode: LayoutNode = {
           type: 'split',
+          id: makeSplitId(),
           dir,
           sizes: [50, 50],
           children:
@@ -699,6 +720,50 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           void useFileStore.getState().loadDir(toPaneId, inserted.path);
         }
       },
+
+      /**
+       * P2 v2: 调整 split 节点中相邻两个 child 的 size 比例。
+       * 由 SplitView 的 split-handle 拖动时调用。
+       * - splitNodeId: split 节点 id(从 LayoutNode.id 读取)
+       * - delta: 拖动 dx(horizontal) 或 dy(vertical),正数=第一个 child 变大
+       * - totalPx: split 容器在拖动方向的总尺寸
+       */
+      setSplitSizes: (splitNodeId, delta, totalPx) => {
+        if (totalPx <= 0) return;
+        const MIN_SIZE = 60; // 60px 最小可视尺寸
+        const minPct = (MIN_SIZE / totalPx) * 100;
+        const newRoot = mapSplitById(get().rootLayout, splitNodeId, (s) => {
+          if (s.children.length < 2) return s;
+          const oldFirst = s.sizes[0] ?? 50;
+          const deltaPct = (delta / totalPx) * 100;
+          let newFirst = oldFirst + deltaPct;
+          newFirst = Math.max(minPct, Math.min(100 - minPct, newFirst));
+          const newSecond = 100 - newFirst;
+          return {
+            ...s,
+            sizes: [newFirst, newSecond, ...s.sizes.slice(2)],
+          };
+        });
+        if (newRoot !== get().rootLayout) {
+          setState({ rootLayout: newRoot });
+        }
+      },
+
+      /**
+       * P2 v2 收尾:把指定 split 节点重置为 [50, 50, ...sizes.slice(2)]。
+       * - mapSplitById 走的是 immutable 替换,没找到 id 时直接返回原树,
+       *   所以这一行只在 split 节点真存在时才会改 layout。
+       */
+      resetSplitSizes: (splitNodeId) => {
+        if (!splitNodeId) return;
+        const newRoot = mapSplitById(get().rootLayout, splitNodeId, (s) => ({
+          ...s,
+          sizes: [50, 50, ...s.sizes.slice(2)],
+        }));
+        if (newRoot !== get().rootLayout) {
+          setState({ rootLayout: newRoot });
+        }
+      },
     },
 
     // ============ P2 v2: tab 拖动状态机 ============
@@ -801,4 +866,41 @@ function basenameOf(p: string): string {
   if (!p) return '';
   const m = p.match(/[^\\/]+$/);
   return m ? m[0] : '';
+}
+
+// =================== P2 v2: split 节点 id 工具 ===================
+
+/** 生成唯一 split 节点 id(给 splitPane 用) */
+export function makeSplitId(): string {
+  return `split-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+}
+
+/** 给定 LayoutNode,缺失的 split.id 用 makeSplitId() 回填,返回新树 */
+export function ensureSplitIds(node: LayoutNode): LayoutNode {
+  if (node.type === 'pane') return node;
+  const id = node.id ?? makeSplitId();
+  return {
+    type: 'split',
+    id,
+    dir: node.dir,
+    sizes: [...node.sizes],
+    children: node.children.map(ensureSplitIds),
+  };
+}
+
+/** 在树里 immutable 替换指定 id 的 split 节点 */
+function mapSplitById(
+  node: LayoutNode,
+  splitNodeId: string,
+  fn: (s: Extract<LayoutNode, { type: 'split' }>) => LayoutNode,
+): LayoutNode {
+  if (node.type === 'pane') return node;
+  if (node.id === splitNodeId) return fn(node);
+  return {
+    type: 'split',
+    id: node.id ?? makeSplitId(),
+    dir: node.dir,
+    sizes: [...node.sizes],
+    children: node.children.map((c) => mapSplitById(c, splitNodeId, fn)),
+  };
 }

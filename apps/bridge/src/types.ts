@@ -145,6 +145,9 @@ export interface Tab {
 export type LayoutNode =
   | {
       type: 'split';
+      /** P2 v2: 唯一 id,用于 split-handle 拖动时定位节点做 setSplitSizes。
+       *  旧版 (P0/P1 早期) 持久化数据可能没有 id,hydrate 时用 makeSplitId() 回填。 */
+      id?: string;
       dir: 'horizontal' | 'vertical';
       sizes: number[];   // 0-100, 比例
       children: LayoutNode[];

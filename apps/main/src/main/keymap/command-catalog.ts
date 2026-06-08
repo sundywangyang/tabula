@@ -355,6 +355,38 @@ export const COMMAND_CATALOG: CommandSpec[] = [
     description: '焦点切到右侧 pane',
     reserved: false,
   },
+  {
+    id: 'pane.resize-left',
+    title: '窗格缩小(向左)',
+    category: '窗格',
+    defaultCombo: parseKeyCombo('Alt+ArrowLeft'),
+    description: '把焦点 pane 所在 split 的相邻左/上 child 变小 20px',
+    reserved: false,
+  },
+  {
+    id: 'pane.resize-right',
+    title: '窗格扩大(向右)',
+    category: '窗格',
+    defaultCombo: parseKeyCombo('Alt+ArrowRight'),
+    description: '把焦点 pane 所在 split 的相邻左/上 child 变大 20px(右/下随之变窄)',
+    reserved: false,
+  },
+  {
+    id: 'pane.resize-up',
+    title: '窗格缩小(向上)',
+    category: '窗格',
+    defaultCombo: parseKeyCombo('Alt+ArrowUp'),
+    description: '纵向 split:让上方 child 变小 20px',
+    reserved: false,
+  },
+  {
+    id: 'pane.resize-down',
+    title: '窗格扩大(向下)',
+    category: '窗格',
+    defaultCombo: parseKeyCombo('Alt+ArrowDown'),
+    description: '纵向 split:让上方 child 变大 20px(下方随之变窄)',
+    reserved: false,
+  },
   // 视图 / 搜索
   {
     id: 'search.global',

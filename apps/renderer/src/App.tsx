@@ -405,6 +405,35 @@ export function App() {
         }
       }
 
+      // P2 v2 收口:Alt+方向键(单独按 Alt)调整 split 大小,步长 20px。
+      // - 命中方向后,沿 layout 树找焦点 pane 的最近祖先 split 节点;
+      // - 从 DOM 上的 [data-split-id] 读取容器实际 px 尺寸,调 setSplitSizes。
+      // - setSplitSizes 内部已有 MIN_SIZE=60 的 clamp 逻辑,这里只传 px delta。
+      if (isAlt && !isMeta && !isShift) {
+        let dir: 'left' | 'right' | 'up' | 'down' | null = null;
+        if (key === 'ArrowLeft') dir = 'left';
+        else if (key === 'ArrowRight') dir = 'right';
+        else if (key === 'ArrowUp') dir = 'up';
+        else if (key === 'ArrowDown') dir = 'down';
+        if (dir) {
+          e.preventDefault();
+          const layout = useLayoutStore.getState().rootLayout;
+          const split = findClosestSplitAncestor(layout, activePaneId);
+          if (!split || !split.id) return;
+          // 方向轴与 split 轴一致才允许调;否则不响应
+          const wantAxis = dir === 'left' || dir === 'right' ? 'horizontal' : 'vertical';
+          if (split.dir !== wantAxis) return;
+          const el = document.querySelector<HTMLElement>(`[data-split-id="${split.id}"]`);
+          if (!el) return;
+          const rect = el.getBoundingClientRect();
+          const totalPx = split.dir === 'horizontal' ? rect.width : rect.height;
+          // 左/上:第一个 child 变小(负 delta);右/下:第一个 child 变大(正 delta)
+          const sign = dir === 'left' || dir === 'up' ? -1 : 1;
+          useLayoutStore.getState().pane.setSplitSizes(split.id, sign * 20, totalPx);
+          return;
+        }
+      }
+
       // P4: Ctrl+P 全局搜索(在任意位置打开)
       if (isMeta && !isAlt && !isShift && (key === 'p' || key === 'P')) {
         e.preventDefault();
@@ -698,6 +727,30 @@ function findNeighborPane(
   else targetIdx = idx + 1;
   if (targetIdx < 0 || targetIdx >= root.children.length) return null;
   return findFirstPane(root.children[targetIdx]!);
+}
+
+/**
+ * 找焦点 pane 的「最近 split 祖先」(直接父节点就是 split 时返回,否则继续往上)。
+ * - 顶层就是单个 pane 时返回 null(没有可调的 split 容器)
+ * - 用于 Alt+方向键 调整 split 大小
+ */
+function findClosestSplitAncestor(
+  root: LayoutNode,
+  paneId: string,
+): Extract<LayoutNode, { type: 'split' }> | null {
+  if (root.type === 'pane') return null;
+  // 直接子节点里包含 paneId → 当前 root 就是最近 split 祖先
+  const directHit = root.children.some(
+    (c) => c.type === 'pane' && c.id === paneId,
+  );
+  if (directHit) return root;
+  // 否则递归到每个 child 子树
+  for (const c of root.children) {
+    if (c.type === 'pane') continue;
+    const r = findClosestSplitAncestor(c, paneId);
+    if (r) return r;
+  }
+  return null;
 }
 
 /** 工具:取父路径 */

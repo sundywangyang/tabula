@@ -5,6 +5,14 @@
  * 启动时由 App.tsx 调用 hydrate() 拉取,设置页变更时由 setBinding / resetAll 触发刷新。
  *
  * 不持久化:数据本身由主进程 electron-store 负责。
+ *
+ * 命令注册表的位置:
+ * - 真正的 `CommandSpec[]` 定义在 `apps/main/src/main/keymap/command-catalog.ts`。
+ *   渲染端不存源(避免双向漂移),而是经由 IPC `window.tabula.shortcuts.getAll()`
+ *   拉主进程的 COMMAND_CATALOG,hydrate() 时把 `commands` 数组填上。
+ * - 用户在设置页改了绑定,只改主进程 electron-store,本 store 只缓存当前快照。
+ * - 因此要新增内置命令(如 P2 v2 的 `pane.resize-*`),只需在 main 进程
+ *   command-catalog.ts 的 COMMAND_CATALOG 里追加;无需(也不应)在这里硬编码。
  */
 import { create } from 'zustand';
 import type { CommandSpec, KeyCombo, ShortcutBinding } from '@tabula/bridge';
