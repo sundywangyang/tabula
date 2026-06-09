@@ -403,7 +403,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           const tab = p.tabs[idx];
           if (tab.pinned) return p;
           const newTabs = [...p.tabs];
-          newTabs[idx] = { ...tab, pinned: true };
+          newTabs[idx] = { ...tab, pinned: true, closable: false };
           return { ...p, tabs: newTabs };
         });
         setState({ rootLayout: newRoot });
@@ -416,7 +416,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           const tab = p.tabs[idx];
           if (!tab.pinned) return p;
           const newTabs = [...p.tabs];
-          newTabs[idx] = { ...tab, pinned: false };
+          newTabs[idx] = { ...tab, pinned: false, closable: true };
           return { ...p, tabs: newTabs };
         });
         setState({ rootLayout: newRoot });
