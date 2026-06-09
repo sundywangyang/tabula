@@ -65,13 +65,13 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
   // P3: 文件操作按钮
   const selectedPaths = useFileStore((s) => s.panes[paneId]?.selectedPaths ?? new Set<string>());
+  const hasSelection = selectedPaths.size > 0;
   const clipboard = useFileStore((s) => s.clipboard);
   const copySelected = useFileStore((s) => s.copySelected);
   const cutSelected = useFileStore((s) => s.cutSelected);
   const pasteToPane = useFileStore((s) => s.pasteToPane);
   const beginRename = useFileStore((s) => s.beginRename);
   const cursorPath = useFileStore((s) => s.panes[paneId]?.cursorPath ?? null);
-  const hasSelection = selectedPaths.size > 0;
   const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
 
   const handleCopy = () => copySelected(paneId);

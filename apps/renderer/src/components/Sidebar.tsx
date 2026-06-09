@@ -103,7 +103,7 @@ export function Sidebar({
   }, [ctxMenu]);
 
   const handleItemDragOver = (
-    e: ReactDragEvent<HTMLButtonElement>,
+    e: ReactDragEvent<HTMLElement>,
     targetPath: string,
   ) => {
     if (!dragState || !targetPath) return;
@@ -115,7 +115,7 @@ export function Sidebar({
   };
 
   const handleItemDrop = async (
-    e: ReactDragEvent<HTMLButtonElement>,
+    e: ReactDragEvent<HTMLElement>,
     targetPath: string,
   ) => {
     e.preventDefault();
@@ -187,7 +187,7 @@ export function Sidebar({
               dragState.targetPath === f.path;
             const isRenaming = renamingPath === f.path;
             return (
-              <button
+              <div
                 key={f.id}
                 className={`sidebar-item ${currentPath === f.path ? 'active' : ''} ${
                   isOver ? 'drag-over' : ''
@@ -198,6 +198,9 @@ export function Sidebar({
                 onDragLeave={() => setDragTarget(null, null, dragState?.effect ?? 'move')}
                 onDrop={(e) => void handleItemDrop(e, f.path)}
                 title={f.path}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') onOpenPath(f.path); }}
               >
                 <span className="sidebar-icon">★</span>
                 {isRenaming ? (
@@ -228,7 +231,7 @@ export function Sidebar({
                 >
                   ✕
                 </button>
-              </button>
+              </div>
             );
           })
         )}
@@ -376,9 +379,9 @@ export function Sidebar({
                 : ''
             }`}
             title={currentPath}
-            onDragOver={(e) => handleItemDragOver(e as unknown as ReactDragEvent<HTMLButtonElement>, currentPath)}
+            onDragOver={(e) => handleItemDragOver(e, currentPath)}
             onDragLeave={() => setDragTarget(null, null, dragState?.effect ?? 'move')}
-            onDrop={(e) => void handleItemDrop(e as unknown as ReactDragEvent<HTMLButtonElement>, currentPath)}
+            onDrop={(e) => void handleItemDrop(e, currentPath)}
           >
             {currentPath}
           </div>
