@@ -24,7 +24,10 @@ const TEXT_TRUNCATE_LINES = 100;
 // 图片超过此大小直接拒绝(避免一次性载入大图片卡死)
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
-const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp']);
+const IMAGE_EXTS = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp',
+  '.ico', '.heic', '.avif', '.tiff', '.tif', '.psd', '.raw',
+]);
 const MARKDOWN_EXTS = new Set(['.md', '.markdown']);
 const CODE_EXTS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json',
@@ -367,6 +370,19 @@ function mimeFromExt(ext: string): string {
       return 'image/svg+xml';
     case '.bmp':
       return 'image/bmp';
+    case '.ico':
+      return 'image/x-icon';
+    case '.heic':
+      return 'image/heic';
+    case '.avif':
+      return 'image/avif';
+    case '.tiff':
+    case '.tif':
+      return 'image/tiff';
+    case '.psd':
+      return 'image/vnd.adobe.photoshop';
+    case '.raw':
+      return 'image/raw';
     default:
       return 'application/octet-stream';
   }
