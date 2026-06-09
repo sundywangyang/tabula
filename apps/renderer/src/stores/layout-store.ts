@@ -33,15 +33,15 @@ import type { LayoutNode, SplitDirection, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from './file-store';
 
 function makeEmptyTab(): Tab {
-  const def = defaultPath();
+  const rootPath = 'C:\\';
   return {
     id: `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     type: 'folder',
-    path: def,
+    path: rootPath,
     title: '新标签',
     pinned: false,
     closable: true,
-    history: [def],
+    history: [rootPath],
     historyIndex: 0,
   };
 }
