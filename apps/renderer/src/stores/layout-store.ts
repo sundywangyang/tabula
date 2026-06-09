@@ -32,6 +32,20 @@ import { create } from 'zustand';
 import type { LayoutNode, SplitDirection, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from './file-store';
 
+function makeEmptyTab(): Tab {
+  const def = defaultPath();
+  return {
+    id: `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    type: 'folder',
+    path: def,
+    title: '新标签',
+    pinned: false,
+    closable: true,
+    history: [def],
+    historyIndex: 0,
+  };
+}
+
 const PERSIST_KEY = 'layoutV1';
 const PERSIST_DEBOUNCE_MS = 200;
 
@@ -377,6 +391,11 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           const tab = p.tabs[idx];
           if (!tab.closable) return p; // 不可关
           const newTabs = p.tabs.filter((t) => t.id !== tabId);
+          // 关闭最后一个 tab → 补一个空 tab，避免内容区空着
+          if (newTabs.length === 0) {
+            const empty = makeEmptyTab();
+            return { ...p, tabs: [empty], activeTabId: empty.id };
+          }
           // 激活相邻 tab(优先选右边的)
           let nextActive: string | null = p.activeTabId;
           if (p.activeTabId === tabId) {
