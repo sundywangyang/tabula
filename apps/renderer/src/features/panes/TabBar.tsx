@@ -178,7 +178,7 @@ export function TabBar({
       return;
     }
     const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
-    void performBulk(state.paths, tab.path, mode);
+    void performBulk(state.paths, tab.path, mode, state.sourcePaneId);
     endFileDrag();
   };
 

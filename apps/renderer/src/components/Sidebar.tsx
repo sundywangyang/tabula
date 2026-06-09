@@ -126,7 +126,7 @@ export function Sidebar({
       return;
     }
     const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
-    await performBulk(state.paths, targetPath, mode);
+    await performBulk(state.paths, targetPath, mode, state.sourcePaneId);
     endDrag();
   };
 

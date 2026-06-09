@@ -189,10 +189,15 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         showToast('同目录拖动无操作', 'info', 1500);
         return;
       }
-      await performBulk(sources, currentPath, mode);
+      await performBulk(sources, currentPath, mode, paneId);
       endDrag();
+      // move 模式下刷新源 pane（可看到文件已被移走）
+      if (mode === 'move' && state.sourcePaneId && state.sourcePaneId !== paneId) {
+        const srcPane = useFileStore.getState().getPanePath(state.sourcePaneId);
+        if (srcPane) void loadDir(state.sourcePaneId, srcPane);
+      }
     },
-    [currentPath, paneId, performBulk, endDrag, showToast],
+    [currentPath, paneId, performBulk, endDrag, showToast, loadDir],
   );
 
   // === 键盘导航(组件级)===

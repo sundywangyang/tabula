@@ -513,7 +513,7 @@ export function App() {
           showToast('无法确定目标目录', 'error', 1500);
           return;
         }
-        void performBulk([srcPath], destDir, 'copy');
+        void performBulk([srcPath], destDir, 'copy', activePaneId);
         return;
       }
 

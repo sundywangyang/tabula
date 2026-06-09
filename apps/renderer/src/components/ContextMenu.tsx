@@ -180,7 +180,7 @@ export function ContextMenu({ paneId }: ContextMenuProps) {
           if (srcPath && currentPath) {
             const parent = srcPath.substring(0, srcPath.lastIndexOf(srcPath.includes('\\') ? '\\' : '/'));
             if (parent !== currentPath) {
-              void performBulk([srcPath], currentPath, 'copy');
+              void performBulk([srcPath], currentPath, 'copy', paneId);
             } else {
               showToast('已在当前位置', 'info', 1500);
             }

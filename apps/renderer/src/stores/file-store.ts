@@ -77,6 +77,8 @@ export type ConflictResolution = 'overwrite' | 'skip' | 'rename' | 'cancelAll';
 
 /** 等待用户逐个解决的冲突队列 */
 export interface PendingConflicts {
+  /** 发起粘贴的 paneId（用于完成后刷新） */
+  paneId: string;
   /** 整批 paste / drop 的参数 */
   sources: string[];
   destinationDir: string;
@@ -347,6 +349,7 @@ interface FileStore {
     sources: string[],
     destDir: string,
     mode: 'copy' | 'move',
+    paneId?: string,
   ) => Promise<{ ok: boolean; moved: number; error?: string }>;
 
   // ============ 选择性订阅工具 ============
@@ -1072,7 +1075,17 @@ export const useFileStore = create<FileStore>((set, get) => {
         return;
       }
       const mode: 'copy' | 'move' = cb.mode === 'cut' ? 'move' : 'copy';
-      await get().performBulk(cb.paths, destDir, mode);
+      const result = await get().performBulk(cb.paths, destDir, mode, paneId);
+      if (result.ok) {
+        // 复制/移动完成后刷新目标 pane 列表
+        await get().loadDir(paneId, destDir);
+        // 若源 pane 与目标 pane 不同，刷新源 pane（move 时清剪贴板后可看到源目录变化）
+        const srcPaneId = cb.sourcePaneId;
+        if (srcPaneId && srcPaneId !== paneId) {
+          const srcPath = get().getPanePath(srcPaneId);
+          if (srcPath) await get().loadDir(srcPaneId, srcPath);
+        }
+      }
     },
 
     // ============ P3: 拖放 ============
@@ -1253,6 +1266,10 @@ export const useFileStore = create<FileStore>((set, get) => {
             );
           } else {
             get().showToast(`已${verb} ${success} 项`, 'success', 2500);
+          }
+          // 冲突全部解决后刷新目标 pane
+          if (pc.paneId) {
+            void get().loadDir(pc.paneId, pc.destinationDir);
           }
         } catch (e) {
           get().setProgress(null);
@@ -1579,7 +1596,7 @@ export const useFileStore = create<FileStore>((set, get) => {
     },
 
     // ============ P3: 批量 copy / move 入口 ============
-    performBulk: async (sources, destDir, mode) => {
+    performBulk: async (sources, destDir, mode, paneId) => {
            if (sources.length === 0) return { ok: true, moved: 0 };
       // 不能把目录粘贴到自己或子目录(简单防呆:检测 destDir 是否在 sources 之下)
       // v1:不防呆,交给用户
@@ -1593,7 +1610,10 @@ export const useFileStore = create<FileStore>((set, get) => {
           continue;
         }
         const dest = joinPath(destDir, srcName);
-        if (dest === src) {
+        // 标准化:去掉末尾斜杠再比较(Windows src 有无斜杠不一致)
+        const normDest = dest.replace(/[\\/]+$/, '');
+        const normSrc = src.replace(/[\\/]+$/, '');
+        if (normDest === normSrc) {
           // 同源同目标:move 直接跳过;copy 在同目录需生成新名(加 -copy)
           if (mode === 'move') {
             continue;
@@ -1637,6 +1657,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       if (conflicts.length > 0) {
         set({
           pendingConflicts: {
+            paneId: paneId ?? '',
             sources,
             destinationDir: destDir,
             mode,
@@ -1680,6 +1701,10 @@ export const useFileStore = create<FileStore>((set, get) => {
           if (mode === 'move') {
             const cb = get().clipboard;
             if (cb && cb.mode === 'cut') set({ clipboard: null });
+          }
+          // 完成后刷新目标 pane（移动时源 pane 由 pasteToPane 层级处理）
+          if (paneId) {
+            void get().loadDir(paneId, destDir);
           }
           return { ok: true, moved: success };
         }
