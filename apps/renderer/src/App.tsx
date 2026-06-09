@@ -588,7 +588,7 @@ export function App() {
       <TitleBar version={version} onSettingsOpen={() => setSettingsOpen(true)} />
 
       <div className="app-body">
-        <Sidebar currentPath={activePath} onOpenPath={(p) => loadDir(activePaneId, p)} />
+        <Sidebar currentPath={activePath} onOpenPath={(p) => useLayoutStore.getState().pane.navigate(activePaneId, p)} />
 
         <div className="app-main">
           {renderLayout ? (
