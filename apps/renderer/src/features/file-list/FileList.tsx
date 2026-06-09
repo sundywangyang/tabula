@@ -588,7 +588,7 @@ function DetailsView({
     overscan: 12,
   });
 
-
+  console.error('[DetailsView] entries:', entries.length, '| virtualItems:', rowVirtualizer.getVirtualItems().length, '| totalSize:', rowVirtualizer.getTotalSize(), '| scrollH:', parentRef.current?.scrollHeight, '| clientH:', parentRef.current?.clientHeight);
 
   return (
     <div className="details-view">
