@@ -76,6 +76,8 @@
   position: relative;
   align-content: flex-start;
   min-height: 0;
+  outline: 1px dashed red;
+  outline-offset: -1px;
 }
 
 .file-list-row {

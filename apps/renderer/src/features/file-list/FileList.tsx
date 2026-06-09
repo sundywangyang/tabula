@@ -93,7 +93,6 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   // === 容器 ref & 虚拟滚动 ===
   const containerRef = useRef<HTMLDivElement>(null);
   const [gridCols, setGridCols] = useState(4);
-  const [debugInfo, setDebugInfo] = useState('');
 
   // 监听容器宽度更新 grid 列数
   useLayoutEffect(() => {
@@ -105,7 +104,11 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       const target = 110; // 每格 ~110px
       const cols = Math.max(3, Math.min(8, Math.floor((w - 24) / target)));
       setGridCols(cols);
-      setDebugInfo(`W=${w} H=${h} entries=${sortedEntries.length} rows=${viewMode === 'grid' ? Math.ceil(sortedEntries.length / cols) : sortedEntries.length}`);
+      // 调试：打印关键容器的实际渲染高度
+      console.error('[FileList] el:', w, 'x', h, '| entries:', sortedEntries.length);
+      const body = el.querySelector<HTMLElement>('.file-list-body');
+      const virtual = el.querySelector<HTMLElement>('.file-list-body-virtual');
+      console.error('[FileList] .file-list-body:', body?.clientHeight, '| .file-list-body-virtual:', virtual?.clientHeight);
     };
     update();
     const ro = new ResizeObserver(update);
@@ -489,7 +492,6 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       onDragLeave={handleContainerDragLeave}
       onDrop={handleContainerDrop}
     >
-      {debugInfo && <div style={{ position: 'fixed', bottom: 0, right: 0, background: 'rgba(0,0,0,0.8)', color: '#fff', fontSize: 11, padding: '4px 8px', zIndex: 9999 }}>{debugInfo}</div>}
       {viewMode === 'details' && (
         <DetailsView
           entries={sortedEntries}
