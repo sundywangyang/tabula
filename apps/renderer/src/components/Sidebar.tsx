@@ -237,58 +237,6 @@ export function Sidebar({
         )}
       </div>
 
-      {/* 历史 */}
-      <div className="sidebar-section">
-        <div className="sidebar-header-row">
-          <button
-            className="sidebar-collapse-btn"
-            onClick={() => setHistoryCollapsed((v) => !v)}
-            title={historyCollapsed ? '展开历史' : '折叠历史'}
-          >
-            <span className={`sidebar-chevron ${historyCollapsed ? 'collapsed' : ''}`}>▶</span>
-          </button>
-          <span className="sidebar-header">历史</span>
-          {!historyCollapsed && history.length > 0 && (
-            <button
-              className="sidebar-header-btn"
-              onClick={clearHistory}
-              title="清空历史"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-        {!historyCollapsed && (history.length === 0 ? (
-          <div className="sidebar-empty">暂无历史</div>
-        ) : (
-          history.slice(0, 20).map((h, idx) => {
-            const isOver =
-              dragState &&
-              dragState.targetKind === 'sidebar' &&
-              dragState.targetPath === h.path;
-            const segs = h.path.split(/[\\/]/).filter(Boolean);
-            const display = segs[segs.length - 1] || h.path;
-            return (
-              <button
-                key={`${h.path}-${idx}`}
-                className={`sidebar-item ${currentPath === h.path ? 'active' : ''} ${
-                  isOver ? 'drag-over' : ''
-                }`}
-                onClick={() => onOpenPath(h.path)}
-                onContextMenu={(e) => openHistoryCtx(e, h.path)}
-                onDragOver={(e) => handleItemDragOver(e, h.path)}
-                onDragLeave={() => setDragTarget(null, null, dragState?.effect ?? 'move')}
-                onDrop={(e) => void handleItemDrop(e, h.path)}
-                title={h.path}
-              >
-                <span className="sidebar-icon">↩</span>
-                <span className="sidebar-name">{display}</span>
-              </button>
-            );
-          })
-        ))}
-      </div>
-
       {/* 回收站 (P3) */}
       <div className="sidebar-section">
         <div className="sidebar-header-row">
@@ -390,6 +338,58 @@ export function Sidebar({
 
       {/* P6 v1:扩展面板 — 渲染扩展注册的面板入口 */}
       <ExtensionPanels />
+
+      {/* 历史 */}
+      <div className="sidebar-section">
+        <div className="sidebar-header-row">
+          <button
+            className="sidebar-collapse-btn"
+            onClick={() => setHistoryCollapsed((v) => !v)}
+            title={historyCollapsed ? '展开历史' : '折叠历史'}
+          >
+            <span className={`sidebar-chevron ${historyCollapsed ? 'collapsed' : ''}`}>▶</span>
+          </button>
+          <span className="sidebar-header">历史</span>
+          {!historyCollapsed && history.length > 0 && (
+            <button
+              className="sidebar-header-btn"
+              onClick={clearHistory}
+              title="清空历史"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {!historyCollapsed && (history.length === 0 ? (
+          <div className="sidebar-empty">暂无历史</div>
+        ) : (
+          history.slice(0, 20).map((h, idx) => {
+            const isOver =
+              dragState &&
+              dragState.targetKind === 'sidebar' &&
+              dragState.targetPath === h.path;
+            const segs = h.path.split(/[\\/]/).filter(Boolean);
+            const display = segs[segs.length - 1] || h.path;
+            return (
+              <button
+                key={`${h.path}-${idx}`}
+                className={`sidebar-item ${currentPath === h.path ? 'active' : ''} ${
+                  isOver ? 'drag-over' : ''
+                }`}
+                onClick={() => onOpenPath(h.path)}
+                onContextMenu={(e) => openHistoryCtx(e, h.path)}
+                onDragOver={(e) => handleItemDragOver(e, h.path)}
+                onDragLeave={() => setDragTarget(null, null, dragState?.effect ?? 'move')}
+                onDrop={(e) => void handleItemDrop(e, h.path)}
+                title={h.path}
+              >
+                <span className="sidebar-icon">↩</span>
+                <span className="sidebar-name">{display}</span>
+              </button>
+            );
+          })
+        ))}
+      </div>
 
       {/* 右键菜单(自定义渲染,不走浏览器默认) */}
       {ctxMenu && (
