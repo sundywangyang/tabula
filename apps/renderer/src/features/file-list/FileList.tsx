@@ -100,15 +100,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     if (!el) return;
     const update = () => {
       const w = el.clientWidth;
-      const h = el.clientHeight;
       const target = 110; // 每格 ~110px
       const cols = Math.max(3, Math.min(8, Math.floor((w - 24) / target)));
       setGridCols(cols);
-      // 调试：打印关键容器的实际渲染高度
-      console.error('[FileList] el:', w, 'x', h, '| entries:', sortedEntries.length);
-      const body = el.querySelector<HTMLElement>('.file-list-body');
-      const virtual = el.querySelector<HTMLElement>('.file-list-body-virtual');
-      console.error('[FileList] .file-list-body:', body?.clientHeight, '| .file-list-body-virtual:', virtual?.clientHeight);
     };
     update();
     const ro = new ResizeObserver(update);
@@ -587,8 +581,6 @@ function DetailsView({
     estimateSize: () => 28,
     overscan: 12,
   });
-
-  console.error('[DetailsView] entries:', entries.length, '| virtualItems:', rowVirtualizer.getVirtualItems().length, '| totalSize:', rowVirtualizer.getTotalSize(), '| scrollH:', parentRef.current?.scrollHeight, '| clientH:', parentRef.current?.clientHeight);
 
   return (
     <div className="details-view">
