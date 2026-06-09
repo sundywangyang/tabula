@@ -13,7 +13,7 @@
  *   - 拖到 pane 边缘 = 新建窗口
  *   - dataTransfer mime: application/x-tabula-tab
  */
-import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, useState, useCallback } from 'react';
 import type { LayoutNode, Tab } from '@tabula/bridge';
 import { useFileStore } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
@@ -46,6 +46,28 @@ export function TabBar({
   const tabDragStart = useLayoutStore((s) => s.tabDragOps.start);
   const tabDragEnd = useLayoutStore((s) => s.tabDragOps.end);
   const setDropTarget = useLayoutStore((s) => s.tabDragOps.setDropTarget);
+  const pinTab = useLayoutStore((s) => s.pane.pinTab);
+  const unpinTab = useLayoutStore((s) => s.pane.unpinTab);
+
+  // =================== 右键菜单 ===================
+  const [ctxMenu, setCtxMenu] = useState<{
+    tab: Tab;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  const onTabCtxMenu = (tab: Tab, e: ReactMouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ tab, x: e.clientX, y: e.clientY });
+  };
+
+  // 点击其他地方关闭菜单
+  const handleClick = useCallback(() => {
+    if (ctxMenu) closeCtxMenu();
+  }, [ctxMenu, closeCtxMenu]);
 
   const fileDragState = useFileStore((s) => s.dragState);
   const setFileDragTarget = useFileStore((s) => s.setDragTarget);
@@ -64,7 +86,7 @@ export function TabBar({
   const onClose = (tab: Tab, e: ReactMouseEvent) => {
     e.stopPropagation();
     if (isTabDragging) return;
-    if (!tab.closable) return;
+    if (!tab.closable || tab.pinned) return;
     closeTab(paneId, tab.id);
   };
 
@@ -72,7 +94,7 @@ export function TabBar({
     if (e.button === 1) {
       e.stopPropagation();
       if (isTabDragging) return;
-      if (!tab.closable) return;
+      if (!tab.closable || tab.pinned) return;
       closeTab(paneId, tab.id);
     }
   };
@@ -185,7 +207,11 @@ export function TabBar({
   // =================== 渲染 ===================
 
   return (
-    <div className="tab-bar" onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="tab-bar"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={handleClick}
+    >
       {pane.tabs.map((tab, index) => {
         const active = tab.id === pane.activeTabId;
         const isSource = tabDrag?.tabId === tab.id;
@@ -218,6 +244,7 @@ export function TabBar({
             title={tab.path ?? tab.title}
             onClick={(e) => onClickTab(tab, e)}
             onAuxClick={(e) => onAuxClick(tab, e)}
+            onContextMenu={(e) => onTabCtxMenu(tab, e)}
             draggable={isDraggableTab(tab) && !isTabDragging}
             onDragStart={(e) => onTabDragStart(e, tab, index)}
             onDragEnd={onTabDragEnd}
@@ -257,6 +284,53 @@ export function TabBar({
         >
           ✕
         </button>
+      )}
+
+      {/* 标签右键菜单 */}
+      {ctxMenu && (
+        <div
+          className="tab-ctx-menu"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {ctxMenu.tab.pinned ? (
+            <button
+              className="tab-ctx-item"
+              onClick={() => {
+                unpinTab(paneId, ctxMenu.tab.id);
+                closeCtxMenu();
+              }}
+            >
+              <span className="tab-ctx-icon">📌</span>
+              <span>取消固定</span>
+            </button>
+          ) : (
+            <button
+              className="tab-ctx-item"
+              onClick={() => {
+                pinTab(paneId, ctxMenu.tab.id);
+                closeCtxMenu();
+              }}
+            >
+              <span className="tab-ctx-icon">📌</span>
+              <span>固定标签</span>
+            </button>
+          )}
+          <div className="tab-ctx-divider" />
+          <button
+            className="tab-ctx-item danger"
+            disabled={!ctxMenu.tab.closable || ctxMenu.tab.pinned}
+            onClick={() => {
+              if (ctxMenu.tab.closable && !ctxMenu.tab.pinned) {
+                closeTab(paneId, ctxMenu.tab.id);
+              }
+              closeCtxMenu();
+            }}
+          >
+            <span className="tab-ctx-icon">✕</span>
+            <span>关闭标签</span>
+          </button>
+        </div>
       )}
     </div>
   );

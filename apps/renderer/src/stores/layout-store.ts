@@ -72,6 +72,8 @@ interface LayoutStore {
     openTab(paneId: string, tab: Tab): void;
     closeTab(paneId: string, tabId: string): void;
     activateTab(paneId: string, tabId: string): void;
+    pinTab(paneId: string, tabId: string): void;
+    unpinTab(paneId: string, tabId: string): void;
     focusPane(paneId: string): void;
     splitPane(paneId: string, dir: SplitDirection): string; // 返回新 paneId
     mergePane(paneId: string): void;
@@ -392,6 +394,32 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           return { ...p, activeTabId: tabId };
         });
         setState({ rootLayout: newRoot, activePaneId: paneId });
+      },
+
+      pinTab: (paneId, tabId) => {
+        const newRoot = mapPane(get().rootLayout, paneId, (p) => {
+          const idx = p.tabs.findIndex((t) => t.id === tabId);
+          if (idx < 0) return p;
+          const tab = p.tabs[idx];
+          if (tab.pinned) return p;
+          const newTabs = [...p.tabs];
+          newTabs[idx] = { ...tab, pinned: true };
+          return { ...p, tabs: newTabs };
+        });
+        setState({ rootLayout: newRoot });
+      },
+
+      unpinTab: (paneId, tabId) => {
+        const newRoot = mapPane(get().rootLayout, paneId, (p) => {
+          const idx = p.tabs.findIndex((t) => t.id === tabId);
+          if (idx < 0) return p;
+          const tab = p.tabs[idx];
+          if (!tab.pinned) return p;
+          const newTabs = [...p.tabs];
+          newTabs[idx] = { ...tab, pinned: false };
+          return { ...p, tabs: newTabs };
+        });
+        setState({ rootLayout: newRoot });
       },
 
       focusPane: (paneId) => {
