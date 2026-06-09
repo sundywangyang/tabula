@@ -5,7 +5,8 @@
 .file-list {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   font-size: 12px;
   outline: none;
   overflow: hidden;
@@ -56,6 +57,7 @@
   letter-spacing: 0.3px;
   user-select: none;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .file-list-body {
@@ -63,15 +65,17 @@
   overflow-y: auto;
   min-height: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .file-list-body-virtual {
   /* 确保虚拟滚动容器的高度明确约束于滚动区域 */
-  height: 100%;
+  flex: 1;
   overflow-y: auto;
   position: relative;
   align-content: flex-start;
-  flex-shrink: 0;
+  min-height: 0;
 }
 
 .file-list-row {
@@ -168,14 +172,47 @@
 
 /* 网格视图 */
 .grid-view {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .grid-view .file-list-body {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
+}
+
+/* 列表视图 */
+.list-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.list-view .file-list-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* 详情视图 */
+.details-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.details-view .file-list-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .grid-row {
