@@ -18,6 +18,7 @@ export const IpcChannels = {
   FS_LIST_DIR: 'fs:list-dir',
   FS_READ_FILE: 'fs:read-file',
   FS_WRITE_FILE: 'fs:write-file',
+  FS_GET_THUMBNAIL: 'fs:get-thumbnail',
   FS_DELETE: 'fs:delete',
   FS_RENAME: 'fs:rename',
   FS_MOVE: 'fs:move',

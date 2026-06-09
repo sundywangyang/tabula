@@ -57,7 +57,7 @@ export function PaneView({
 
   // 挂载时确保 file-store 有 pane 数据空壳
   useEffect(() => {
-    ensurePane(paneId);
+    void ensurePane(paneId);
   }, [paneId, ensurePane]);
 
   // 监听 active tab path 变化:触发 loadDir(初始/切换 tab / goBack / goForward)

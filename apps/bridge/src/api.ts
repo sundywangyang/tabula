@@ -30,6 +30,7 @@ import type {
   SplitDirection,
   StartupTimings,
   Tab,
+  ThumbnailResult,
   TrashListResult,
   UpdateInfo,
   UpdateStatus,
@@ -123,6 +124,12 @@ export interface TabulaAPI {
     trashEmpty(): Promise<Result<void>>;
     /** P4 v1: 递归搜索文件(按文件名模糊匹配) */
     search(req: SearchRequest): Promise<Result<SearchResult>>;
+    /**
+     * P7 v1: 取图片缩略图(主进程自带 LRU 缓存)。
+     * 非图片 / 损坏文件 / 过大文件 → 返回 ok=false + 错误码。
+     * dataUrl 可直接 `<img src=...>`,CSP 已放行 `data:`。
+     */
+    getThumbnail(path: string): Promise<Result<ThumbnailResult>>;
   };
 
   // 标签

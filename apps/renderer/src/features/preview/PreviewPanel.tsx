@@ -16,6 +16,7 @@ import { marked } from 'marked';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 import { useFileStore } from '../../stores/file-store';
+import { useLayoutStore } from '../../stores/layout-store';
 import './PreviewPanel.css';
 
 // 阈值:文本/代码/MD 超过此大小截断到 100 行
@@ -71,11 +72,32 @@ export function PreviewPanel() {
   const setPreviewLoading = useFileStore((s) => s.setPreviewLoading);
   const setPreviewData = useFileStore((s) => s.setPreviewData);
   const setPreviewError = useFileStore((s) => s.setPreviewError);
+  const previewNavigate = useFileStore((s) => s.previewNavigate);
   const showToast = useFileStore((s) => s.showToast);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const entry = preview?.entry ?? null;
   const kind = entry ? detectKind(entry.ext) : 'unsupported';
+
+  // 计算当前在同目录 entry 列表里的位置(用于位置指示 + 左右按钮的可见性)
+  // getFilteredSortedEntries 是按当前 sort 顺序返回(就是 FileList 里看到的顺序)
+  const navInfo = useMemo(() => {
+    if (!entry) return null;
+    const activePaneId = useLayoutStore.getState().activePaneId;
+    if (!activePaneId) return null;
+    const siblings = useFileStore.getState().getFilteredSortedEntries(activePaneId);
+    // 预览只对文件开放,目录里不显示(对用户来说不可达)
+    const fileSiblings = siblings.filter((e) => !e.isDirectory);
+    if (fileSiblings.length === 0) return null;
+    const idx = fileSiblings.findIndex((e) => e.path === entry.path);
+    if (idx < 0) return null;
+    return {
+      index: idx,
+      total: fileSiblings.length,
+      canPrev: idx > 0,
+      canNext: idx < fileSiblings.length - 1,
+    };
+  }, [entry]);
 
   // 加载内容(在 preview.loading 翻为 true / entry 变化时重跑)
   useEffect(() => {
@@ -163,7 +185,7 @@ export function PreviewPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry?.path, entry?.mtime, entry?.size, preview?.loading]);
 
-  // Esc 关闭
+  // Esc 关闭 / ←/→ 切换同目录文件
   useEffect(() => {
     if (!preview) return;
     const onKey = (e: KeyboardEvent) => {
@@ -171,12 +193,25 @@ export function PreviewPanel() {
         e.preventDefault();
         e.stopPropagation();
         closePreview();
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        previewNavigate(-1);
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        previewNavigate(1);
+        return;
       }
     };
     // 用 capture 确保在 App.tsx 全局监听之前先收到
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
-  }, [preview, closePreview]);
+  }, [preview, closePreview, previewNavigate]);
 
   // 自动 focus
   useEffect(() => {
@@ -202,18 +237,67 @@ export function PreviewPanel() {
             <span className="preview-meta">
               {formatSize(entry.size)} · {formatDate(entry.mtime)} · {entry.ext || '文件'}
             </span>
+            {navInfo && navInfo.total > 1 && (
+              <span className="preview-position" title="同目录位置">
+                {navInfo.index + 1} / {navInfo.total}
+              </span>
+            )}
           </div>
-          <button
-            className="preview-close"
-            onClick={closePreview}
-            title="关闭 (Esc)"
-            aria-label="关闭预览"
-          >
-            ✕
-          </button>
+          <div className="preview-header-actions">
+            {navInfo && (navInfo.canPrev || navInfo.canNext) && (
+              <>
+                <button
+                  className="preview-nav preview-nav-prev"
+                  onClick={() => previewNavigate(-1)}
+                  disabled={!navInfo.canPrev}
+                  title="上一个 (←)"
+                  aria-label="上一个文件"
+                >
+                  ‹
+                </button>
+                <button
+                  className="preview-nav preview-nav-next"
+                  onClick={() => previewNavigate(1)}
+                  disabled={!navInfo.canNext}
+                  title="下一个 (→)"
+                  aria-label="下一个文件"
+                >
+                  ›
+                </button>
+              </>
+            )}
+            <button
+              className="preview-close"
+              onClick={closePreview}
+              title="关闭 (Esc)"
+              aria-label="关闭预览"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="preview-body">
+          {navInfo && navInfo.canPrev && (
+            <button
+              className="preview-fab preview-fab-prev"
+              onClick={() => previewNavigate(-1)}
+              title="上一个 (←)"
+              aria-label="上一个文件"
+            >
+              ‹
+            </button>
+          )}
+          {navInfo && navInfo.canNext && (
+            <button
+              className="preview-fab preview-fab-next"
+              onClick={() => previewNavigate(1)}
+              title="下一个 (→)"
+              aria-label="下一个文件"
+            >
+              ›
+            </button>
+          )}
           {preview.loading && !preview.error && (
             <div className="preview-loading">
               <div className="loading-spinner" />

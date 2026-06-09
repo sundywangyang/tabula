@@ -108,6 +108,9 @@ export interface PaneFileData {
   // P4: 当前目录文件名过滤(Ctrl+F)
   searchQuery: string;
   searchOpen: boolean;
+
+  /** 视图模式(list/grid/details)，每个 pane 独立 */
+  viewMode: ViewMode;
 }
 
 function emptyPaneData(): PaneFileData {
@@ -123,6 +126,7 @@ function emptyPaneData(): PaneFileData {
     renameTarget: null,
     searchQuery: '',
     searchOpen: false,
+    viewMode: 'details',
   };
 }
 
@@ -186,9 +190,30 @@ export interface GlobalSearchState {
 /** P4: 文件类型过滤 */
 export type FileTypeFilter = 'all' | 'image' | 'document' | 'code' | 'archive';
 
+// =================== P7: 缩略图缓存 ===================
+
+/** 缩略图缓存项(key = path) */
+export interface ThumbnailEntry {
+  /** base64 data URL(已 resize) */
+  dataUrl: string;
+  /** 文件 mtime(用于失效判定) */
+  mtime: number;
+  /** 加载时间戳(用于 LRU 淘汰 — 后续 v2 可加) */
+  loadedAt: number;
+}
+
+/** 支持缩略图的图片扩展名(与主进程 thumbnail.ts 的 IMAGE_EXTS 保持一致) */
+export const THUMBNAIL_EXTS = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp',
+  '.ico', '.heic', '.avif', '.tiff', '.tif', '.psd', '.raw',
+]);
+
+export function isThumbnailable(ext: string): boolean {
+  return THUMBNAIL_EXTS.has(ext.toLowerCase());
+}
+
 interface FileStore {
   // ===== 共享视图设置(全局)=====
-  viewMode: ViewMode;
   sortBy: SortField;
   sortDir: SortDir;
   showHidden: boolean;
@@ -223,17 +248,23 @@ interface FileStore {
   /** 回收站选中项(itemPath 集合) */
   trashSelectedPaths: Set<string>;
 
+  // ===== P7: 缩略图缓存 =====
+  /** path → 缩略图 dataURL(mtime 一起记,用于后续判定失效) */
+  thumbnails: Map<string, ThumbnailEntry>;
+  /** 正在加载的 path 集合(去重 + UI 状态) */
+  thumbnailLoading: Set<string>;
+
   // ===== 每 pane 数据分片 =====
   panes: Record<string, PaneFileData>;
 
   // ============ Per-pane: 目录 ============
-  ensurePane: (paneId: string) => void;
+  ensurePane: (paneId: string) => Promise<void>;
   removePaneData: (paneId: string) => void;
   loadDir: (paneId: string, path: string) => Promise<void>;
   refresh: (paneId: string) => Promise<void>;
 
-  // ============ Per-pane: 视图设置(共享)===========
-  setViewMode: (mode: ViewMode) => void;
+  // ============ Per-pane: 视图设置(每个 pane 独立)===========
+  setViewMode: (paneId: string, mode: ViewMode) => void;
   cycleSort: (field: SortField) => void;
   toggleShowHidden: () => void;
   toggleShowExtensions: () => void;
@@ -325,6 +356,12 @@ interface FileStore {
   setPreviewLoading: (loading: boolean) => void;
   setPreviewData: (data: { blobUrl?: string | null; text?: string | null; truncated?: boolean; totalLines?: number }) => void;
   setPreviewError: (msg: string | null) => void;
+  /**
+   * 在当前 active pane 的 entry 列表里左右切换预览目标(方向:-1=上一项,1=下一项)
+   * 跳过目录;在边界停住(不循环);无 preview 时为 no-op。
+   * 返回:切换成功 true / 无可切换目标 false
+   */
+  previewNavigate: (delta: -1 | 1) => boolean;
 
   // ============ P4: 全局搜索(Ctrl+P / Ctrl+Shift+F)============
   openGlobalSearch: () => Promise<void>;
@@ -349,14 +386,27 @@ interface FileStore {
     sources: string[],
     destDir: string,
     mode: 'copy' | 'move',
-    paneId?: string,
+    paneId?: string | null,
   ) => Promise<{ ok: boolean; moved: number; error?: string }>;
+
+  // ============ P7: 缩略图 =============
+  /**
+   * 取某路径的缩略图。命中本地缓存直接返回;未命中走 IPC。
+   * 同 path 并发请求会去重(共享一个 Promise)。
+   * mtime 变了会重新加载。
+   */
+  loadThumbnail: (filePath: string, mtime: number) => Promise<ThumbnailEntry | null>;
+  /** 清空缩略图缓存(目录切换 / 用户主动) */
+  clearThumbnails: () => void;
 
   // ============ 选择性订阅工具 ============
   getFilteredSortedEntries: (paneId: string) => FsEntry[];
 }
 
 // =================== 工具函数 ===================
+
+/** 模块级 in-flight Promise 池(同 path 并发请求去重) */
+const inflightThumbnails = new Map<string, Promise<ThumbnailEntry | null>>();
 
 function pathToBreadcrumb(p: string): BreadcrumbSegment[] {
   if (!p) return [];
@@ -500,8 +550,7 @@ async function persistConfig(key: string, value: unknown): Promise<void> {
 export const useFileStore = create<FileStore>((set, get) => {
 
   return {
-    // 视图
-    viewMode: 'details',
+    // 视图(共享)
     sortBy: 'name',
     sortDir: 'asc',
     showHidden: false,
@@ -545,13 +594,30 @@ export const useFileStore = create<FileStore>((set, get) => {
     trashError: null,
     trashSelectedPaths: new Set(),
 
+    // P7: 缩略图缓存
+    thumbnails: new Map(),
+    thumbnailLoading: new Set(),
+
     // panes
     panes: {},
 
     // ============ Pane 数据生命周期 ============
-    ensurePane: (paneId) => {
+    ensurePane: async (paneId) => {
       if (!get().panes[paneId]) {
-        set({ panes: { ...get().panes, [paneId]: emptyPaneData() } });
+        // 尝试从持久化配置读 viewMode 默认值(没有则用 'details')
+        let defaultView: ViewMode = 'details';
+        try {
+          const all = await window.tabula.config.all();
+          if (all.defaultView) defaultView = all.defaultView as ViewMode;
+        } catch {
+          /* noop */
+        }
+        set({
+          panes: {
+            ...get().panes,
+            [paneId]: { ...emptyPaneData(), viewMode: defaultView },
+          },
+        });
       }
     },
 
@@ -641,10 +707,15 @@ export const useFileStore = create<FileStore>((set, get) => {
       }
     },
 
-    // ============ 视图 ============
-    setViewMode: (mode) => {
-      set({ viewMode: mode });
-      void persistConfig(VIEW_KEY, mode);
+    // ============ 视图(per-pane) ============
+    setViewMode: (paneId, mode) => {
+      set((s) => ({
+        panes: {
+          ...s.panes,
+          [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), viewMode: mode },
+        },
+      }));
+      void persistConfig(VIEW_KEY, mode); // 持久化最后一个切换的视图模式(新 pane 默认值)
     },
 
     cycleSort: (field) => {
@@ -678,7 +749,6 @@ export const useFileStore = create<FileStore>((set, get) => {
       try {
         const all = await window.tabula.config.all();
         set({
-          viewMode: (all.defaultView ?? 'details') as ViewMode,
           sortBy: (all.sortBy ?? 'name') as SortField,
           sortDir: (all.sortDir !== undefined ? all.sortDir : 'asc') as SortDir,
           showHidden: all.showHidden ?? false,
@@ -1453,6 +1523,31 @@ export const useFileStore = create<FileStore>((set, get) => {
         previewState: { ...cur, loading: false, error: msg },
       });
     },
+    previewNavigate: (delta) => {
+      const cur = get().previewState;
+      if (!cur) return false;
+      // 走当前 active pane(预览是从那里打开的)
+      const activePaneId = useLayoutStore.getState().activePaneId;
+      if (!activePaneId) return false;
+      const entries = get().getFilteredSortedEntries(activePaneId);
+      if (entries.length === 0) return false;
+      const curIdx = entries.findIndex((e) => e.path === cur.entry.path);
+      if (curIdx < 0) return false;
+      // 沿 delta 方向找第一个非目录条目;到边界就停
+      let nextIdx = curIdx;
+      for (let step = 0; step < entries.length; step += 1) {
+        nextIdx += delta;
+        if (nextIdx < 0 || nextIdx >= entries.length) {
+          // 越界:停在边界(不循环)
+          return false;
+        }
+        const candidate = entries[nextIdx];
+        if (candidate.isDirectory) continue; // 跳过目录
+        get().openPreview(candidate);
+        return true;
+      }
+      return false;
+    },
 
     // ============ P4: 全局搜索 (Ctrl+P / Ctrl+Shift+F) ============
     openGlobalSearch: async () => {
@@ -1713,6 +1808,59 @@ export const useFileStore = create<FileStore>((set, get) => {
         get().showToast(`${verb}失败: ${String(e)}`, 'error', 4000);
         return { ok: false, moved: 0, error: String(e) };
       }
+    },
+
+    // ============ P7: 缩略图 =============
+    // 用模块级 Map 存 in-flight Promise(同 path 并发请求去重)
+    // — 不放 store 内部是因为 store state 序列化会丢 Promise
+    loadThumbnail: async (filePath, mtime) => {
+      const cur = get().thumbnails.get(filePath);
+      if (cur && cur.mtime === mtime) {
+        return cur;
+      }
+      // 复用 in-flight
+      const inflight = inflightThumbnails.get(filePath);
+      if (inflight) {
+        return inflight;
+      }
+      // 标 loading
+      set((s) => {
+        const next = new Set(s.thumbnailLoading);
+        next.add(filePath);
+        return { thumbnailLoading: next };
+      });
+      const p = (async () => {
+        try {
+          const res = await window.tabula.fs.getThumbnail(filePath);
+          if (!res.ok) return null;
+          const entry: ThumbnailEntry = {
+            dataUrl: res.data.dataUrl,
+            mtime: res.data.mtime,
+            loadedAt: Date.now(),
+          };
+          set((s) => {
+            const next = new Map(s.thumbnails);
+            next.set(filePath, entry);
+            return { thumbnails: next };
+          });
+          return entry;
+        } catch {
+          return null;
+        } finally {
+          inflightThumbnails.delete(filePath);
+          set((s) => {
+            const next = new Set(s.thumbnailLoading);
+            next.delete(filePath);
+            return { thumbnailLoading: next };
+          });
+        }
+      })();
+      inflightThumbnails.set(filePath, p);
+      return p;
+    },
+
+    clearThumbnails: () => {
+      set({ thumbnails: new Map(), thumbnailLoading: new Set() });
     },
   };
 });

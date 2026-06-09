@@ -117,7 +117,6 @@ export function App() {
   const hydrateLayout = useLayoutStore((s) => s.hydrateFromConfig);
 
   // 视图设置(从 file-store 全局取,用于 StatusBar)
-  const viewMode = useFileStore((s) => s.viewMode);
   const sortBy = useFileStore((s) => s.sortBy);
   const sortDir = useFileStore((s) => s.sortDir);
 
@@ -168,7 +167,7 @@ export function App() {
       const layout = useLayoutStore.getState().rootLayout;
       const active = useLayoutStore.getState().activePaneId;
       const ids = useLayoutStore.getState().getAllPaneIds();
-      ids.forEach((id) => ensurePane(id));
+      await Promise.all(ids.map((id) => ensurePane(id)));
       const activePane = findPaneInLayout(layout, active);
       let initPath = '';
       if (activePane && activePane.type === 'pane' && activePane.activeTabId) {
@@ -607,7 +606,6 @@ export function App() {
         selectedCount={activeSelected?.size ?? 0}
         sortBy={sortBy}
         sortDir={sortDir}
-        viewMode={viewMode}
         paneCount={paneCount}
         activePaneIndex={activePaneIndex}
       />

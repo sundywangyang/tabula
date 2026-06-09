@@ -366,6 +366,24 @@ export type SetBindingResult =
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: FsError };
 
+/** 缩略图结果(主进程 → 渲染端) */
+export interface ThumbnailResult {
+  /** base64 data URL(已 resize 到 ~128px,可直接 `<img src=...>`) */
+  dataUrl: string;
+  /** 输出 mime,通常是 image/jpeg */
+  mime: string;
+  /** 原图尺寸(像素) */
+  width: number;
+  height: number;
+  /** 缩略图尺寸(像素) */
+  thumbWidth: number;
+  thumbHeight: number;
+  /** 文件 mtime(用于渲染端缓存失效判定) */
+  mtime: number;
+  /** 文件大小(字节) */
+  size: number;
+}
+
 // =================== 性能埋点 (P7 v1) ===================
 
 /** 一条埋点(渲染端 → 主进程) */

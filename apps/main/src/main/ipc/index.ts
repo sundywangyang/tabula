@@ -11,6 +11,7 @@ import type { AppConfig, FsErrorCode, UpdateStatus } from '@tabula/bridge';
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
 import * as trashService from '../fs/trash';
+import { getThumbnail } from '../fs/thumbnail';
 import { getConfig, setConfig, getAllConfig } from '../store/config';
 import { extensionHost } from '../ext-host/extension-host';
 import { getLogPaths, readTail, installLogSink } from '../infra/logger';
@@ -125,6 +126,11 @@ export function registerIpcHandlers(ctx: IpcContext) {
 
   // =================== Search (P4 v1) ===================
   ipcMain.handle(IpcChannels.FS_SEARCH, (_e, req) => fsService.search(req));
+
+  // =================== Thumbnail (P7 v1) ===================
+  ipcMain.handle(IpcChannels.FS_GET_THUMBNAIL, (_e, p: string) => {
+    return getThumbnail(p);
+  });
 
   // =================== Tabs (P0 桩) ===================
   ipcMain.handle(IpcChannels.TABS_OPEN, () => {

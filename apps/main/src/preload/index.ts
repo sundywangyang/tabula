@@ -145,6 +145,7 @@ const api: TabulaAPI = {
       ipcRenderer.invoke(IpcChannels.FS_TRASH_RESTORE, itemPath, originalPath),
     trashEmpty: () => ipcRenderer.invoke(IpcChannels.FS_TRASH_EMPTY),
     search: (req) => ipcRenderer.invoke(IpcChannels.FS_SEARCH, req),
+    getThumbnail: (p) => ipcRenderer.invoke(IpcChannels.FS_GET_THUMBNAIL, p),
   },
 
   tabs: {

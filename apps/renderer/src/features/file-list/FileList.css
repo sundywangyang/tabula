@@ -10,6 +10,7 @@
   font-size: 12px;
   outline: none;
   overflow: hidden;
+  position: relative; /* 使 ::after overlay 相对于此元素定位 */
 }
 
 .file-list:focus {
@@ -121,6 +122,17 @@
   width: 18px;
   text-align: center;
   flex-shrink: 0;
+}
+
+/* P7 v1: 真实图片缩略图(行内小图) */
+.row-icon-thumb {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  display: block;
 }
 
 .row-name {
@@ -259,6 +271,18 @@
   line-height: 1;
 }
 
+/* P7 v1: 真实图片缩略图(网格视图) */
+.grid-icon-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  display: block;
+  /* 防止 64x64 内的大图缩放抖动 */
+  image-rendering: -webkit-optimize-contrast;
+}
+
 .grid-name {
   font-size: 11px;
   color: var(--fg-primary);
@@ -317,22 +341,55 @@
   gap: 12px;
 }
 
-/* ===== P3: 拖放 highlight ===== */
-.file-list-dropping {
-  outline: 2px dashed var(--accent);
-  outline-offset: -4px;
-  background: rgba(99, 102, 241, 0.06);
-  transition: background 0.1s, outline-color 0.1s;
+/* ===== P3: 拖放 highlight — 全区域 overlay ===== */
+/*
+ * 拖放时覆盖整个 file-list 区域(包含所有行),
+ * 让用户在任意位置都能看到可放置的视觉反馈,
+ * 而不只是边缘的虚线框。
+ * pointer-events: none 确保不阻挡 rows 的交互和 drop 事件冒泡到容器。
+ */
+.file-list-dropping::after {
+  content: '松开以粘贴到当前目录';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.07);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+  animation: drop-overlay-in 0.12s ease-out;
 }
 
-.file-list-dropping.file-list-drop-noop {
-  outline-color: var(--fg-tertiary);
+/* 无操作时的样式(同 pane 同 dir 自拖) */
+.file-list-dropping.file-list-drop-noop::after {
+  content: '同目录拖动无操作';
   background: transparent;
-  cursor: not-allowed;
+  border-color: var(--fg-tertiary);
+  color: var(--fg-tertiary);
+}
+
+@keyframes drop-overlay-in {
+  from {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .file-list-empty-wrap {
   cursor: default;
+  position: relative; /* 提升 stacking context,让空目录内容在 overlay 之上 */
+  z-index: 2;
 }
 
 .drop-hint {

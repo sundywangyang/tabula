@@ -20,7 +20,7 @@ const VIEW_MODES: { mode: ViewMode; icon: string; label: string }[] = [
 ];
 
 export function Toolbar({ paneId }: { paneId: string }) {
-  const viewMode = useFileStore((s) => s.viewMode);
+  const viewMode = useFileStore((s) => s.panes[paneId]?.viewMode ?? 'details');
   const setViewMode = useFileStore((s) => s.setViewMode);
   const showHidden = useFileStore((s) => s.showHidden);
   const showExtensions = useFileStore((s) => s.showExtensions);
@@ -192,7 +192,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
           <button
             key={m.mode}
             className={`toolbar-btn ${viewMode === m.mode ? 'active' : ''}`}
-            onClick={() => setViewMode(m.mode)}
+            onClick={() => setViewMode(paneId, m.mode)}
             title={`${m.label}视图`}
           >
             <span className="toolbar-icon">{m.icon}</span>

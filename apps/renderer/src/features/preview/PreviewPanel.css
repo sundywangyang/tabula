@@ -112,6 +112,90 @@
   color: var(--fg-primary);
 }
 
+/* ===== header 位置指示 + 左右切换按钮(header 工具栏)===== */
+.preview-position {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.preview-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.preview-nav {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--fg-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s, opacity 0.1s;
+  flex-shrink: 0;
+}
+
+.preview-nav:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--fg-primary);
+}
+
+.preview-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ===== body 浮层左右按钮(图片浏览用)===== */
+.preview-fab {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 64px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 28px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  backdrop-filter: blur(6px);
+}
+
+.preview-fab:hover {
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+}
+
+.preview-fab-prev {
+  left: 12px;
+}
+
+.preview-fab-next {
+  right: 12px;
+}
+
+/* hover panel 时才显出浮层按钮(避免遮挡内容) */
+.preview-panel:hover .preview-fab,
+.preview-fab:focus-visible {
+  opacity: 1;
+}
+
 .preview-body {
   flex: 1;
   position: relative;

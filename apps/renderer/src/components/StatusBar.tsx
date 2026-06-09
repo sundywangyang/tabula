@@ -32,7 +32,6 @@ export function StatusBar({
   selectedCount,
   sortBy,
   sortDir,
-  viewMode,
   paneCount,
   activePaneIndex,
 }: {
@@ -42,7 +41,6 @@ export function StatusBar({
   selectedCount: number;
   sortBy: SortField;
   sortDir: 'asc' | 'desc' | null;
-  viewMode: 'list' | 'grid' | 'details';
   paneCount: number;
   activePaneIndex: number;
 }) {
@@ -50,6 +48,7 @@ export function StatusBar({
   const clipboard = useFileStore((s) => s.clipboard);
   const progress = useFileStore((s) => s.progress);
   const activePaneId = useLayoutStore((s) => s.activePaneId);
+  const viewMode = useFileStore((s) => s.panes[activePaneId]?.viewMode ?? 'details');
   const searchQuery = useFileStore((s) => s.panes[activePaneId]?.searchQuery ?? '');
   const clearSearch = useFileStore((s) => s.clearSearch);
   return (

@@ -18,7 +18,7 @@ import {
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { FsEntry } from '@tabula/bridge';
-import { useFileStore, type SortField } from '../../stores/file-store';
+import { useFileStore, isThumbnailable, type SortField } from '../../stores/file-store';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
 
@@ -29,13 +29,13 @@ interface Props {
 
 export function FileList({ paneId, onOpenEntry }: Props) {
   // 全部状态从 store 拉
-  const viewMode = useFileStore((s) => s.viewMode);
   const sortBy = useFileStore((s) => s.sortBy);
   const sortDir = useFileStore((s) => s.sortDir);
   const showHidden = useFileStore((s) => s.showHidden);
   const showExtensions = useFileStore((s) => s.showExtensions);
 
   const paneData = useFileStore((s) => s.panes[paneId]);
+  const viewMode = paneData?.viewMode ?? 'details';
   const selectedPaths = paneData?.selectedPaths ?? new Set<string>();
   const cursorPath = paneData?.cursorPath ?? null;
   const renameTarget = paneData?.renameTarget ?? null;
@@ -149,15 +149,27 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   }, [endDrag]);
 
   // === P3: 拖放 — 容器作为 target(pane 内的 drop)===
+  // 支持两类拖入:
+  //   1. Tabula 内部拖拽(dragState 有值)
+  //   2. 外部文件(Windows Explorer 等) — dataTransfer.types 包含 'Files'
   const handleContainerDragOver = useCallback(
     (e: ReactDragEvent<HTMLDivElement>) => {
-      // 只在有 dragState 时高亮
-      if (!dragState) return;
+      // 内部拖拽:必须有 dragState
+      // 外部拖拽:dataTransfer.types 包含 'Files'(拖入文件时必含)
+      const hasInternalDrag = !!dragState;
+      const hasExternalFiles = Array.from(e.dataTransfer.types).includes('Files');
+      if (!hasInternalDrag && !hasExternalFiles) return;
+
       e.preventDefault();
       e.stopPropagation();
-      const effect: 'move' | 'copy' = e.ctrlKey || e.metaKey ? 'copy' : 'move';
+      // 外部文件默认 copy;内部拖拽走 Ctrl 切换
+      const effect: 'move' | 'copy' =
+        hasInternalDrag ? (e.ctrlKey || e.metaKey ? 'copy' : 'move') : 'copy';
       e.dataTransfer.dropEffect = effect;
-      setDragTarget(currentPath, 'pane', effect);
+
+      if (hasInternalDrag) {
+        setDragTarget(currentPath, 'pane', effect);
+      }
     },
     [dragState, currentPath, setDragTarget],
   );
@@ -172,11 +184,34 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     [dragState, setDragTarget],
   );
 
+  // 检测是否是外部文件(非 Tabula 内部拖拽)
+  const isExternalDrop = (e: ReactDragEvent<HTMLDivElement>): boolean => {
+    return Array.from(e.dataTransfer.types).includes('Files') && !dragState;
+  };
+
   const handleContainerDrop = useCallback(
     async (e: ReactDragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
+
       const state = useFileStore.getState().dragState;
+      const isExternal = isExternalDrop(e);
+
+      // ===== 外部文件拖入(Windows Explorer 等) =====
+      if (isExternal && currentPath) {
+        const files = e.dataTransfer.files;
+        if (files.length === 0) {
+          endDrag();
+          return;
+        }
+        // 外部文件只能 copy;move 外部文件 Electron 有安全限制
+        const paths = Array.from(files).map((f) => f.path);
+        endDrag();
+        await performBulk(paths, currentPath, 'copy', paneId);
+        return;
+      }
+
+      // ===== Tabula 内部拖拽 =====
       if (!state || !currentPath) {
         endDrag();
         return;
@@ -456,7 +491,6 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         <div className="file-list-empty">
           <div className="empty-icon">📂</div>
           <div>{showHidden ? '此目录为空' : '此目录为空(隐藏文件已隐藏)'}</div>
-          {dragState && <div className="drop-hint">松开以粘贴到当前目录</div>}
         </div>
       </div>
     );
@@ -502,6 +536,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           onRenameCancel={() => endRename(paneId)}
           onRowDragStart={handleRowDragStart}
           onRowDragEnd={handleRowDragEnd}
+          onDragOver={handleContainerDragOver}
+          onDragLeave={handleContainerDragLeave}
+          onDrop={handleContainerDrop}
         />
       )}
       {viewMode === 'list' && (
@@ -517,6 +554,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           onRenameCancel={() => endRename(paneId)}
           onRowDragStart={handleRowDragStart}
           onRowDragEnd={handleRowDragEnd}
+          onDragOver={handleContainerDragOver}
+          onDragLeave={handleContainerDragLeave}
+          onDrop={handleContainerDrop}
         />
       )}
       {viewMode === 'grid' && (
@@ -533,10 +573,63 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           onRenameCancel={() => endRename(paneId)}
           onRowDragStart={handleRowDragStart}
           onRowDragEnd={handleRowDragEnd}
+          onDragOver={handleContainerDragOver}
+          onDragLeave={handleContainerDragLeave}
+          onDrop={handleContainerDrop}
         />
       )}
     </div>
   );
+}
+
+// =================== 缩略图组件(供 row / grid 复用)===================
+
+/**
+ * 单个文件图标的渲染。
+ * - 若是支持的图片:挂载时调 loadThumbnail 拿 dataURL,加载完渲染 <img>
+ * - 加载中/失败/非图片:回退到 emoji
+ *
+ * 注意:virtualizer 会把不可见行 unmount,visible 时重新 mount。
+ * loadThumbnail 命中 store 缓存会同步返回,无 IPC 开销。
+ */
+function FileThumb({ entry, variant }: { entry: FsEntry; variant: 'row' | 'grid' }) {
+  const loadThumbnail = useFileStore((s) => s.loadThumbnail);
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+  // 进入或 mtime/path 变化时拉一次
+  useEffect(() => {
+    let cancelled = false;
+    if (entry.isDirectory) return; // 目录不需要
+    if (!isThumbnailable(entry.ext)) return;
+    // 拉一次。store 内部按 mtime 失效,无需自己比较。
+    void loadThumbnail(entry.path, entry.mtime).then((result) => {
+      if (cancelled) return;
+      setDataUrl(result?.dataUrl ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.path, entry.mtime, entry.isDirectory, entry.ext, loadThumbnail]);
+
+  const className = variant === 'grid' ? 'grid-icon-thumb' : 'row-icon-thumb';
+
+  if (entry.isDirectory) {
+    return <span className={variant === 'grid' ? 'grid-icon' : 'row-icon'}>📁</span>;
+  }
+  if (isThumbnailable(entry.ext) && dataUrl) {
+    return (
+      <img
+        className={className}
+        src={dataUrl}
+        alt={entry.name}
+        draggable={false}
+        loading="lazy"
+        decoding="async"
+      />
+    );
+  }
+  // 回退到 emoji
+  return <span className={variant === 'grid' ? 'grid-icon' : 'row-icon'}>{iconFor(entry)}</span>;
 }
 
 // =================== 详情视图 ===================
@@ -556,6 +649,10 @@ interface DetailsViewProps {
   onRenameCancel: () => void;
   onRowDragStart: (entry: FsEntry, e: ReactDragEvent<HTMLElement>) => void;
   onRowDragEnd: () => void;
+  /** 挂到 scroll container 的 drop 处理器 */
+  onDragOver?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  onDragLeave?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: ReactDragEvent<HTMLDivElement>) => void;
 }
 
 function DetailsView({
@@ -573,6 +670,9 @@ function DetailsView({
   onRenameCancel,
   onRowDragStart,
   onRowDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: DetailsViewProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
@@ -618,7 +718,13 @@ function DetailsView({
           className="col col-type"
         />
       </div>
-      <div ref={parentRef} className="file-list-body file-list-body-virtual">
+      <div
+        ref={parentRef}
+        className="file-list-body file-list-body-virtual"
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -730,7 +836,7 @@ function DetailsRow({
       data-entry-path={entry.path}
     >
       <div className="col col-name">
-        <span className="row-icon">{iconFor(entry)}</span>
+        <FileThumb entry={entry} variant="row" />
         {renaming ? (
           <RenameInput
             entry={entry}
@@ -767,6 +873,9 @@ function ListView({
   onRenameCancel,
   onRowDragStart,
   onRowDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   entries: FsEntry[];
   showExtensions: boolean;
@@ -779,6 +888,9 @@ function ListView({
   onRenameCancel: () => void;
   onRowDragStart: (entry: FsEntry, e: ReactDragEvent<HTMLElement>) => void;
   onRowDragEnd: () => void;
+  onDragOver?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  onDragLeave?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: ReactDragEvent<HTMLDivElement>) => void;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
@@ -793,7 +905,13 @@ function ListView({
       <div className="file-list-header">
         <div className="col col-name-full">名称</div>
       </div>
-      <div ref={parentRef} className="file-list-body file-list-body-virtual">
+      <div
+        ref={parentRef}
+        className="file-list-body file-list-body-virtual"
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -825,7 +943,7 @@ function ListView({
                 data-entry-path={entry.path}
               >
                 <div className="col col-name-full">
-                  <span className="row-icon">{iconFor(entry)}</span>
+                  <FileThumb entry={entry} variant="row" />
                   {renameTarget === entry.path ? (
                     <RenameInput
                       entry={entry}
@@ -863,6 +981,9 @@ function GridView({
   onRenameCancel,
   onRowDragStart,
   onRowDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   entries: FsEntry[];
   cols: number;
@@ -876,6 +997,9 @@ function GridView({
   onRenameCancel: () => void;
   onRowDragStart: (entry: FsEntry, e: ReactDragEvent<HTMLElement>) => void;
   onRowDragEnd: () => void;
+  onDragOver?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  onDragLeave?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: ReactDragEvent<HTMLDivElement>) => void;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rows = Math.ceil(entries.length / cols);
@@ -888,7 +1012,13 @@ function GridView({
 
   return (
     <div className="grid-view" style={{ ['--grid-cols' as string]: String(cols) }}>
-      <div ref={parentRef} className="file-list-body file-list-body-virtual">
+      <div
+        ref={parentRef}
+        className="file-list-body file-list-body-virtual"
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -925,7 +1055,7 @@ function GridView({
                     onDragEnd={onRowDragEnd}
                     data-entry-path={entry.path}
                   >
-                    <div className="grid-icon">{iconFor(entry)}</div>
+                    <FileThumb entry={entry} variant="grid" />
                     {renameTarget === entry.path ? (
                       <RenameInput
                         entry={entry}
