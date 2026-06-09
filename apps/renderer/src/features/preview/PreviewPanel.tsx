@@ -91,7 +91,6 @@ export function PreviewPanel() {
 
     const ext = entry.ext;
     const localKind = detectKind(ext);
-    console.error('[Preview] loading. ext:', ext, 'kind:', localKind, 'size:', entry.size, 'path:', entry.path);
     let cancelled = false;
 
     const run = async () => {
@@ -112,12 +111,10 @@ export function PreviewPanel() {
           const res = await window.tabula.fs.readFile(entry.path, 'binary');
           if (cancelled) return;
           if (!res.ok) {
-            console.error('[Preview] readFile failed:', res.error);
             setPreviewError(res.error.message);
             showToast(`预览失败: ${res.error.message}`, 'error', 3500);
             return;
           }
-          console.error('[Preview] readFile ok. data type:', typeof res.data, 'instanceof ArrayBuffer:', res.data instanceof ArrayBuffer, 'length:', (res.data as ArrayBuffer).byteLength);
           const ab = res.data as ArrayBuffer;
           const mime = mimeFromExt(ext);
           const blob = new Blob([ab], { type: mime });
@@ -187,7 +184,6 @@ export function PreviewPanel() {
   }, [preview]);
 
   if (!preview || !entry) return null;
-  console.error('[Preview] rendering. entry:', entry.name, 'ext:', entry.ext, 'kind:', kind, 'blobUrl:', preview.blobUrl?.slice(0, 30), 'error:', preview.error);
 
   return (
     <div
