@@ -38,7 +38,7 @@ function makeEmptyTab(): Tab {
     id: `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     type: 'folder',
     path: rootPath,
-    title: '新标签',
+    title: 'C:\\',
     pinned: false,
     closable: true,
     history: [rootPath],
