@@ -61,23 +61,20 @@
 }
 
 .file-list-body {
+  height: 0;
   flex: 1;
   overflow-y: auto;
-  min-height: 0;
   position: relative;
   display: flex;
   flex-direction: column;
 }
 
 .file-list-body-virtual {
-  /* 确保虚拟滚动容器的高度明确约束于滚动区域 */
+  /* 虚拟滚动容器：flex 填满滚动容器的可用高度 */
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
   position: relative;
   align-content: flex-start;
-  min-height: 0;
-  outline: 1px dashed red;
-  outline-offset: -1px;
 }
 
 .file-list-row {
