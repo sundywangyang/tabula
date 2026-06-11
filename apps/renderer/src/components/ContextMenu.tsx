@@ -1,23 +1,53 @@
 /**
  * 右键菜单组件 (P3)
  *
- * 在 FileList 空白处右键:粘贴 / 新建文件夹
- * 在文件/文件夹上右键:完整菜单(复制/剪切/粘贴/删除/重命名/属性/打开方式)
+ * 设计:全局单例。
+ * - 监听 window contextmenu 事件
+ * - 从 e.target 反推 paneId(closest('[data-pane-id]'))和 entryPath(closest('[data-entry-path]'))
+ * - 这样即便有 split pane / 多 pane 树,也只挂一个 listener,只显示一个菜单
+ *
+ * 行为:
+ * - 在 FileList 空白处右键:粘贴 / 新建文件夹
+ * - 在文件/文件夹上右键:完整菜单(复制/剪切/粘贴/删除/重命名/属性/打开方式)
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFileStore, makeFolderTab } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
 import type { FsEntry } from '@tabula/bridge';
 import './ContextMenu.css';
 
-interface ContextMenuProps {
-  paneId: string;
+/** 全局单例:模块级 state,所有 ContextMenu 实例共享 */
+interface GlobalState {
+  paneId: string | null;
+  entry: FsEntry | null;
+  visible: boolean;
+  pos: { x: number; y: number };
 }
 
-interface MenuPosition {
-  x: number;
-  y: number;
+let globalState: GlobalState = {
+  paneId: null,
+  entry: null,
+  visible: false,
+  pos: { x: 0, y: 0 },
+};
+
+let globalRegistered = false;
+const globalSubscribers = new Set<() => void>();
+
+function setGlobalState(next: GlobalState) {
+  globalState = next;
+  globalSubscribers.forEach((fn) => fn());
+}
+
+function hideGlobalMenu() {
+  if (!globalState.visible) return;
+  setGlobalState({ ...globalState, visible: false });
+}
+
+interface ContextMenuProps {
+  /** 保留 prop 兼容性,但全局单例模式下被忽略 */
+  paneId?: string;
 }
 
 interface MenuItem {
@@ -30,311 +60,423 @@ interface MenuItem {
   action?: () => void;
 }
 
-export function ContextMenu({ paneId }: ContextMenuProps) {
-  const [visible, setVisible] = useState(false);
-  const [position, setPosition] = useState<MenuPosition>({ x: 0, y: 0 });
-  const [targetEntry, setTargetEntry] = useState<FsEntry | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+/** buildMenuItems 提到组件外面:纯函数 + 闭包传参,避免 hooks 顺序问题 */
+function buildMenuItems(args: {
+  paneId: string;
+  targetEntry: FsEntry | null;
+  isEmptySpace: boolean;
+  selectedPaths: Set<string>;
+  currentPath: string;
+  clipboard: ReturnType<typeof useFileStore.getState>['clipboard'];
+  actions: ReturnType<typeof useFileStore.getState>;
+}): MenuItem[] {
+  const { paneId, targetEntry, isEmptySpace, selectedPaths, currentPath, clipboard, actions } = args;
+  const items: MenuItem[] = [];
 
-  // file-store
-  const paneData = useFileStore((s) => s.panes[paneId]);
-  const selectedPaths = paneData?.selectedPaths ?? new Set<string>();
-  const cursorPath = paneData?.cursorPath ?? null;
-  const currentPath = paneData?.currentPath ?? '';
-  const clipboard = useFileStore((s) => s.clipboard);
-  const entries = paneData?.entries ?? [];
+  if (isEmptySpace) {
+    const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
+    items.push({
+      label: '粘贴',
+      icon: '📄',
+      shortcut: 'Ctrl+V',
+      disabled: !hasClipboard,
+      action: () => { void actions.pasteToPane(paneId); hideGlobalMenu(); },
+    });
+    items.push({ label: '', divider: true });
+    items.push({
+      label: '新建文件夹',
+      icon: '📁',
+      shortcut: 'Ctrl+N',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('tabula:new-folder', { detail: { paneId } }));
+        hideGlobalMenu();
+      },
+    });
+    items.push({
+      label: '新建文件',
+      icon: '📄',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('tabula:new-file', { detail: { paneId } }));
+        hideGlobalMenu();
+      },
+    });
+    items.push({ label: '', divider: true });
+    items.push({
+      label: '刷新',
+      icon: '⟳',
+      shortcut: 'F5',
+      action: () => { void actions.loadDir(paneId, currentPath); hideGlobalMenu(); },
+    });
+  } else {
+    const hasSelection = selectedPaths.size > 0 || targetEntry !== null;
 
-  const copySelected = useFileStore((s) => s.copySelected);
-  const cutSelected = useFileStore((s) => s.cutSelected);
-  const pasteToPane = useFileStore((s) => s.pasteToPane);
-  const beginRename = useFileStore((s) => s.beginRename);
-  const deleteSelected = useFileStore((s) => s.deleteSelected);
-  const showToast = useFileStore((s) => s.showToast);
-  const loadDir = useFileStore((s) => s.loadDir);
-  const performBulk = useFileStore((s) => s.performBulk);
+    items.push({
+      label: '打开',
+      icon: '📂',
+      action: () => {
+        if (targetEntry) {
+          if (targetEntry.isDirectory) {
+            void actions.loadDir(paneId, targetEntry.path);
+          } else {
+            void window.tabula.fs.openPath(targetEntry.path);
+          }
+        }
+        hideGlobalMenu();
+      },
+    });
 
-  // 判断是否在空白处右键
-  const isEmptySpace = !targetEntry;
-
-  // 构建菜单项
-  const buildMenuItems = useCallback((): MenuItem[] => {
-    const items: MenuItem[] = [];
-
-    if (isEmptySpace) {
-      // 空白处右键菜单
-      const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
+    if (targetEntry?.isDirectory) {
       items.push({
-        label: '粘贴',
-        icon: '📄',
-        shortcut: 'Ctrl+V',
-        disabled: !hasClipboard,
-        action: () => { void pasteToPane(paneId); setVisible(false); },
-      });
-      items.push({ label: '', divider: true });
-      items.push({
-        label: '新建文件夹',
-        icon: '📁',
-        shortcut: 'Ctrl+N',
-        action: () => {
-          window.dispatchEvent(new CustomEvent('tabula:new-folder', { detail: { paneId } }));
-          setVisible(false);
-        },
-      });
-      items.push({
-        label: '新建文件',
-        icon: '📄',
-        action: () => {
-          window.dispatchEvent(new CustomEvent('tabula:new-file', { detail: { paneId } }));
-          setVisible(false);
-        },
-      });
-      items.push({ label: '', divider: true });
-      items.push({
-        label: '刷新',
-        icon: '⟳',
-        shortcut: 'F5',
-        action: () => { void loadDir(paneId, currentPath); setVisible(false); },
-      });
-    } else {
-      // 文件/文件夹右键菜单
-      const hasSelection = selectedPaths.size > 0 || targetEntry !== null;
-
-      items.push({
-        label: '打开',
-        icon: '📂',
+        label: '在新标签页打开',
+        icon: '🏷',
         action: () => {
           if (targetEntry) {
-            if (targetEntry.isDirectory) {
-              void loadDir(paneId, targetEntry.path);
-            } else {
-              void window.tabula.fs.openPath(targetEntry.path);
-            }
+            const newTab = makeFolderTab(targetEntry.path, targetEntry.name);
+            useLayoutStore.getState().pane.openTab(paneId, newTab);
           }
-          setVisible(false);
-        },
-      });
-
-      if (targetEntry?.isDirectory) {
-        items.push({
-          label: '在新标签页打开',
-          icon: '🏷',
-          action: () => {
-            if (targetEntry) {
-              const newTab = makeFolderTab(targetEntry.path, targetEntry.name);
-              useLayoutStore.getState().pane.openTab(paneId, newTab);
-            }
-            setVisible(false);
-          },
-        });
-      }
-
-      items.push({ label: '', divider: true });
-
-      items.push({
-        label: '复制',
-        icon: '📋',
-        shortcut: 'Ctrl+C',
-        disabled: !hasSelection,
-        action: () => { copySelected(paneId); setVisible(false); },
-      });
-      items.push({
-        label: '剪切',
-        icon: '✂',
-        shortcut: 'Ctrl+X',
-        disabled: !hasSelection,
-        action: () => { cutSelected(paneId); setVisible(false); },
-      });
-
-      const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
-      items.push({
-        label: '粘贴',
-        icon: '📄',
-        shortcut: 'Ctrl+V',
-        disabled: !hasClipboard,
-        action: () => { void pasteToPane(paneId); setVisible(false); },
-      });
-
-      items.push({ label: '', divider: true });
-
-      items.push({
-        label: '重命名',
-        icon: '✏',
-        shortcut: 'F2',
-        disabled: selectedPaths.size !== 1 && !targetEntry,
-        action: () => {
-          if (targetEntry) {
-            beginRename(paneId, targetEntry.path);
-          }
-          setVisible(false);
-        },
-      });
-
-      // 复制到同级目录
-      items.push({
-        label: '复制到当前位置',
-        icon: '📑',
-        shortcut: 'Ctrl+D',
-        disabled: selectedPaths.size !== 1 && !targetEntry,
-        action: () => {
-          const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
-          if (srcPath && currentPath) {
-            const parent = srcPath.substring(0, srcPath.lastIndexOf(srcPath.includes('\\') ? '\\' : '/'));
-            if (parent !== currentPath) {
-              void performBulk([srcPath], currentPath, 'copy', paneId);
-            } else {
-              showToast('已在当前位置', 'info', 1500);
-            }
-          }
-          setVisible(false);
-        },
-      });
-
-      // P5: 添加到收藏夹
-      items.push({
-        label: '添加到收藏夹',
-        icon: '★',
-        action: () => {
-          if (targetEntry) {
-            const pathToFav = targetEntry.isDirectory ? targetEntry.path : currentPath;
-            if (pathToFav) {
-              const { addFavorite, isFavorite } = useFavoritesStore.getState();
-              if (isFavorite(pathToFav)) {
-                showToast('已在收藏夹中', 'info', 1500);
-              } else {
-                addFavorite(pathToFav, targetEntry.isDirectory ? targetEntry.name : undefined);
-                showToast(`已添加到收藏夹`, 'success', 1500);
-              }
-            }
-          }
-          setVisible(false);
-        },
-      });
-
-      items.push({ label: '', divider: true });
-
-      items.push({
-        label: '删除',
-        icon: '🗑',
-        shortcut: 'Delete',
-        danger: true,
-        disabled: !hasSelection,
-        action: () => {
-          if (selectedPaths.size > 0) {
-            window.dispatchEvent(
-              new CustomEvent('tabula:confirm-delete', {
-                detail: { paneId, count: selectedPaths.size },
-              }),
-            );
-          }
-          setVisible(false);
-        },
-      });
-
-      items.push({ label: '', divider: true });
-
-      items.push({
-        label: '属性',
-        icon: 'ℹ',
-        action: () => {
-          if (targetEntry) {
-            showToast(
-              `${targetEntry.name}\n类型: ${targetEntry.isDirectory ? '文件夹' : '文件'}\n大小: ${formatSize(targetEntry.size)}\n修改: ${formatDate(targetEntry.mtime)}`,
-              'info',
-              4000,
-            );
-          }
-          setVisible(false);
+          hideGlobalMenu();
         },
       });
     }
 
-    return items;
-  }, [
-    isEmptySpace,
-    targetEntry,
-    selectedPaths,
-    clipboard,
-    paneId,
-    currentPath,
-    copySelected,
-    cutSelected,
-    pasteToPane,
-    beginRename,
-    deleteSelected,
-    showToast,
-    loadDir,
-    performBulk,
-  ]);
+    items.push({ label: '', divider: true });
 
-  // 监听右键事件
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      // 检查是否点击在菜单上
-      if (menuRef.current?.contains(e.target as Node)) return;
+    items.push({
+      label: '复制',
+      icon: '📋',
+      shortcut: 'Ctrl+C',
+      disabled: !hasSelection,
+      action: () => { actions.copySelected(paneId); hideGlobalMenu(); },
+    });
+    items.push({
+      label: '剪切',
+      icon: '✂',
+      shortcut: 'Ctrl+X',
+      disabled: !hasSelection,
+      action: () => { actions.cutSelected(paneId); hideGlobalMenu(); },
+    });
 
-      const target = e.target as HTMLElement;
-      const row = target.closest('[data-entry-path]') as HTMLElement | null;
+    const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
+    items.push({
+      label: '粘贴',
+      icon: '📄',
+      shortcut: 'Ctrl+V',
+      disabled: !hasClipboard,
+      action: () => { void actions.pasteToPane(paneId); hideGlobalMenu(); },
+    });
 
-      if (row) {
-        // 点击在文件/文件夹行上
-        const entryPath = row.getAttribute('data-entry-path');
-        if (entryPath) {
-          const entry = entries.find((e) => e.path === entryPath);
-          if (entry) {
-            setTargetEntry(entry);
-            // 如果右键的不是选中项,则选中该项
-            if (!selectedPaths.has(entryPath)) {
-              useFileStore.getState().selectOne(paneId, entryPath);
+    items.push({ label: '', divider: true });
+
+    // P3: 复制路径
+    items.push({
+      label: '复制路径',
+      icon: '🔗',
+      disabled: !hasSelection && !targetEntry,
+      action: async () => {
+        const paths: string[] = [];
+        if (targetEntry) {
+          paths.push(targetEntry.path);
+        } else if (selectedPaths.size > 0) {
+          paths.push(...selectedPaths);
+        }
+        if (paths.length > 0) {
+          await window.tabula.fs.writeClipboard(paths.join('\n'));
+          actions.showToast('路径已复制', 'success', 1500);
+        }
+        hideGlobalMenu();
+      },
+    });
+
+    // P3: 在资源管理器中打开
+    items.push({
+      label: '在文件资源管理器中打开',
+      icon: '📁',
+      disabled: !targetEntry,
+      action: () => {
+        if (targetEntry) {
+          void window.tabula.fs.showInFolder(targetEntry.path);
+        }
+        hideGlobalMenu();
+      },
+    });
+
+    // P3: 在新窗口中打开（仅文件夹）
+    if (targetEntry?.isDirectory) {
+      items.push({
+        label: '在新窗口中打开',
+        icon: '🪟',
+        action: () => {
+          if (targetEntry) {
+            void window.tabula.windows.open(targetEntry.path);
+          }
+          hideGlobalMenu();
+        },
+      });
+    }
+
+    items.push({ label: '', divider: true });
+
+    items.push({
+      label: '重命名',
+      icon: '✏',
+      shortcut: 'F2',
+      disabled: selectedPaths.size !== 1 && !targetEntry,
+      action: () => {
+        if (targetEntry) {
+          actions.beginRename(paneId, targetEntry.path);
+        }
+        hideGlobalMenu();
+      },
+    });
+
+    items.push({
+      label: '复制到当前位置',
+      icon: '📑',
+      shortcut: 'Ctrl+D',
+      disabled: selectedPaths.size !== 1 && !targetEntry,
+      action: () => {
+        const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
+        if (srcPath && currentPath) {
+          const sep = srcPath.includes('\\') ? '\\' : '/';
+          const parent = srcPath.substring(0, srcPath.lastIndexOf(sep));
+          if (parent !== currentPath) {
+            void actions.performBulk([srcPath], currentPath, 'copy', paneId);
+          } else {
+            actions.showToast('已在当前位置', 'info', 1500);
+          }
+        }
+        hideGlobalMenu();
+      },
+    });
+
+    // P5: 添加到收藏夹
+    items.push({
+      label: '添加到收藏夹',
+      icon: '★',
+      action: () => {
+        if (targetEntry) {
+          const pathToFav = targetEntry.isDirectory ? targetEntry.path : currentPath;
+          if (pathToFav) {
+            const { addFavorite, isFavorite } = useFavoritesStore.getState();
+            if (isFavorite(pathToFav)) {
+              actions.showToast('已在收藏夹中', 'info', 1500);
+            } else {
+              addFavorite(pathToFav, targetEntry.isDirectory ? targetEntry.name : undefined);
+              actions.showToast(`已添加到收藏夹`, 'success', 1500);
             }
           }
         }
-      } else {
-        // 点击在空白处
-        setTargetEntry(null);
+        hideGlobalMenu();
+      },
+    });
+
+    // P3: 计算文件夹大小（仅文件夹）
+    if (targetEntry?.isDirectory) {
+      items.push({
+        label: '计算文件夹大小',
+        icon: '📊',
+        action: () => {
+          if (targetEntry) {
+            const toastId = actions.showToast('正在计算…', 'info', 0);
+            void window.tabula.fs.getDirSize(targetEntry.path).then((result) => {
+              actions.dismissToast(toastId);
+              if (result.ok) {
+                const { size, fileCount, dirCount } = result.data;
+                actions.showToast(`大小: ${formatSize(size)} · 文件: ${fileCount} · 目录: ${dirCount}`, 'success', 3000);
+              } else {
+                actions.showToast(`计算失败: ${result.error.message}`, 'error', 3000);
+              }
+            });
+          }
+          hideGlobalMenu();
+        },
+      });
+    }
+
+    // P3: 发送到...
+    items.push({
+      label: '发送到...',
+      icon: '📨',
+      disabled: !hasSelection && !targetEntry,
+      action: async () => {
+        const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
+        if (!srcPath) {
+          hideGlobalMenu();
+          return;
+        }
+        const targetDir = await window.tabula.fs.pickDirectory();
+        if (targetDir) {
+          const srcPaths = selectedPaths.size > 0 ? Array.from(selectedPaths) : [srcPath];
+          // 检查源和目标是否相同
+          const srcDir = srcPath.substring(0, srcPath.lastIndexOf(srcPath.includes('\\') ? '\\' : '/'));
+          if (srcDir === targetDir) {
+            actions.showToast('已在目标位置', 'info', 1500);
+          } else {
+            void actions.performBulk(srcPaths, targetDir, 'copy', paneId);
+          }
+        }
+        hideGlobalMenu();
+      },
+    });
+
+    // P3: 打开方式（仅文件）
+    if (targetEntry && !targetEntry.isDirectory) {
+      items.push({
+        label: '打开方式',
+        icon: '⚡',
+        action: () => {
+          if (targetEntry) {
+            void window.tabula.fs.openWithDialog(targetEntry.path);
+          }
+          hideGlobalMenu();
+        },
+      });
+    }
+
+    items.push({ label: '', divider: true });
+
+    items.push({
+      label: '删除',
+      icon: '🗑',
+      shortcut: 'Delete',
+      danger: true,
+      disabled: !hasSelection,
+      action: () => {
+        if (selectedPaths.size > 0) {
+          window.dispatchEvent(
+            new CustomEvent('tabula:confirm-delete', {
+              detail: { paneId, count: selectedPaths.size },
+            }),
+          );
+        }
+        hideGlobalMenu();
+      },
+    });
+
+    items.push({ label: '', divider: true });
+
+    items.push({
+      label: '属性',
+      icon: 'ℹ',
+      action: () => {
+        if (targetEntry) {
+          actions.showToast(
+            `${targetEntry.name}\n类型: ${targetEntry.isDirectory ? '文件夹' : '文件'}\n大小: ${formatSize(targetEntry.size)}\n修改: ${formatDate(targetEntry.mtime)}`,
+            'info',
+            4000,
+          );
+        }
+        hideGlobalMenu();
+      },
+    });
+  }
+
+  return items;
+}
+
+export function ContextMenu(_props: ContextMenuProps = {}) {
+  // 订阅全局单例状态
+  const [, force] = useState(0);
+  useEffect(() => {
+    const sub = () => force((n) => n + 1);
+    globalSubscribers.add(sub);
+    return () => {
+      globalSubscribers.delete(sub);
+    };
+  }, []);
+
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 第一次 mount 注册全局 listener(只挂一次,全生命周期不卸载)
+  useEffect(() => {
+    if (globalRegistered) return;
+    globalRegistered = true;
+
+    const onContextMenu = (e: MouseEvent) => {
+      // 点在菜单上 → 让菜单自己处理
+      if (menuRef.current?.contains(e.target as Node)) return;
+
+      const target = e.target as HTMLElement;
+      const paneEl = target.closest('[data-pane-id]') as HTMLElement | null;
+      const rowEl = target.closest('[data-entry-path]') as HTMLElement | null;
+
+      if (!paneEl) {
+        // 不在任何 pane 内(标题栏、状态栏、侧边栏、tab 栏等)→ 不弹菜单
+        hideGlobalMenu();
+        return;
       }
 
-      // 计算菜单位置(确保不超出屏幕)
-      const menuWidth = 200;
-      const menuHeight = 300;
+      const pickedPaneId = paneEl.getAttribute('data-pane-id') ?? null;
+      let entry: FsEntry | null = null;
+
+      if (rowEl && pickedPaneId) {
+        const entryPath = rowEl.getAttribute('data-entry-path') ?? '';
+        const paneData = useFileStore.getState().panes[pickedPaneId];
+        const entries = paneData?.entries ?? [];
+        const found = entries.find((x) => x.path === entryPath);
+        if (found) {
+          entry = found;
+          const sel = paneData?.selectedPaths;
+          if (!sel || !sel.has(entryPath)) {
+            useFileStore.getState().selectOne(pickedPaneId, entryPath);
+          }
+        }
+      }
+
+      // 屏幕边界保护
+      const menuWidth = 220;
+      const menuHeight = 360;
       let x = e.clientX;
       let y = e.clientY;
+      if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+      if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
 
-      if (x + menuWidth > window.innerWidth) {
-        x = window.innerWidth - menuWidth - 10;
-      }
-      if (y + menuHeight > window.innerHeight) {
-        y = window.innerHeight - menuHeight - 10;
-      }
-
-      setPosition({ x, y });
-      setVisible(true);
+      setGlobalState({
+        paneId: pickedPaneId,
+        entry,
+        visible: true,
+        pos: { x, y },
+      });
       e.preventDefault();
     };
 
-    const handleClick = () => {
-      setVisible(false);
+    const onClick = () => hideGlobalMenu();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') hideGlobalMenu();
     };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setVisible(false);
-      }
-    };
+    window.addEventListener('contextmenu', onContextMenu);
+    window.addEventListener('click', onClick);
+    window.addEventListener('keydown', onKey);
+  }, []);
 
-    window.addEventListener('contextmenu', handleContextMenu);
-    window.addEventListener('click', handleClick);
-    window.addEventListener('keydown', handleKeyDown);
+  // early return 必须放在所有 hooks 之后,否则 hooks 顺序会被破坏
+  if (!globalState.visible || !globalState.paneId) return null;
 
-    return () => {
-      window.removeEventListener('contextmenu', handleContextMenu);
-      window.removeEventListener('click', handleClick);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [paneId, entries, selectedPaths]);
+  const paneId = globalState.paneId;
+  const targetEntry = globalState.entry;
+  const position = globalState.pos;
+  const isEmptySpace = !targetEntry;
 
-  if (!visible) return null;
+  // 从 store 取当前 pane 数据(读一次,菜单打开期间用)
+  const paneData = useFileStore.getState().panes[paneId];
+  const selectedPaths = paneData?.selectedPaths ?? new Set<string>();
+  const currentPath = paneData?.currentPath ?? '';
+  const clipboard = useFileStore.getState().clipboard;
 
-  const menuItems = buildMenuItems();
+  // action 用 getState 一次取齐(避免 selector 不稳定引用)
+  const actions = useFileStore.getState();
+
+  // buildMenuItems 现在是模块级纯函数,直接调用,不依赖 hook 顺序
+  const menuItems = buildMenuItems({
+    paneId,
+    targetEntry,
+    isEmptySpace,
+    selectedPaths,
+    currentPath,
+    clipboard,
+    actions,
+  });
 
   return (
     <div
@@ -376,7 +518,7 @@ function formatSize(bytes: number): string {
 }
 
 function formatDate(ms: number): string {
-  if (!ms) return '—';
+  if (!ms) return '-';
   const d = new Date(ms);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
