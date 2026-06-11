@@ -60,3 +60,11 @@ deliverable.md
 deliverable-*.md
 *.verifier.md
 .verifier-*.log
+
+# Temp / test files (never commit these)
+test-*.txt
+test-*.mjs
+test-plugin/
+.playwright-mcp/
+electron-builder-custom.json
+electron-builder.json
