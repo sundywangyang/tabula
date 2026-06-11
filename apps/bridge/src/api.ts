@@ -5,6 +5,7 @@ import type {
   AppConfig,
   AppWindowState,
   CommandSpec,
+  DirSizeResult,
   DownloadProgress,
   DriveInfo,
   ExtensionManifest,
@@ -23,6 +24,7 @@ import type {
   PerfEvent,
   PerfReport,
   Result,
+  RunCommandResult,
   SearchRequest,
   SearchResult,
   SetBindingResult,
@@ -130,6 +132,12 @@ export interface TabulaAPI {
      * dataUrl 可直接 `<img src=...>`,CSP 已放行 `data:`。
      */
     getThumbnail(path: string): Promise<Result<ThumbnailResult>>;
+    /** 计算目录递归大小（异步，后台执行） */
+    getDirSize(path: string): Promise<Result<DirSizeResult>>;
+    /** 写文本到系统剪贴板 */
+    writeClipboard(text: string): Promise<void>;
+    /** 显示 Windows「打开方式」对话框并用用户选择的程序打开文件 */
+    openWithDialog(path: string): Promise<void>;
   };
 
   // 标签
@@ -197,6 +205,17 @@ export interface TabulaAPI {
     setBinding(commandId: string, combo: KeyCombo | null): Promise<SetBindingResult>;
     /** 重置所有用户自定义,恢复默认绑定 */
     resetAll(): Promise<void>;
+  };
+
+  // 命令执行 (P7 v1 收口)
+  commands: {
+    /**
+     * 请求主进程派发一条内置命令。
+     * - 主进程会在 COMMAND_CATALOG 中校验,合法时通过 `commands:run-command`
+     *   事件推回请求方所在的渲染窗口,渲染端由 `runCommandById` 真正执行。
+     * - 命令不存在时立刻返回 `ok=false`(`UNKNOWN_COMMAND`)。
+     */
+    run(commandId: string, args?: unknown[]): Promise<RunCommandResult>;
   };
 
   // 事件订阅(主进程 → 渲染进程)

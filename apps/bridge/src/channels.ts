@@ -35,6 +35,9 @@ export const IpcChannels = {
   FS_TRASH_RESTORE: 'fs:trash-restore',
   FS_TRASH_EMPTY: 'fs:trash-empty',
   FS_SEARCH: 'fs:search',
+  FS_GET_DIR_SIZE: 'fs:get-dir-size',
+  FS_WRITE_CLIPBOARD: 'fs:write-clipboard',
+  FS_OPEN_WITH_DIALOG: 'fs:open-with-dialog',
 
   // 标签
   TABS_OPEN: 'tabs:open',
@@ -81,6 +84,11 @@ export const IpcChannels = {
   SHORTCUTS_GET_BINDINGS: 'shortcuts:get-bindings',
   SHORTCUTS_SET_BINDING: 'shortcuts:set-binding',
   SHORTCUTS_RESET_ALL: 'shortcuts:reset-all',
+
+  // 命令执行 (P7 v1 收口)
+  COMMANDS_RUN: 'commands:run',
+  // 主进程 → 渲染端:通知渲染端执行指定命令(用于命令面板 / 跨进程派发)
+  COMMANDS_RUN_COMMAND: 'commands:run-command',
 
   // 应用
   APP_READY: 'app:ready',

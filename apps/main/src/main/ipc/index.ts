@@ -3,7 +3,7 @@
  *
  * 所有 ipcMain.handle 集中在这里,主进程 API 入口。
  */
-import { ipcMain, dialog, shell, app } from 'electron';
+import { ipcMain, dialog, shell, app, clipboard } from 'electron';
 import { promises as fs } from 'node:fs';
 import { join, basename } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
@@ -26,6 +26,7 @@ import { registerShortcutsHandlers } from './shortcuts';
 import {
   registerPerfIpcHandlers,
 } from '../perf/perf-service';
+import { dispatchRunCommand } from '../keymap/command-dispatcher';
 
 export interface IpcContext {
   windowManager: WindowManager;
@@ -126,6 +127,29 @@ export function registerIpcHandlers(ctx: IpcContext) {
 
   // =================== Search (P4 v1) ===================
   ipcMain.handle(IpcChannels.FS_SEARCH, (_e, req) => fsService.search(req));
+
+  // =================== Dir size (new) ===================
+  ipcMain.handle(IpcChannels.FS_GET_DIR_SIZE, (_e, p: string) => fsService.getDirSize(p));
+
+  // =================== Clipboard (new) ===================
+  ipcMain.handle(IpcChannels.FS_WRITE_CLIPBOARD, (_e, text: string) => {
+    clipboard.writeText(text);
+  });
+
+  // =================== Open With (new) ===================
+  ipcMain.handle(IpcChannels.FS_OPEN_WITH_DIALOG, async (_e, p: string) => {
+    const win = ctx.windowManager.getMainWindow();
+    if (!win) return;
+    // 显示「打开方式」对话框（Windows）
+    const result = await dialog.showOpenDialog(win, {
+      title: '选择要使用的程序',
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return;
+    const program = result.filePaths[0];
+    const { spawn } = await import('node:child_process');
+    spawn(program, [p], { detached: true, windowsHide: true });
+  });
 
   // =================== Thumbnail (P7 v1) ===================
   ipcMain.handle(IpcChannels.FS_GET_THUMBNAIL, (_e, p: string) => {
@@ -275,6 +299,17 @@ export function registerIpcHandlers(ctx: IpcContext) {
 
   // =================== P7 Shortcuts ===================
   registerShortcutsHandlers();
+
+  // =================== P7 v1 收口:命令执行 (Ctrl+Shift+P 命令面板) ===================
+  // 渲染端命令面板 / 其它来源请求执行一条内置命令;主进程校验合法性后,
+  // 通过 `commands:run-command` 事件把命令 id 推回发起方所在的渲染窗口。
+  // 实际命令体在渲染端(`runCommandById` 统一执行),这样保持「单一来源」
+  // — 同一份命令体既被 keydown handler 触发,也被命令面板触发。
+  ipcMain.handle(
+    IpcChannels.COMMANDS_RUN,
+    (evt, commandId: string, args?: unknown[]) =>
+      dispatchRunCommand(evt, commandId, args),
+  );
 
   // =================== P7 Perf ===================
   // 仅注册 IPC handler,内存采样定时器由 main/index.ts bootstrap 单独启动

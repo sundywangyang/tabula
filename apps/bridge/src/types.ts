@@ -107,6 +107,18 @@ export interface SearchResult {
   truncated: boolean;
 }
 
+/** 目录大小统计结果 */
+export interface DirSizeResult {
+  /** 字节 */
+  size: number;
+  /** 文件数 */
+  fileCount: number;
+  /** 目录数 */
+  dirCount: number;
+  /** 计算耗时(ms) */
+  elapsedMs: number;
+}
+
 /** 驱动器 / 盘符 (P5: 侧边栏「此电脑」section) */
 export interface DriveInfo {
   /** 挂载点,Windows 下形如 `C:\\` / `D:\\`;POSIX 下形如 `/` */
@@ -360,6 +372,28 @@ export type SetBindingResult =
   | { ok: true; data: { commandId: string; combo: KeyCombo | null } }
   | { ok: false; error: ShortcutError };
 
+
+// =================== 命令执行 (P7 v1 收口) ===================
+
+/** P7 v1 收口:运行一条内置命令 */
+export interface RunCommandInput {
+  /** 命令 id(如 `file.open`) */
+  commandId: string;
+  /** 透传给命令的可选参数(预留,目前内置命令不消费) */
+  args?: unknown[];
+}
+
+/** 运行结果。命令不存在 / 已被用户禁用时返回 ok=false + 错误码 */
+export type RunCommandErrorCode = 'UNKNOWN_COMMAND' | 'UNKNOWN';
+
+export interface RunCommandError {
+  code: RunCommandErrorCode;
+  message: string;
+}
+
+export type RunCommandResult =
+  | { ok: true; data: { commandId: string } }
+  | { ok: false; error: RunCommandError };
 
 
 // =================== IPC 响应包装 ===================
