@@ -64,10 +64,10 @@
 .file-list-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   position: relative;
   display: flex;
   flex-direction: column;
+  /* 不设置 height/overflow —滚动由 .file-list-body-virtual 内部处理 */
 }
 
 .file-list-body-virtual {

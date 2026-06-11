@@ -674,13 +674,24 @@ function DetailsView({
   onDragLeave,
   onDrop,
 }: DetailsViewProps) {
-  const parentRef = useRef<HTMLDivElement>(null);
+   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 28,
     overscan: 12,
   });
+
+  // 调试：挂载后打印滚动容器和虚拟滚动器状态
+  useEffect(() => {
+    const el = parentRef.current;
+    console.error('[DetailsView] mounted', {
+      scrollEl: el ? `${el.clientWidth}x${el.clientHeight}` : 'null',
+      totalEntries: entries.length,
+      totalSize: rowVirtualizer.getTotalSize(),
+      virtualItems: rowVirtualizer.getVirtualItems().length,
+    });
+  }, []);
 
   return (
     <div className="details-view">
@@ -900,6 +911,17 @@ function ListView({
     overscan: 12,
   });
 
+  // 调试：挂载后打印滚动容器和虚拟滚动器状态
+  useEffect(() => {
+    const el = parentRef.current;
+    console.error('[ListView] mounted', {
+      scrollEl: el ? `${el.clientWidth}x${el.clientHeight}` : 'null',
+      totalEntries: entries.length,
+      totalSize: rowVirtualizer.getTotalSize(),
+      virtualItems: rowVirtualizer.getVirtualItems().length,
+    });
+  }, []);
+
   return (
     <div className="list-view">
       <div className="file-list-header">
@@ -1009,6 +1031,18 @@ function GridView({
     estimateSize: () => 96,
     overscan: 4,
   });
+
+  // 调试：挂载后打印滚动容器和虚拟滚动器状态
+  useEffect(() => {
+    const el = parentRef.current;
+    console.error('[GridView] mounted', {
+      scrollEl: el ? `${el.clientWidth}x${el.clientHeight}` : 'null',
+      totalRows: rows,
+      totalEntries: entries.length,
+      totalSize: rowVirtualizer.getTotalSize(),
+      virtualItems: rowVirtualizer.getVirtualItems().length,
+    });
+  }, []);
 
   return (
     <div className="grid-view" style={{ ['--grid-cols' as string]: String(cols) }}>
