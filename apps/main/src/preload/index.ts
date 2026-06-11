@@ -146,6 +146,9 @@ const api: TabulaAPI = {
     trashEmpty: () => ipcRenderer.invoke(IpcChannels.FS_TRASH_EMPTY),
     search: (req) => ipcRenderer.invoke(IpcChannels.FS_SEARCH, req),
     getThumbnail: (p) => ipcRenderer.invoke(IpcChannels.FS_GET_THUMBNAIL, p),
+    getDirSize: (p) => ipcRenderer.invoke(IpcChannels.FS_GET_DIR_SIZE, p),
+    writeClipboard: (text) => ipcRenderer.invoke(IpcChannels.FS_WRITE_CLIPBOARD, text),
+    openWithDialog: (p) => ipcRenderer.invoke(IpcChannels.FS_OPEN_WITH_DIALOG, p),
   },
 
   tabs: {
@@ -200,6 +203,12 @@ const api: TabulaAPI = {
     setBinding: (commandId, combo) =>
       ipcRenderer.invoke(IpcChannels.SHORTCUTS_SET_BINDING, commandId, combo),
     resetAll: () => ipcRenderer.invoke(IpcChannels.SHORTCUTS_RESET_ALL),
+  },
+
+  // P7 v1 收口:命令执行(供命令面板 Ctrl+Shift+P 调用)
+  commands: {
+    run: (commandId, args) =>
+      ipcRenderer.invoke(IpcChannels.COMMANDS_RUN, commandId, args ?? []),
   },
 
   events: makeEvents(),
