@@ -74,6 +74,7 @@
   /* 虚拟滚动容器：flex 填满滚动容器的可用高度 */
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
   position: relative;
   align-content: flex-start;
 }
