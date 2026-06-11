@@ -12,23 +12,21 @@
   background: var(--bg-overlay);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
   padding: 0 4px;
   gap: 2px;
-}
-
-.tab-bar::-webkit-scrollbar {
-  height: 0;
+  /* tabs 整体不滚动，超出部分直接裁掉，交给 flex-shrink 收缩 */
+  overflow: hidden;
 }
 
 .tab-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 0 8px 0 10px;
-  min-width: 80px;
-  max-width: 220px;
+  /*关键: flex-shrink:1 让 tab 在 pane 变窄时自动收缩，
+     min-width 设一个足够小的值允许渐进收缩 */
+  flex-shrink: 1;
+  min-width: 28px;
   height: 26px;
   margin-top: 3px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -39,7 +37,6 @@
   user-select: none;
   transition: background 0.1s, color 0.1s, opacity 0.15s;
   position: relative;
-  flex-shrink: 0;
 }
 
 .tab-chip:hover {
@@ -158,6 +155,38 @@
   margin-right: 2px;
   align-self: center;
   flex-shrink: 0;
+}
+
+/* =================== 极窄 pane渐进收缩 ===================
+ * .pane-view 已设置 container-type: inline-size / container-name: pane
+ * (Toolbar.css)，tabs 响应 pane 实际宽度收缩。
+ *
+ * 触发条件: pane 宽度 < tabs 总 min-width 之和时 flex-shrink 介入。
+ * 在此基础上，极窄时再进一步收缩。
+ */
+
+/* 极窄 pane:icon-only 模式，隐藏标题文字 */
+@container pane (max-width: 280px) {
+  .tab-chip {
+    flex-shrink: 1;
+    min-width: 26px;
+    padding: 0 4px;
+    justify-content: center;
+  }
+  .tab-title {
+    display: none;
+  }
+}
+
+/* 更窄:只保留 icon 和 close */
+@container pane (max-width: 200px) {
+  .tab-chip {
+    flex-shrink: 1;
+    min-width: 22px;
+    padding: 0 2px;
+    gap: 2px;
+    justify-content: center;
+  }
 }
 
 /* =================== 标签右键菜单 =================== */

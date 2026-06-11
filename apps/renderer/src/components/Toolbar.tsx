@@ -7,11 +7,15 @@
  *
  * P2: openPathBar 需要 paneId(每个 pane 独立打开路径栏,这里取 active pane)
  */
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useFileStore, type ViewMode } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
+import type { Tab } from '@tabula/bridge';
 import './Toolbar.css';
+
+// 右键历史菜单最大条目数
+const MAX_HISTORY_MENU_ITEMS = 20;
 
 const VIEW_MODES: { mode: ViewMode; icon: string; label: string }[] = [
   { mode: 'list', icon: '☰', label: '列表' },
@@ -19,19 +23,98 @@ const VIEW_MODES: { mode: ViewMode; icon: string; label: string }[] = [
   { mode: 'details', icon: '☷', label: '详情' },
 ];
 
+// 模块级常量，避免 selector 每次渲染创建新引用
+const EMPTY_PATH = '';
+const EMPTY_SET = Object.freeze(new Set<string>());
+
+/** 从 Tab 获取历史（去重，过滤 null/undefined） */
+function getTabHistory(tab: Tab): string[] {
+  return (tab.history ?? []).filter((p): p is string => Boolean(p));
+}
+
 export function Toolbar({ paneId }: { paneId: string }) {
+  // 数据切片（值类型，不创建新引用）
   const viewMode = useFileStore((s) => s.panes[paneId]?.viewMode ?? 'details');
-  const setViewMode = useFileStore((s) => s.setViewMode);
   const showHidden = useFileStore((s) => s.showHidden);
   const showExtensions = useFileStore((s) => s.showExtensions);
-  const toggleShowHidden = useFileStore((s) => s.toggleShowHidden);
-  const toggleShowExtensions = useFileStore((s) => s.toggleShowExtensions);
-  const openPathBar = useFileStore((s) => s.openPathBar);
-  const refresh = useFileStore((s) => s.refresh);
-  const showToast = useFileStore((s) => s.showToast);
+  const currentPath = useFileStore((s) => s.panes[paneId]?.currentPath ?? EMPTY_PATH);
+  // selectedPaths 必须是稳定引用——用 Object.freeze 的空 Set 而非 new Set()
+  const selectedPaths = useFileStore((s) => s.panes[paneId]?.selectedPaths ?? EMPTY_SET);
+  const cursorPath = useFileStore((s) => s.panes[paneId]?.cursorPath ?? null);
+  const clipboard = useFileStore((s) => s.clipboard);
+
+  // 前进/后退状态：从 layout-store 取 active tab 的 history 信息
+  const [historyMenuOpen, setHistoryMenuOpen] = useState<'back' | 'forward' | null>(null);
+  const historyMenuRef = useRef<HTMLDivElement>(null);
+
+  // 获取 active tab
+  const activeTab = useMemo(() => {
+    const root = useLayoutStore.getState().rootLayout;
+    const paneNode = findPaneNode(root, paneId);
+    if (!paneNode || paneNode.type !== 'pane' || !paneNode.activeTabId) return null;
+    return paneNode.tabs.find((t) => t.id === paneNode.activeTabId) ?? null;
+  }, [paneId]);
+
+  const history = useMemo(() => activeTab ? getTabHistory(activeTab) : [], [activeTab]);
+  const historyIndex = activeTab?.historyIndex ?? -1;
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < history.length - 1;
+
+  // 关闭历史菜单的 effect
+  useEffect(() => {
+    if (!historyMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (historyMenuRef.current && !historyMenuRef.current.contains(e.target as Node)) {
+        setHistoryMenuOpen(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [historyMenuOpen]);
+
+  // 前进/后退 handlers
+  const handleGoBack = () => {
+    useLayoutStore.getState().pane.goBack(paneId);
+  };
+
+  const handleGoForward = () => {
+    useLayoutStore.getState().pane.goForward(paneId);
+  };
+
+  // 右键打开历史菜单
+  const handleNavMouseDown = (dir: 'back' | 'forward') => (e: React.MouseEvent) => {
+    if (e.button === 2) {
+      e.preventDefault();
+      setHistoryMenuOpen(dir);
+    }
+  };
+
+  // 从历史菜单跳转
+  const handleHistoryJump = (path: string) => {
+    setHistoryMenuOpen(null);
+    useLayoutStore.getState().pane.navigate(paneId, path);
+  };
+
+  // 阻止默认右键菜单
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+  };
+
+  // 历史菜单数据
+  const backHistory = useMemo(() => history.slice(0, historyIndex).reverse().slice(0, MAX_HISTORY_MENU_ITEMS), [history, historyIndex]);
+  const forwardHistory = useMemo(() => history.slice(historyIndex + 1).slice(0, MAX_HISTORY_MENU_ITEMS), [history, historyIndex]);
+  const menuItems = historyMenuOpen === 'back' ? backHistory : forwardHistory;
+
+  // 所有 action 用 getState() 获取（避免 selector 返回函数导致 getSnapshot 缓存失效）
+  const { setViewMode, openPathBar, refresh, showToast } = useFileStore.getState();
+  const toggleShowHidden = useFileStore.getState().toggleShowHidden;
+  const toggleShowExtensions = useFileStore.getState().toggleShowExtensions;
+  const copySelected = useFileStore.getState().copySelected;
+  const cutSelected = useFileStore.getState().cutSelected;
+  const pasteToPane = useFileStore.getState().pasteToPane;
+  const beginRename = useFileStore.getState().beginRename;
 
   // P5: 收藏
-  const currentPath = useFileStore((s) => s.panes[paneId]?.currentPath ?? '');
   const isFavorite = useMemo(
     () => (currentPath ? useFavoritesStore.getState().favorites.some((f) => f.path === currentPath) : false),
     [currentPath],
@@ -64,19 +147,19 @@ export function Toolbar({ paneId }: { paneId: string }) {
   };
 
   // P3: 文件操作按钮
-  const selectedPaths = useFileStore((s) => s.panes[paneId]?.selectedPaths ?? new Set<string>());
   const hasSelection = selectedPaths.size > 0;
-  const clipboard = useFileStore((s) => s.clipboard);
-  const copySelected = useFileStore((s) => s.copySelected);
-  const cutSelected = useFileStore((s) => s.cutSelected);
-  const pasteToPane = useFileStore((s) => s.pasteToPane);
-  const beginRename = useFileStore((s) => s.beginRename);
-  const cursorPath = useFileStore((s) => s.panes[paneId]?.cursorPath ?? null);
   const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
 
   const handleCopy = () => copySelected(paneId);
   const handleCut = () => cutSelected(paneId);
   const handlePaste = () => { void pasteToPane(paneId); };
+  const handleCopyPath = async () => {
+    const paths = selectedPaths.size > 0 ? Array.from(selectedPaths) : (cursorPath ? [cursorPath] : []);
+    if (paths.length > 0) {
+      await window.tabula.fs.writeClipboard(paths.join('\n'));
+      showToast('路径已复制', 'success', 1500);
+    }
+  };
   const handleDelete = () => {
     if (selectedPaths.size === 0) return;
     window.dispatchEvent(
@@ -95,8 +178,102 @@ export function Toolbar({ paneId }: { paneId: string }) {
     if (target) beginRename(paneId, target);
   };
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollState, setScrollState] = useState({ left: false, right: false });
+
+  // 滚轮横滚支持（同时按住 Shift 时竖滚 = 横滚）
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // 浏览器原生横滚
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
+  // 溢出状态感知
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setScrollState({ left: el.scrollLeft > 4, right: el.scrollLeft < el.scrollWidth - el.clientWidth - 4 });
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      el.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [updateScrollState]);
+
+  const scrollBy = (delta: number) => scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
+
+  const scrollClass = [
+    'toolbar-scroll-container',
+    scrollState.left ? 'has-overflow-left' : '',
+    scrollState.right ? 'has-overflow-right' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div className="toolbar">
+      {/* 左滚动按钮 */}
+      {scrollState.left && (
+        <button className="toolbar-scroll-btn toolbar-scroll-left" onClick={() => scrollBy(-80)} aria-label="向左滚动">
+          ‹
+        </button>
+      )}
+      {/* 横向滚动容器 */}
+      <div className={scrollClass} ref={scrollRef}>
+      {/* 前进/后退按钮组 */}
+      <div className="toolbar-group">
+        <button
+          className={`toolbar-btn toolbar-nav ${canGoBack ? '' : 'disabled'}`}
+          onClick={handleGoBack}
+          onMouseDown={handleNavMouseDown('back')}
+          onContextMenu={handleContextMenu}
+          disabled={!canGoBack}
+          title="后退 (Alt+←)"
+        >
+          <span className="toolbar-icon">◀</span>
+        </button>
+        <button
+          className={`toolbar-btn toolbar-nav ${canGoForward ? '' : 'disabled'}`}
+          onClick={handleGoForward}
+          onMouseDown={handleNavMouseDown('forward')}
+          onContextMenu={handleContextMenu}
+          disabled={!canGoForward}
+          title="前进 (Alt+→)"
+        >
+          <span className="toolbar-icon">▶</span>
+        </button>
+      </div>
+
+      {/* 历史菜单下拉 */}
+      {historyMenuOpen && menuItems.length > 0 && (
+        <div className="toolbar-history-menu" ref={historyMenuRef}>
+          {menuItems.map((path, i) => (
+            <div
+              key={i}
+              className="toolbar-history-item"
+              onClick={() => handleHistoryJump(path)}
+            >
+              {path}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="toolbar-divider" />
+
       <div className="toolbar-group">
         <button
           className="toolbar-btn toolbar-new"
@@ -142,6 +319,14 @@ export function Toolbar({ paneId }: { paneId: string }) {
         >
           <span className="toolbar-icon">📄</span>
           <span className="toolbar-label">粘贴</span>
+        </button>
+        <button
+          className="toolbar-btn"
+          onClick={handleCopyPath}
+          disabled={!hasSelection && !cursorPath}
+          title="复制路径"
+        >
+          <span className="toolbar-icon">🔗</span>
         </button>
         <button
           className="toolbar-btn"
@@ -246,9 +431,32 @@ export function Toolbar({ paneId }: { paneId: string }) {
           title={showExtensions ? '隐藏扩展名' : '显示扩展名'}
         >
           <span className="toolbar-icon">𝝰</span>
-          <span className="toolbar-label">{showExtensions ? '扩展名:开' : '扩展名:关'}</span>
+                    <span className="toolbar-label">{showExtensions ? '扩展名:开' : '扩展名:关'}</span>
         </button>
       </div>
+      </div>
+      {/* 右滚动按钮 */}
+      {scrollState.right && (
+        <button className="toolbar-scroll-btn toolbar-scroll-right" onClick={() => scrollBy(80)} aria-label="向右滚动">
+          ›
+        </button>
+      )}
     </div>
   );
+}
+
+// =================== 辅助函数 ===================
+
+import type { LayoutNode } from '@tabula/bridge';
+
+/** 在布局树中查找 pane 节点 */
+function findPaneNode(node: LayoutNode, paneId: string): LayoutNode | null {
+  if (node.type === 'pane') {
+    return node.id === paneId ? node : null;
+  }
+  for (const child of node.children) {
+    const hit = findPaneNode(child, paneId);
+    if (hit) return hit;
+  }
+  return null;
 }

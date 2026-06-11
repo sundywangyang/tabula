@@ -267,7 +267,7 @@ export function TabBar({
                 disabled={isTabDragging}
               >
                 ×
-              </button>
+                           </button>
             )}
           </div>
         );
