@@ -92,6 +92,9 @@
   position: relative;
   transition: border-color 0.12s;
   border: 1px solid transparent;
+  /* P2 v2 收口:CSS Container Queries 让 Toolbar 在窄 pane 里自动切 icon-only */
+  container-type: inline-size;
+  container-name: pane;
 }
 
 .pane-focused {

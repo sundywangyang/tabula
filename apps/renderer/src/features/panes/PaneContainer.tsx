@@ -35,9 +35,16 @@ function SplitView({ node }: { node: LayoutNode }) {
     if (!child) continue;
     const size = node.sizes[i] ?? (100 / node.children.length);
     const flexValue = `${size} 1 0`;
+    // key 必须是稳定的:split child 用其 node.id,pane 用其 id。
+    // 之前用 Math.random() 会导致每次 re-render 子树被卸载重建,
+    // 既破坏 PaneView 内部状态,也会引发 TabBar/Toolbar 视觉闪烁。
+    const childKey =
+      child.type === 'pane'
+        ? `pane-${child.id}`
+        : `split-${child.id ?? `orphan-${i}`}`;
     children.push(
       <div
-        key={child.type === 'pane' ? child.id : `split-${i}-${Math.random().toString(36).slice(2, 6)}`}
+        key={childKey}
         className="layout-split-child"
         style={{ flex: flexValue, minWidth: 0, minHeight: 0, display: 'flex' }}
       >
@@ -47,7 +54,7 @@ function SplitView({ node }: { node: LayoutNode }) {
     if (i < node.children.length - 1) {
       children.push(
         <SplitHandle
-          key={`handle-${i}`}
+          key={`handle-${node.id ?? 'split'}-${i}`}
           isHoriz={isHoriz}
           splitNodeId={node.id ?? ''}
           containerRef={containerRef}

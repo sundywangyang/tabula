@@ -29,6 +29,16 @@ const isDev = !app.isPackaged;
 
 let windowManager: WindowManager | null = null;
 
+// P2-regression probe: external test orchestrator sets TABULA_REMOTE_DEBUG=1
+// to expose the renderer over CDP for Playwright connectOverCDP.
+// Zero cost when unset (no flag pushed, no port bound).
+if (process.env.TABULA_REMOTE_DEBUG === '1') {
+  const port = Number(process.env.TABULA_REMOTE_DEBUG_PORT) || 9223;
+  // eslint-disable-next-line no-console
+  console.error(`[main] TABULA_REMOTE_DEBUG enabled, --remote-debugging-port=${port}`);
+  app.commandLine.appendSwitch('remote-debugging-port', String(port));
+}
+
 // P7: 把 logger 装在所有其它模块 import 之前的最早阶段,
 // 这样后面任何 throw 都能被 log 捕获(尽管 TS 解析的顺序是静态的,
 // 实际 Electron 运行时 app.whenReady 之前的 console.* 也走 log)。

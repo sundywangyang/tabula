@@ -19,7 +19,6 @@ import { Breadcrumb } from '../../components/Breadcrumb';
 import { Toolbar } from '../../components/Toolbar';
 import { FileList } from '../file-list/FileList';
 import { SearchBar } from '../file-list/SearchBar';
-import { ContextMenu } from '../../components/ContextMenu';
 import { TrashPane } from '../trash/TrashPane';
 import { useFileStore, type BreadcrumbSegment } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
@@ -268,8 +267,7 @@ export function PaneView({
                 }
               }}
             />
-            {/* P3: 右键菜单 */}
-            <ContextMenu paneId={paneId} />
+            {/* P3 右键菜单已上移至 App 顶层(全局单例) */}
           </>
         )}
       </div>

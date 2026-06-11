@@ -19,6 +19,17 @@ import { ToastHost } from './components/Toast';
 import { ConflictDialog } from './components/ConflictDialog';
 import { InputDialog } from './components/InputDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { PropertiesPanel } from './features/file-list/PropertiesPanel';
+import { BatchRenameDialog } from './features/file-list/BatchRenameDialog';
+import { ContextMenu } from './components/ContextMenu';
+import {
+  CommandPalette,
+  openCommandPalette,
+  closeCommandPalette,
+  isCommandPaletteOpen,
+} from './features/command-palette/CommandPalette';
+import { runCommandById } from './command-dispatcher';
+import { IpcChannels } from '@tabula/bridge';
 import { LayoutView } from './features/panes/PaneContainer';
 import { PerfPanel } from './features/perf/PerfPanel';
 import { UpdateNotification } from './features/update/UpdateNotification';
@@ -28,6 +39,7 @@ import { useFavoritesStore } from './stores/favorites-store';
 import { useThemeStore, type ThemeMode } from './stores/theme-store';
 import { useSettingsStore } from './stores/settings-store';
 import { useKeymapStore } from './stores/keymap-store';
+import { useUiDialogsStore } from './stores/ui-dialogs-store';
 import { makeFolderTab } from './stores/file-store';
 import { usePerfStore } from './stores/perf-store';
 import { reportFirstPaint, pullStartupTimings } from './perf/perf-client';
@@ -50,23 +62,36 @@ const Settings = lazy(() =>
 export function App() {
   const [version, setVersion] = useState<string>('');
 
-  // P3: dialog state
-  const [newFolderOpen, setNewFolderOpen] = useState(false);
-  const [newFileOpen, setNewFileOpen] = useState(false);
-  const [newTargetPane, setNewTargetPane] = useState<string | null>(null);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [confirmDeleteData, setConfirmDeleteData] = useState<{
-    paneId: string;
-    count: number;
-  } | null>(null);
+  // P3: dialog state — 集中到 ui-dialogs-store(P7 v1 收口),
+  // 这样命令面板(runCommandById)也能直接驱动 dialog 开关,
+  // 不用走 custom event 绕一圈。
+  const newFolderOpen = useUiDialogsStore((s) => s.newFolderOpen);
+  const setNewFolder = useUiDialogsStore((s) => s.setNewFolder);
+  const newFileOpen = useUiDialogsStore((s) => s.newFileOpen);
+  const setNewFile = useUiDialogsStore((s) => s.setNewFile);
+  const newTargetPane = useUiDialogsStore((s) => s.newFolderTargetPane);
+  const confirmDeleteOpen = useUiDialogsStore((s) => s.confirmDeleteOpen);
+  const confirmDeleteData = useUiDialogsStore((s) => s.confirmDeleteData);
+  const setConfirmDelete = useUiDialogsStore((s) => s.setConfirmDelete);
+  const confirmPermanentDeleteOpen = useUiDialogsStore(
+    (s) => s.confirmPermanentDeleteOpen,
+  );
+  const confirmPermanentDeleteData = useUiDialogsStore(
+    (s) => s.confirmPermanentDeleteData,
+  );
+  const setConfirmPermanentDelete = useUiDialogsStore(
+    (s) => s.setConfirmPermanentDelete,
+  );
+  const settingsOpen = useUiDialogsStore((s) => s.settingsOpen);
+  const setSettingsOpen = useUiDialogsStore((s) => s.setSettingsOpen);
 
-  // P3: permanent delete dialog state
-  const [confirmPermanentDeleteOpen, setConfirmPermanentDeleteOpen] = useState(false);
-  const [confirmPermanentDeleteData, setConfirmPermanentDeleteData] = useState<{
-    paneId: string;
-    count: number;
-    paths: string[];
-  } | null>(null);
+  // P3: 属性面板
+  const propertiesPanel = useUiDialogsStore((s) => s.propertiesPanel);
+  const closePropertiesPanel = useUiDialogsStore((s) => s.closePropertiesPanel);
+
+  // P3: 批量重命名
+  const batchRename = useUiDialogsStore((s) => s.batchRename);
+  const closeBatchRename = useUiDialogsStore((s) => s.closeBatchRename);
 
   // file-store
   const hydrateFromConfig = useFileStore((s) => s.hydrateFromConfig);
@@ -106,9 +131,6 @@ export function App() {
 
   // P7 v1: 快捷键(从主进程拉命令 + 绑定)
   const hydrateKeymap = useKeymapStore((s) => s.hydrate);
-
-  // P5: 设置页 state
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // layout-store
   const rootLayout = useLayoutStore((s) => s.rootLayout);
@@ -227,6 +249,25 @@ export function App() {
     return () => mq.removeEventListener('change', onChange);
   }, [themeSetEffective]);
 
+  // P7 v1: Ctrl+Shift+P 切换命令面板(独立 effect,捕获阶段,
+  // 即便焦点在 path bar / dialog input 里也能触发 — 沿用 VS Code 行为)。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isMeta = e.ctrlKey || e.metaKey;
+      if (isMeta && e.shiftKey && !e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isCommandPaletteOpen()) {
+          closeCommandPalette();
+        } else {
+          openCommandPalette();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
   // P5: 监听 active pane 路径变化 → 记录到 history
   useEffect(() => {
     if (!activePath) return;
@@ -238,26 +279,53 @@ export function App() {
   useEffect(() => {
     const onNewFolder = (e: Event) => {
       const detail = (e as CustomEvent).detail as { paneId: string };
-      setNewTargetPane(detail.paneId);
-      setNewFolderOpen(true);
+      setNewFolder(true, detail.paneId);
     };
     const onNewFile = (e: Event) => {
       const detail = (e as CustomEvent).detail as { paneId: string };
-      setNewTargetPane(detail.paneId);
-      setNewFileOpen(true);
+      setNewFile(true, detail.paneId);
     };
     const onConfirmDelete = (e: Event) => {
       const detail = (e as CustomEvent).detail as { paneId: string; count: number };
-      setConfirmDeleteData({ paneId: detail.paneId, count: detail.count });
-      setConfirmDeleteOpen(true);
+      setConfirmDelete({ paneId: detail.paneId, count: detail.count });
     };
+    // P7 v1 收口:主进程 `commands:run-command` 事件回推后,统一派发到
+    // 命令执行器(与 App.tsx keydown handler 走同一条路径)。
+    // 这里走 IPC 事件(`window.tabula.events.on` 订阅主进程 webContents.send),
+    // 不是 window custom event。
+    const offRunCommand = window.tabula.events.on<{ commandId: string }>(
+      IpcChannels.COMMANDS_RUN_COMMAND,
+      (payload) => {
+        if (payload && typeof payload.commandId === 'string') {
+          runCommandById(payload.commandId);
+        }
+      },
+    );
     window.addEventListener('tabula:new-folder', onNewFolder);
     window.addEventListener('tabula:new-file', onNewFile);
     window.addEventListener('tabula:confirm-delete', onConfirmDelete);
+
+    // P3: 属性面板
+    const onShowProperties = (e: Event) => {
+      const detail = (e as CustomEvent<{ paneId: string; entry: import('@tabula/bridge').FsEntry }>).detail;
+      useUiDialogsStore.getState().openPropertiesPanel(detail.paneId, detail.entry);
+    };
+    window.addEventListener('tabula:show-properties', onShowProperties);
+
+    // P3: 批量重命名
+    const onBatchRename = (e: Event) => {
+      const detail = (e as CustomEvent<{ paneId: string; paths: string[]; names: string[] }>).detail;
+      useUiDialogsStore.getState().openBatchRename(detail.paneId, detail.paths, detail.names);
+    };
+    window.addEventListener('tabula:batch-rename', onBatchRename);
+
     return () => {
       window.removeEventListener('tabula:new-folder', onNewFolder);
       window.removeEventListener('tabula:new-file', onNewFile);
       window.removeEventListener('tabula:confirm-delete', onConfirmDelete);
+      window.removeEventListener('tabula:show-properties', onShowProperties);
+      window.removeEventListener('tabula:batch-rename', onBatchRename);
+      offRunCommand();
     };
   }, []);
 
@@ -308,9 +376,9 @@ export function App() {
       // Esc:清空选择 / 关闭 dialog
       if (key === 'Escape') {
         // dialog 优先(它们自己处理)
-        if (newFolderOpen) { setNewFolderOpen(false); return; }
-        if (newFileOpen) { setNewFileOpen(false); return; }
-        if (confirmDeleteOpen) { setConfirmDeleteOpen(false); return; }
+        if (newFolderOpen) { setNewFolder(false, null); return; }
+        if (newFileOpen) { setNewFile(false, null); return; }
+        if (confirmDeleteOpen) { setConfirmDelete(null); return; }
         if ((activeSelected?.size ?? 0) > 0) {
           e.preventDefault();
           clearSelection(activePaneId);
@@ -341,8 +409,7 @@ export function App() {
       // Ctrl+N:新建文件夹(全局)
       if (isMeta && !isAlt && !isShift && (key === 'n' || key === 'N')) {
         e.preventDefault();
-        setNewTargetPane(activePaneId);
-        setNewFolderOpen(true);
+        setNewFolder(true, activePaneId);
         return;
       }
 
@@ -552,12 +619,11 @@ export function App() {
         const data = useFileStore.getState().panes[activePaneId];
         const selected = data?.selectedPaths ?? new Set<string>();
         if (selected.size === 0) return;
-        setConfirmPermanentDeleteData({
+        setConfirmPermanentDelete({
           paneId: activePaneId,
           count: selected.size,
           paths: Array.from(selected),
         });
-        setConfirmPermanentDeleteOpen(true);
         return;
       }
     };
@@ -614,6 +680,12 @@ export function App() {
       <ToastHost />
       <ConflictDialog />
 
+      {/* P3: 全局右键菜单(单例,挂在 App 顶层,从 data-pane-id 推断目标 pane) */}
+      <ContextMenu />
+
+      {/* P7 v1: 快捷命令面板(单例,Ctrl+Shift+P 打开) */}
+      <CommandPalette />
+
       {/* P4: 预览 / 全局搜索 — 懒加载(Suspense 兜底) */}
       <Suspense fallback={null}>
         <PreviewPanel />
@@ -634,9 +706,9 @@ export function App() {
         okLabel="创建"
         onSubmit={(name) => {
           if (newTargetPane) void createFolder(newTargetPane, name);
-          setNewFolderOpen(false);
+          setNewFolder(false, null);
         }}
-        onCancel={() => setNewFolderOpen(false)}
+        onCancel={() => setNewFolder(false, null)}
       />
       <InputDialog
         open={newFileOpen}
@@ -646,9 +718,9 @@ export function App() {
         okLabel="创建"
         onSubmit={(name) => {
           if (newTargetPane) void createFile(newTargetPane, name);
-          setNewFileOpen(false);
+          setNewFile(false, null);
         }}
-        onCancel={() => setNewFileOpen(false)}
+        onCancel={() => setNewFile(false, null)}
       />
       <ConfirmDialog
         open={confirmDeleteOpen}
@@ -666,9 +738,9 @@ export function App() {
           if (confirmDeleteData) {
             await deleteSelected(confirmDeleteData.paneId);
           }
-          setConfirmDeleteOpen(false);
+          setConfirmDelete(null);
         }}
-        onCancel={() => setConfirmDeleteOpen(false)}
+        onCancel={() => setConfirmDelete(null)}
       />
       {/* P3: 永久删除确认对话框 */}
       <ConfirmDialog
@@ -690,15 +762,37 @@ export function App() {
               confirmPermanentDeleteData.paths,
             );
           }
-          setConfirmPermanentDeleteOpen(false);
+          setConfirmPermanentDelete(null);
         }}
-        onCancel={() => setConfirmPermanentDeleteOpen(false)}
+        onCancel={() => setConfirmPermanentDelete(null)}
       />
       {/* P5: 设置页 — 懒加载(Suspense 兜底) */}
       {settingsOpen && (
         <Suspense fallback={null}>
           <Settings onClose={() => setSettingsOpen(false)} />
         </Suspense>
+      )}
+
+      {/* P3: 属性详情面板 */}
+      {propertiesPanel.open && propertiesPanel.entry && (
+        <PropertiesPanel
+          paneId={propertiesPanel.paneId!}
+          entry={propertiesPanel.entry}
+          onClose={closePropertiesPanel}
+        />
+      )}
+
+      {/* P3: 批量重命名对话框 */}
+      {batchRename.open && (
+        <BatchRenameDialog
+          paneId={batchRename.paneId ?? activePaneId}
+          paths={batchRename.paths}
+          names={batchRename.names}
+          onClose={closeBatchRename}
+          onRenamed={() => {
+            if (batchRename.paneId) void refresh(batchRename.paneId);
+          }}
+        />
       )}
     </div>
   );

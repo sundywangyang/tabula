@@ -8,7 +8,8 @@
  * - 渲染端 JS heap
  * - IPC 调用计数 top 10
  *
- * 通过 Ctrl+Shift+P 打开/关闭(冲突说明:全局搜索用 Ctrl+P,本面板用 Ctrl+Shift+P,避免冲突)
+ * 通过 Ctrl+Alt+P 打开/关闭(冲突说明:全局搜索用 Ctrl+P,命令面板用 Ctrl+Shift+P,
+ * 本面板用 Ctrl+Alt+P 避免与上述两者冲突)
  */
 import { useEffect, useState } from 'react';
 import { usePerfStore } from '../../stores/perf-store';
@@ -52,11 +53,12 @@ export function PerfPanel() {
     void window.tabula.perf.snapshot().then(usePerfStore.getState().setReport).catch(() => undefined);
   }, [open, refreshNonce]);
 
-  // 全局快捷键:Ctrl+Shift+P(避免与 Ctrl+P 全局搜索冲突)
+  // 全局快捷键:Ctrl+Alt+P(让出 Ctrl+Shift+P 给命令面板,
+  // 避免与 Ctrl+P 全局搜索冲突)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const isMeta = e.ctrlKey || e.metaKey;
-      if (isMeta && e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+      if (isMeta && e.altKey && !e.shiftKey && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
         if (usePerfStore.getState().panelOpen) {
           usePerfStore.getState().closePanel();
@@ -216,7 +218,7 @@ export function PerfPanel() {
           </section>
 
           <div className="perf-hint">
-            快捷键:Ctrl+Shift+P 打开 / 关闭
+            快捷键:Ctrl+Alt+P 打开 / 关闭
           </div>
         </div>
       </div>
