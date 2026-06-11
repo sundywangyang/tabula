@@ -1,0 +1,243 @@
+/* 批量重命名对话框 */
+.batch-rename-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 7000;
+  backdrop-filter: blur(2px);
+}
+
+.batch-rename-dialog {
+  width: min(520px, 90vw);
+  max-height: 80vh;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.batch-rename-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.batch-rename-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+
+.batch-rename-count {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+}
+
+/* Rules section */
+.batch-rename-rules {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.batch-rename-rule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.batch-rename-label {
+  font-size: 12px;
+  color: var(--fg-secondary);
+  flex-shrink: 0;
+  width: 40px;
+}
+
+.batch-rename-input {
+  flex: 1;
+  height: 32px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  color: var(--fg-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.1s;
+}
+
+.batch-rename-input:focus {
+  border-color: var(--accent);
+}
+
+.batch-rename-input::placeholder {
+  color: var(--fg-tertiary);
+  font-family: var(--font-sans);
+}
+
+.batch-rename-preview-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.batch-rename-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+}
+
+.batch-rename-checkbox-label input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.batch-rename-preview-hint {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+/* Preview list */
+.batch-rename-preview-list {
+  flex: 1;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  max-height: 240px;
+  padding: 8px 0;
+}
+
+.batch-rename-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 20px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.batch-rename-preview-item:hover {
+  background: var(--bg-hover);
+}
+
+.batch-rename-preview-item.changed .batch-rename-old {
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+.batch-rename-preview-item.changed .batch-rename-new {
+  color: var(--success);
+}
+
+.batch-rename-old {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-secondary);
+}
+
+.batch-rename-arrow {
+  color: var(--fg-tertiary);
+  flex-shrink: 0;
+}
+
+.batch-rename-new {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-primary);
+}
+
+.batch-rename-preview-more {
+  padding: 8px 20px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  text-align: center;
+}
+
+/* Error list */
+.batch-rename-errors {
+  padding: 12px 20px;
+  background: rgba(220, 38, 38, 0.08);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.batch-rename-errors-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger);
+  margin-bottom: 6px;
+}
+
+.batch-rename-error-item {
+  font-size: 11px;
+  color: var(--danger);
+  font-family: var(--font-mono);
+  padding: 2px 0;
+}
+
+/* Actions */
+.batch-rename-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 14px 20px;
+  flex-shrink: 0;
+}
+
+.batch-rename-btn {
+  height: 32px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.batch-rename-btn-cancel {
+  background: var(--bg-overlay);
+  color: var(--fg-primary);
+  border: 1px solid var(--border-strong);
+}
+
+.batch-rename-btn-cancel:hover:not(:disabled) {
+  background: var(--bg-active);
+  border-color: var(--accent);
+}
+
+.batch-rename-btn-primary {
+  background: var(--accent);
+  color: white;
+  border: 1px solid var(--accent);
+}
+
+.batch-rename-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.batch-rename-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
