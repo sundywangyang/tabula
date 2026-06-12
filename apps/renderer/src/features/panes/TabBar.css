@@ -111,7 +111,7 @@
 }
 
 .tab-close {
-  display: none;
+  display: inline-flex;
   width: 16px;
   height: 16px;
   border-radius: 3px;
@@ -153,9 +153,8 @@
   color: var(--fg-primary, #e6e6e6);
 }
 
-.tab-chip:hover .tab-close {
-  display: inline-flex;
-}
+/* P2 v2: 关闭按钮始终显示(不依赖 hover)
+   旧规则 .tab-chip:hover .tab-close { display:inline-flex; } 已删除 */
 
 .tab-close:hover {
   background: var(--bg-active);
@@ -163,7 +162,6 @@
 }
 
 /* P2 v2: 拖动期间所有 close 按钮隐藏(避免误点) */
-.tab-bar.is-dragging .tab-chip:hover .tab-close,
 .tab-bar.is-dragging .tab-close {
   display: none;
 }
