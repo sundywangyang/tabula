@@ -34,19 +34,6 @@ try {
   if (typeof (window as any).tabula?.log?.write === 'function') {
     (window as any).tabula.log.write('info', 'renderer mounted OK');
   }
-
-  // 调试:检查 tab chip 的 draggable 属性
-  (window as any).__tabCheck = () => {
-    const chips = Array.from(document.querySelectorAll('.tab-chip'));
-    return chips.map((el) => {
-      const tab = el as HTMLElement;
-      return {
-        title: tab.title,
-        draggable: tab.draggable,
-        className: tab.className.toString().slice(0, 80),
-      };
-    });
-  };
 } catch (err) {
   // eslint-disable-next-line no-console
   console.error('[renderer] mount failed:', err);

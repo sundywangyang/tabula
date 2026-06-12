@@ -110,11 +110,6 @@ export function TabBar({
 
   const onTabDragStart = (e: ReactDragEvent<HTMLDivElement>, tab: Tab, index: number) => {
     if (!isDraggableTab(tab)) {
-      console.error('[TabBar] dragStart blocked, not draggable', {
-        pinned: tab.pinned,
-        closable: tab.closable,
-        tabId: tab.id,
-      });
       e.preventDefault();
       return;
     }
@@ -124,7 +119,6 @@ export function TabBar({
     // 写一个 fallback 文本 mime(部分浏览器需要非空 dataTransfer 才能拖动)
     e.dataTransfer.setData('text/plain', tab.path ?? tab.title);
     tabDragStart(paneId, tab.id, index);
-    console.error('[TabBar] dragStart OK', { paneId, tabId: tab.id, index });
   };
 
   const onTabDragEnd = () => {
