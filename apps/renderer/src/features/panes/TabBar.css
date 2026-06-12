@@ -141,6 +141,8 @@
   line-height: 1;
   flex-shrink: 0;
   margin-left: 4px;
+  /* 与 .tab-chip 一致下沉 3px,让 + 按钮和 tab 文字垂直居中对齐 */
+  margin-top: 3px;
   background: transparent;
   border: 0;
   cursor: pointer;
