@@ -132,6 +132,22 @@ function sendMessage(msg: object): void {
   process.stdout.write(JSON.stringify(msg) + '\n');
 }
 
+// 重要:JSON-RPC 协议独占 stdout(每行一条 JSON 消息)。
+// ext-host 子进程 + extension 内的 console.log 默认会写 stdout,
+// 会被主进程 JsonRpcChannel 当成"非法 JSON 消息" 解析失败(已知的 P6 v1 噪音 bug)。
+// 解决:把 console.log/error/info/warn 重定向到 stderr,
+// 这样 ext-host bootstrap 自己的 banner、extension 内的 console 输出都不污染通道。
+// 注意:sendMessage() 直接走 process.stdout.write,绕过 console → 不受影响。
+const _originalLog = console.log;
+const _originalInfo = console.info;
+const _originalWarn = console.warn;
+const _stderrWrite = (s: string) => process.stderr.write(s + '\n');
+console.log = (...args: unknown[]) => _stderrWrite(args.map(String).join(' '));
+console.info = (...args: unknown[]) => _stderrWrite(args.map(String).join(' '));
+console.warn = (...args: unknown[]) => _stderrWrite(args.map(String).join(' '));
+// console.error 已经是 stderr,不需要重定向;但保留引用防止 lint 报 unused
+void _originalLog; void _originalInfo; void _originalWarn;
+
 function sendResponse(id: number, result?: unknown, error?: { code: number; message: string }): void {
   if (error) {
     sendMessage({ id, error });
