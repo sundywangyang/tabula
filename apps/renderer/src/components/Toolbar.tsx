@@ -230,7 +230,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
     .join(' ');
 
   return (
-    <div className="toolbar">
+    <div className="toolbar" onContextMenu={handleScrollContainerContextMenu}>
       {/* 左滚动按钮 */}
       {scrollState.left && (
         <button className="toolbar-scroll-btn toolbar-scroll-left" onClick={() => scrollBy(-80)} aria-label="向左滚动">

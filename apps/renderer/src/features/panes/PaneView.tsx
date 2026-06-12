@@ -13,7 +13,7 @@
  *  - 下边缘(底部 80px 行)→ 底部「拖出新建窗口」虚线占位
  *  - drop → 调 window.tabula.windows.openWithTab + 从源 pane 移除 tab
  */
-import { useEffect, useRef, type DragEvent as ReactDragEvent } from 'react';
+import { useEffect, useRef, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { FsEntry, LayoutNode, Tab } from '@tabula/bridge';
 import { Breadcrumb } from '../../components/Breadcrumb';
 import { Toolbar } from '../../components/Toolbar';
@@ -211,6 +211,12 @@ export function PaneView({
   const showRightZone = tabDrag?.dropEdge === 'right';
   const showBottomZone = tabDrag?.dropEdge === 'bottom';
 
+  // 禁用 chrome 区域(tabs/breadcrumb/toolbar)上的右键 context menu
+  // 这些是 UI 布局区,不需要原生右键菜单
+  const blockContextMenu = (e: ReactMouseEvent) => {
+    e.preventDefault();
+  };
+
   return (
     <div
       ref={containerRef}
@@ -223,13 +229,16 @@ export function PaneView({
       onDragLeave={onContainerDragLeave}
       onDrop={onContainerDrop}
     >
-      <div className={`tab-bar-wrap ${tabDrag ? 'is-dragging' : ''}`}>
+      <div
+        className={`tab-bar-wrap ${tabDrag ? 'is-dragging' : ''}`}
+        onContextMenu={blockContextMenu}
+      >
         <TabBar paneId={paneId} pane={pane} />
       </div>
 
       {!isTrash && (
         <>
-          <div className="pane-toolbar">
+          <div className="pane-toolbar" onContextMenu={blockContextMenu}>
             <Breadcrumb
               segments={breadcrumb}
               onNavigate={(p) => {
