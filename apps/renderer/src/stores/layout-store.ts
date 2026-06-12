@@ -190,6 +190,7 @@ function cloneLayout(node: LayoutNode): LayoutNode {
   }
   return {
     type: 'split',
+    id: node.id,
     dir: node.dir,
     sizes: [...node.sizes],
     children: node.children.map(cloneLayout),
@@ -220,6 +221,10 @@ function mapPane(
   }
   return {
     type: 'split',
+    // 保留 split.id(mapPane 经过 split 时必须复制,否则下游 replaceNode 用
+    // 这个 split.id 找节点会失败 — 跟 layout-store 的 splitPane 链式调用
+    // 配合时会导致 mergePane 找不到正确的 split 节点)
+    id: node.id,
     dir: node.dir,
     sizes: [...node.sizes],
     children: node.children.map((c) => mapPane(c, paneId, fn)),
