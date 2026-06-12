@@ -22,7 +22,9 @@
 .pane-view .pane-content {
   flex: 1;
   min-height: 0;
-  overflow: visible;
+  /* overflow 必须设为 hidden:auto/visible 会让 flex item 的 min-content
+     等于内容尺寸,内部虚拟滚动器会按总高度撑开,破坏滚动容器高度约束。 */
+  overflow: hidden;
   position: relative;
 }
 
