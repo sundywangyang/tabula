@@ -6,21 +6,54 @@
  * P3: 新建文件夹/文件按钮(顶在最左)
  *
  * P2: openPathBar 需要 paneId(每个 pane 独立打开路径栏,这里取 active pane)
+ *
+ * 图标:lucide-react SVG; 提示:自定义 Tooltip 气泡
  */
-import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Plus,
+  Copy,
+  Scissors,
+  Clipboard,
+  Link2,
+  Trash2,
+  Pencil,
+  MapPin,
+  RotateCw,
+  Star,
+  Eye,
+  EyeOff,
+  Type,
+  Columns2,
+  Rows2,
+  LayoutList,
+  LayoutGrid,
+  List,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { useFileStore, type ViewMode } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
+import { Tooltip } from './Tooltip';
 import type { Tab } from '@tabula/bridge';
 import './Toolbar.css';
 
 // 右键历史菜单最大条目数
 const MAX_HISTORY_MENU_ITEMS = 20;
 
-const VIEW_MODES: { mode: ViewMode; icon: string; label: string }[] = [
-  { mode: 'list', icon: '☰', label: '列表' },
-  { mode: 'grid', icon: '▦', label: '网格' },
-  { mode: 'details', icon: '☷', label: '详情' },
+interface ViewModeDef {
+  mode: ViewMode;
+  icon: ReactNode;
+  label: string;
+}
+
+const VIEW_MODES: ViewModeDef[] = [
+  { mode: 'list', icon: <List size={16} />, label: '列表' },
+  { mode: 'grid', icon: <LayoutGrid size={16} />, label: '网格' },
+  { mode: 'details', icon: <LayoutList size={16} />, label: '详情' },
 ];
 
 // 模块级常量，避免 selector 每次渲染创建新引用
@@ -234,7 +267,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       {/* 左滚动按钮 */}
       {scrollState.left && (
         <button className="toolbar-scroll-btn toolbar-scroll-left" onClick={() => scrollBy(-80)} aria-label="向左滚动">
-          ‹
+          <ChevronLeft size={14} />
         </button>
       )}
       {/* 横向滚动容器 */}
@@ -246,26 +279,28 @@ export function Toolbar({ paneId }: { paneId: string }) {
       >
       {/* 前进/后退按钮组 */}
       <div className="toolbar-group">
-        <button
-          className={`toolbar-btn toolbar-nav ${canGoBack ? '' : 'disabled'}`}
-          onClick={handleGoBack}
-          onMouseDown={handleNavMouseDown('back')}
-          onContextMenu={handleContextMenu}
-          disabled={!canGoBack}
-          title="后退 (Alt+←)"
-        >
-          <span className="toolbar-icon">◀</span>
-        </button>
-        <button
-          className={`toolbar-btn toolbar-nav ${canGoForward ? '' : 'disabled'}`}
-          onClick={handleGoForward}
-          onMouseDown={handleNavMouseDown('forward')}
-          onContextMenu={handleContextMenu}
-          disabled={!canGoForward}
-          title="前进 (Alt+→)"
-        >
-          <span className="toolbar-icon">▶</span>
-        </button>
+        <Tooltip label="后退" shortcut="Alt+←">
+          <button
+            className={`toolbar-btn toolbar-nav ${canGoBack ? '' : 'disabled'}`}
+            onClick={handleGoBack}
+            onMouseDown={handleNavMouseDown('back')}
+            onContextMenu={handleContextMenu}
+            disabled={!canGoBack}
+          >
+            <ArrowLeft size={16} />
+          </button>
+        </Tooltip>
+        <Tooltip label="前进" shortcut="Alt+→">
+          <button
+            className={`toolbar-btn toolbar-nav ${canGoForward ? '' : 'disabled'}`}
+            onClick={handleGoForward}
+            onMouseDown={handleNavMouseDown('forward')}
+            onContextMenu={handleContextMenu}
+            disabled={!canGoForward}
+          >
+            <ArrowRight size={16} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* 历史菜单下拉 */}
@@ -286,113 +321,124 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        <button
-          className="toolbar-btn toolbar-new"
-          onClick={handleNewFolder}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            handleNewFile();
-          }}
-          title="新建文件夹(右键 = 新建文件)"
-        >
-          <span className="toolbar-icon">＋</span>
-          <span className="toolbar-label">新建</span>
-        </button>
+        <Tooltip label="新建文件夹" shortcut="右键 = 新建文件">
+          <button
+            className="toolbar-btn toolbar-new"
+            onClick={handleNewFolder}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              handleNewFile();
+            }}
+          >
+            <Plus size={16} />
+            <span className="toolbar-label">新建</span>
+          </button>
+        </Tooltip>
       </div>
 
       <div className="toolbar-divider" />
 
       {/* P3: 文件操作按钮 */}
       <div className="toolbar-group">
-        <button
-          className="toolbar-btn"
-          onClick={handleCopy}
-          disabled={!hasSelection}
-          title="复制 (Ctrl+C)"
-        >
-          <span className="toolbar-icon">📋</span>
-          <span className="toolbar-label">复制</span>
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={handleCut}
-          disabled={!hasSelection}
-          title="剪切 (Ctrl+X)"
-        >
-          <span className="toolbar-icon">✂</span>
-          <span className="toolbar-label">剪切</span>
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={handlePaste}
-          disabled={!hasClipboard}
-          title="粘贴 (Ctrl+V)"
-        >
-          <span className="toolbar-icon">📄</span>
-          <span className="toolbar-label">粘贴</span>
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={handleCopyPath}
-          disabled={!hasSelection && !cursorPath}
-          title="复制路径"
-        >
-          <span className="toolbar-icon">🔗</span>
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={handleDelete}
-          disabled={!hasSelection}
-          title="删除 (Delete)"
-        >
-          <span className="toolbar-icon">🗑</span>
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={handleRename}
-          disabled={!hasSelection && !cursorPath}
-          title="重命名 (F2)"
-        >
-          <span className="toolbar-icon">✏</span>
-        </button>
+        <Tooltip label="复制" shortcut="Ctrl+C">
+          <button
+            className="toolbar-btn"
+            onClick={handleCopy}
+            disabled={!hasSelection}
+          >
+            <Copy size={16} />
+            <span className="toolbar-label">复制</span>
+          </button>
+        </Tooltip>
+        <Tooltip label="剪切" shortcut="Ctrl+X">
+          <button
+            className="toolbar-btn"
+            onClick={handleCut}
+            disabled={!hasSelection}
+          >
+            <Scissors size={16} />
+            <span className="toolbar-label">剪切</span>
+          </button>
+        </Tooltip>
+        <Tooltip label="粘贴" shortcut="Ctrl+V">
+          <button
+            className="toolbar-btn"
+            onClick={handlePaste}
+            disabled={!hasClipboard}
+          >
+            <Clipboard size={16} />
+            <span className="toolbar-label">粘贴</span>
+          </button>
+        </Tooltip>
+        <Tooltip label="复制路径">
+          <button
+            className="toolbar-btn"
+            onClick={handleCopyPath}
+            disabled={!hasSelection && !cursorPath}
+          >
+            <Link2 size={16} />
+          </button>
+        </Tooltip>
+        <Tooltip label="删除" shortcut="Delete">
+          <button
+            className="toolbar-btn"
+            onClick={handleDelete}
+            disabled={!hasSelection}
+          >
+            <Trash2 size={16} />
+          </button>
+        </Tooltip>
+        <Tooltip label="重命名" shortcut="F2">
+          <button
+            className="toolbar-btn"
+            onClick={handleRename}
+            disabled={!hasSelection && !cursorPath}
+          >
+            <Pencil size={16} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        <button
-          className="toolbar-btn"
-          onClick={() => openPathBar(paneId)}
-          title="转到路径 (Ctrl+L)"
-        >
-          <span className="toolbar-icon">📍</span>
-          <span className="toolbar-label">路径</span>
-        </button>
-        <button className="toolbar-btn" onClick={() => void refresh(paneId)} title="刷新 (F5)">
-          <span className="toolbar-icon">⟳</span>
-        </button>
-        <button
-          className={`toolbar-btn toolbar-fav ${isFavorite ? 'active' : ''}`}
-          onClick={handleToggleFavorite}
-          disabled={!currentPath}
-          title={isFavorite ? '从收藏移除' : '收藏当前目录'}
-        >
-          <span className="toolbar-icon">{isFavorite ? '★' : '☆'}</span>
-        </button>
+        <Tooltip label="转到路径" shortcut="Ctrl+L">
+          <button
+            className="toolbar-btn"
+            onClick={() => openPathBar(paneId)}
+          >
+            <MapPin size={16} />
+            <span className="toolbar-label">路径</span>
+          </button>
+        </Tooltip>
+        <Tooltip label="刷新" shortcut="F5">
+          <button className="toolbar-btn" onClick={() => void refresh(paneId)}>
+            <RotateCw size={16} />
+          </button>
+        </Tooltip>
+        <Tooltip label={isFavorite ? '从收藏移除' : '收藏当前目录'}>
+          <button
+            className={`toolbar-btn toolbar-fav ${isFavorite ? 'active' : ''}`}
+            onClick={handleToggleFavorite}
+            disabled={!currentPath}
+          >
+            <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
         {VIEW_MODES.map((m) => (
-          <button
-            key={m.mode}
-            className={`toolbar-btn ${viewMode === m.mode ? 'active' : ''}`}
-            onClick={() => setViewMode(paneId, m.mode)}
-            title={`${m.label}视图`}
-          >
-            <span className="toolbar-icon">{m.icon}</span>
-          </button>
+          <Tooltip key={m.mode} label={`${m.label}视图`}>
+            <button
+              className={`toolbar-btn ${viewMode === m.mode ? 'active' : ''}`}
+              onClick={() => setViewMode(paneId, m.mode)}
+            >
+              {m.icon}
+            </button>
+          </Tooltip>
         ))}
       </div>
 
@@ -400,56 +446,56 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
       {/* P2 v2: 分屏 — 左/右 / 上/下 */}
       <div className="toolbar-group">
-        <button
-          className="toolbar-btn"
-          onClick={() => {
-            useLayoutStore.getState().pane.splitPane(paneId, 'horizontal');
-          }}
-          title="左右分屏 (Ctrl+\\)"
-        >
-          <span className="toolbar-icon">◫</span>
-          <span className="toolbar-label">分屏</span>
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={() => {
-            useLayoutStore.getState().pane.splitPane(paneId, 'vertical');
-          }}
-          title="上下分屏 (Ctrl+Shift+\\)"
-        >
-          <span className="toolbar-icon">▭</span>
-        </button>
+        <Tooltip label="左右分屏" shortcut="Ctrl+\\">
+          <button
+            className="toolbar-btn"
+            onClick={() => {
+              useLayoutStore.getState().pane.splitPane(paneId, 'horizontal');
+            }}
+          >
+            <Columns2 size={16} />
+            <span className="toolbar-label">分屏</span>
+          </button>
+        </Tooltip>
+        <Tooltip label="上下分屏" shortcut="Ctrl+Shift+\\">
+          <button
+            className="toolbar-btn"
+            onClick={() => {
+              useLayoutStore.getState().pane.splitPane(paneId, 'vertical');
+            }}
+          >
+            <Rows2 size={16} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        <button
-          className={`toolbar-btn ${showHidden ? 'active' : ''}`}
-          onClick={toggleShowHidden}
-          title={showHidden ? '隐藏隐藏文件' : '显示隐藏文件'}
-        >
-          {showHidden ? (
-            <span className="toolbar-icon">👁</span>
-          ) : (
-            <span className="toolbar-icon toolbar-icon-muted">👁‍🗨</span>
-          )}
-          <span className="toolbar-label">.{showHidden ? '已显' : '隐藏'}</span>
-        </button>
-        <button
-          className={`toolbar-btn ${showExtensions ? 'active' : ''}`}
-          onClick={toggleShowExtensions}
-          title={showExtensions ? '隐藏扩展名' : '显示扩展名'}
-        >
-          <span className="toolbar-icon">𝝰</span>
-                    <span className="toolbar-label">{showExtensions ? '扩展名:开' : '扩展名:关'}</span>
-        </button>
+        <Tooltip label={showHidden ? '隐藏隐藏文件' : '显示隐藏文件'}>
+          <button
+            className={`toolbar-btn ${showHidden ? 'active' : ''}`}
+            onClick={toggleShowHidden}
+          >
+            {showHidden ? <Eye size={16} /> : <EyeOff size={16} />}
+            <span className="toolbar-label">.{showHidden ? '已显' : '隐藏'}</span>
+          </button>
+        </Tooltip>
+        <Tooltip label={showExtensions ? '隐藏扩展名' : '显示扩展名'}>
+          <button
+            className={`toolbar-btn ${showExtensions ? 'active' : ''}`}
+            onClick={toggleShowExtensions}
+          >
+            <Type size={16} />
+            <span className="toolbar-label">{showExtensions ? '扩展名:开' : '扩展名:关'}</span>
+          </button>
+        </Tooltip>
       </div>
       </div>
       {/* 右滚动按钮 */}
       {scrollState.right && (
         <button className="toolbar-scroll-btn toolbar-scroll-right" onClick={() => scrollBy(80)} aria-label="向右滚动">
-          ›
+          <ChevronRight size={14} />
         </button>
       )}
     </div>

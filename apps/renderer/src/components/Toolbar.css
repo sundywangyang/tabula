@@ -190,10 +190,10 @@
   color: var(--accent);
 }
 
-.toolbar-icon {
-  font-size: 13px;
-  line-height: 1;
+/* SVG 图标(裸渲染)— 大小由 lucide 的 size prop 控制(默认 16px) */
+.toolbar-btn svg {
   flex-shrink: 0;
+  display: block;
 }
 
 .toolbar-icon-muted {
