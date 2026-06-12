@@ -215,6 +215,12 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
   const scrollBy = (delta: number) => scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
 
+  // 禁用 toolbar 滚动容器自身的右键 context menu
+  // (子按钮上的右键不受影响 — 它们自己处理或冒泡)
+  const handleScrollContainerContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+  };
+
   const scrollClass = [
     'toolbar-scroll-container',
     scrollState.left ? 'has-overflow-left' : '',
@@ -232,7 +238,11 @@ export function Toolbar({ paneId }: { paneId: string }) {
         </button>
       )}
       {/* 横向滚动容器 */}
-      <div className={scrollClass} ref={scrollRef}>
+      <div
+        className={scrollClass}
+        ref={scrollRef}
+        onContextMenu={handleScrollContainerContextMenu}
+      >
       {/* 前进/后退按钮组 */}
       <div className="toolbar-group">
         <button
