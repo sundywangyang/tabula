@@ -2,14 +2,18 @@
  * 自定义标题栏
  */
 import { useState, useEffect } from 'react';
+import { PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 import './TitleBar.css';
 
 interface TitleBarProps {
   version: string;
+  sidebarVisible: boolean;
+  onToggleSidebar: () => void;
   onSettingsOpen?: () => void;
 }
 
-export function TitleBar({ version, onSettingsOpen }: TitleBarProps) {
+export function TitleBar({ version, sidebarVisible, onToggleSidebar, onSettingsOpen }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
@@ -31,6 +35,16 @@ export function TitleBar({ version, onSettingsOpen }: TitleBarProps) {
           <span className="logo-mark">▣</span>
           <span className="logo-text">Tabula</span>
           {version && <span className="logo-version">v{version}</span>}
+          <Tooltip label={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}>
+            <button
+              type="button"
+              className="title-bar-btn title-bar-sidebar-toggle"
+              onClick={onToggleSidebar}
+              aria-label={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
+            >
+              {sidebarVisible ? <PanelLeftClose size={14} /> : <PanelLeft size={14} />}
+            </button>
+          </Tooltip>
         </div>
       </div>
 

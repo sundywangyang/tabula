@@ -62,6 +62,7 @@ const Settings = lazy(() =>
 
 export function App() {
   const [version, setVersion] = useState<string>('');
+  const [sidebarVisible, setSidebarVisible] = useState(true);
 
   // P3: dialog state — 集中到 ui-dialogs-store(P7 v1 收口),
   // 这样命令面板(runCommandById)也能直接驱动 dialog 开关,
@@ -651,10 +652,17 @@ export function App() {
 
   return (
     <div className="app-root">
-      <TitleBar version={version} onSettingsOpen={() => setSettingsOpen(true)} />
+      <TitleBar
+        version={version}
+        sidebarVisible={sidebarVisible}
+        onToggleSidebar={() => setSidebarVisible((v) => !v)}
+        onSettingsOpen={() => setSettingsOpen(true)}
+      />
 
       <div className="app-body">
-        <Sidebar currentPath={activePath} onOpenPath={(p) => useLayoutStore.getState().pane.navigate(activePaneId, p)} />
+        {sidebarVisible && (
+          <Sidebar currentPath={activePath} onOpenPath={(p) => useLayoutStore.getState().pane.navigate(activePaneId, p)} />
+        )}
 
         <div className="app-main">
           {renderLayout ? (

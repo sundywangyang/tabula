@@ -45,6 +45,28 @@
   border-radius: 3px;
 }
 
+/* 侧边栏切换按钮 — 在 logo/version 之后 */
+.title-bar-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-secondary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.1s, color 0.1s;
+  margin-left: 2px;
+}
+
+.title-bar-sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
 .title-bar-actions {
   display: flex;
   align-items: center;
