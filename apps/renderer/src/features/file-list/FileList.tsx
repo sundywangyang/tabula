@@ -521,15 +521,53 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       onDrop={handleContainerDrop}
     >
       {viewMode === 'details' && (
+        <div className="file-list-header">
+          <SortHeader
+            field="name"
+            label="名称"
+            currentField={sortBy}
+            currentDir={sortDir}
+            onSort={cycleSort}
+            className="col col-name"
+          />
+          <SortHeader
+            field="size"
+            label="大小"
+            currentField={sortBy}
+            currentDir={sortDir}
+            onSort={cycleSort}
+            className="col col-size"
+          />
+          <SortHeader
+            field="mtime"
+            label="修改时间"
+            currentField={sortBy}
+            currentDir={sortDir}
+            onSort={cycleSort}
+            className="col col-mtime"
+          />
+          <SortHeader
+            field="type"
+            label="类型"
+            currentField={sortBy}
+            currentDir={sortDir}
+            onSort={cycleSort}
+            className="col col-type"
+          />
+        </div>
+      )}
+      {viewMode === 'list' && (
+        <div className="file-list-header">
+          <div className="col col-name-full">名称</div>
+        </div>
+      )}
+      {viewMode === 'details' && (
         <DetailsView
           entries={sortedEntries}
-          sortBy={sortBy}
-          sortDir={sortDir}
           showExtensions={showExtensions}
           selectedPaths={selectedPaths}
           cursorPath={cursorPath}
           renameTarget={renameTarget}
-          onHeaderSort={cycleSort}
           onRowClick={handleRowClick}
           onRowDoubleClick={handleRowDoubleClick}
           onRenameSubmit={(oldPath, newName) => renameEntry(paneId, oldPath, newName)}
@@ -657,13 +695,10 @@ interface DetailsViewProps {
 
 function DetailsView({
   entries,
-  sortBy,
-  sortDir,
   showExtensions,
   selectedPaths,
   cursorPath,
   renameTarget,
-  onHeaderSort,
   onRowClick,
   onRowDoubleClick,
   onRenameSubmit,
@@ -673,8 +708,8 @@ function DetailsView({
   onDragOver,
   onDragLeave,
   onDrop,
-}: DetailsViewProps) {
-   const parentRef = useRef<HTMLDivElement>(null);
+}: Omit<DetailsViewProps, 'sortBy' | 'sortDir' | 'onHeaderSort'>) {
+  const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => parentRef.current,
@@ -682,95 +717,48 @@ function DetailsView({
     overscan: 12,
   });
 
-  // 调试：挂载后打印滚动容器和虚拟滚动器状态
-  useEffect(() => {
-    const el = parentRef.current;
-    console.error('[DetailsView] mounted', {
-      scrollEl: el ? `${el.clientWidth}x${el.clientHeight}` : 'null',
-      totalEntries: entries.length,
-      totalSize: rowVirtualizer.getTotalSize(),
-      virtualItems: rowVirtualizer.getVirtualItems().length,
-    });
-  }, []);
-
   return (
-    <div className="details-view">
-      <div className="file-list-header">
-        <SortHeader
-          field="name"
-          label="名称"
-          currentField={sortBy}
-          currentDir={sortDir}
-          onSort={onHeaderSort}
-          className="col col-name"
-        />
-        <SortHeader
-          field="size"
-          label="大小"
-          currentField={sortBy}
-          currentDir={sortDir}
-          onSort={onHeaderSort}
-          className="col col-size"
-        />
-        <SortHeader
-          field="mtime"
-          label="修改时间"
-          currentField={sortBy}
-          currentDir={sortDir}
-          onSort={onHeaderSort}
-          className="col col-mtime"
-        />
-        <SortHeader
-          field="type"
-          label="类型"
-          currentField={sortBy}
-          currentDir={sortDir}
-          onSort={onHeaderSort}
-          className="col col-type"
-        />
-      </div>
+    <div
+      ref={parentRef}
+      className="details-view file-list-body file-list-body-virtual"
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <div
-        ref={parentRef}
-        className="file-list-body file-list-body-virtual"
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          position: 'relative',
+          width: '100%',
+        }}
       >
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            position: 'relative',
-            width: '100%',
-          }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const entry = entries[virtualRow.index];
-            return (
-              <DetailsRow
-                key={entry.path}
-                entry={entry}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  transform: `translateY(${virtualRow.start}px)`,
-                  height: `${virtualRow.size}px`,
-                }}
-                showExtensions={showExtensions}
-                selected={selectedPaths.has(entry.path)}
-                cursor={cursorPath === entry.path}
-                renaming={renameTarget === entry.path}
-                onClick={onRowClick}
-                onDoubleClick={onRowDoubleClick}
-                onRenameSubmit={onRenameSubmit}
-                onRenameCancel={onRenameCancel}
-                onDragStart={onRowDragStart}
-                onDragEnd={onRowDragEnd}
-              />
-            );
-          })}
-        </div>
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const entry = entries[virtualRow.index];
+          return (
+            <DetailsRow
+              key={entry.path}
+              entry={entry}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${virtualRow.start}px)`,
+                height: `${virtualRow.size}px`,
+              }}
+              showExtensions={showExtensions}
+              selected={selectedPaths.has(entry.path)}
+              cursor={cursorPath === entry.path}
+              renaming={renameTarget === entry.path}
+              onClick={onRowClick}
+              onDoubleClick={onRowDoubleClick}
+              onRenameSubmit={onRenameSubmit}
+              onRenameCancel={onRenameCancel}
+              onDragStart={onRowDragStart}
+              onDragEnd={onRowDragEnd}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -911,78 +899,62 @@ function ListView({
     overscan: 12,
   });
 
-  // 调试：挂载后打印滚动容器和虚拟滚动器状态
-  useEffect(() => {
-    const el = parentRef.current;
-    console.error('[ListView] mounted', {
-      scrollEl: el ? `${el.clientWidth}x${el.clientHeight}` : 'null',
-      totalEntries: entries.length,
-      totalSize: rowVirtualizer.getTotalSize(),
-      virtualItems: rowVirtualizer.getVirtualItems().length,
-    });
-  }, []);
-
   return (
-    <div className="list-view">
-      <div className="file-list-header">
-        <div className="col col-name-full">名称</div>
-      </div>
+    <div
+      ref={parentRef}
+      className="list-view file-list-body file-list-body-virtual"
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <div
-        ref={parentRef}
-        className="file-list-body file-list-body-virtual"
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          position: 'relative',
+          width: '100%',
+        }}
       >
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            position: 'relative',
-            width: '100%',
-          }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const entry = entries[virtualRow.index];
-            return (
-              <div
-                key={entry.path}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  transform: `translateY(${virtualRow.start}px)`,
-                  height: `${virtualRow.size}px`,
-                }}
-                className={`file-list-row row-list ${selectedPaths.has(entry.path) ? 'selected' : ''} ${
-                  cursorPath === entry.path ? 'cursor' : ''
-                }`}
-                onClick={(e) => onRowClick(entry, e)}
-                onDoubleClick={() => onRowDoubleClick(entry)}
-                draggable={renameTarget !== entry.path}
-                onDragStart={(e) => onRowDragStart(entry, e)}
-                onDragEnd={onRowDragEnd}
-                data-entry-path={entry.path}
-              >
-                <div className="col col-name-full">
-                  <FileThumb entry={entry} variant="row" />
-                  {renameTarget === entry.path ? (
-                    <RenameInput
-                      entry={entry}
-                      showExtensions={showExtensions}
-                      onSubmit={(name) => onRenameSubmit(entry.path, name)}
-                      onCancel={onRenameCancel}
-                    />
-                  ) : (
-                    <span className="row-name" title={entry.path}>
-                      {displayName(entry, showExtensions)}
-                    </span>
-                  )}
-                </div>
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const entry = entries[virtualRow.index];
+          return (
+            <div
+              key={entry.path}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${virtualRow.start}px)`,
+                height: `${virtualRow.size}px`,
+              }}
+              className={`file-list-row row-list ${selectedPaths.has(entry.path) ? 'selected' : ''} ${
+                cursorPath === entry.path ? 'cursor' : ''
+              }`}
+              onClick={(e) => onRowClick(entry, e)}
+              onDoubleClick={() => onRowDoubleClick(entry)}
+              draggable={renameTarget !== entry.path}
+              onDragStart={(e) => onRowDragStart(entry, e)}
+              onDragEnd={onRowDragEnd}
+              data-entry-path={entry.path}
+            >
+              <div className="col col-name-full">
+                <FileThumb entry={entry} variant="row" />
+                {renameTarget === entry.path ? (
+                  <RenameInput
+                    entry={entry}
+                    showExtensions={showExtensions}
+                    onSubmit={(name) => onRenameSubmit(entry.path, name)}
+                    onCancel={onRenameCancel}
+                  />
+                ) : (
+                  <span className="row-name" title={entry.path}>
+                    {displayName(entry, showExtensions)}
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1032,83 +1004,70 @@ function GridView({
     overscan: 4,
   });
 
-  // 调试：挂载后打印滚动容器和虚拟滚动器状态
-  useEffect(() => {
-    const el = parentRef.current;
-    console.error('[GridView] mounted', {
-      scrollEl: el ? `${el.clientWidth}x${el.clientHeight}` : 'null',
-      totalRows: rows,
-      totalEntries: entries.length,
-      totalSize: rowVirtualizer.getTotalSize(),
-      virtualItems: rowVirtualizer.getVirtualItems().length,
-    });
-  }, []);
-
   return (
-    <div className="grid-view" style={{ ['--grid-cols' as string]: String(cols) }}>
+    <div
+      ref={parentRef}
+      className="grid-view file-list-body file-list-body-virtual"
+      style={{ ['--grid-cols' as string]: String(cols) }}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <div
-        ref={parentRef}
-        className="file-list-body file-list-body-virtual"
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          position: 'relative',
+          width: '100%',
+        }}
       >
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            position: 'relative',
-            width: '100%',
-          }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const start = virtualRow.index * cols;
-            const rowItems = entries.slice(start, start + cols);
-            return (
-              <div
-                key={virtualRow.index}
-                className="grid-row"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  transform: `translateY(${virtualRow.start}px)`,
-                  height: `${virtualRow.size}px`,
-                }}
-              >
-                {rowItems.map((entry) => (
-                  <div
-                    key={entry.path}
-                    className={`grid-cell ${selectedPaths.has(entry.path) ? 'selected' : ''} ${
-                      cursorPath === entry.path ? 'cursor' : ''
-                    }`}
-                    onClick={(e) => onRowClick(entry, e)}
-                    onDoubleClick={() => onDoubleClickGrid(onRowDoubleClick, entry)}
-                    draggable={renameTarget !== entry.path}
-                    onDragStart={(e) => onRowDragStart(entry, e)}
-                    onDragEnd={onRowDragEnd}
-                    data-entry-path={entry.path}
-                  >
-                    <FileThumb entry={entry} variant="grid" />
-                    {renameTarget === entry.path ? (
-                      <RenameInput
-                        entry={entry}
-                        showExtensions={showExtensions}
-                        onSubmit={(name) => onRenameSubmit(entry.path, name)}
-                        onCancel={onRenameCancel}
-                        variant="grid"
-                      />
-                    ) : (
-                      <div className="grid-name" title={entry.path}>
-                        {displayName(entry, showExtensions)}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const start = virtualRow.index * cols;
+          const rowItems = entries.slice(start, start + cols);
+          return (
+            <div
+              key={virtualRow.index}
+              className="grid-row"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${virtualRow.start}px)`,
+                height: `${virtualRow.size}px`,
+              }}
+            >
+              {rowItems.map((entry) => (
+                <div
+                  key={entry.path}
+                  className={`grid-cell ${selectedPaths.has(entry.path) ? 'selected' : ''} ${
+                    cursorPath === entry.path ? 'cursor' : ''
+                  }`}
+                  onClick={(e) => onRowClick(entry, e)}
+                  onDoubleClick={() => onDoubleClickGrid(onRowDoubleClick, entry)}
+                  draggable={renameTarget !== entry.path}
+                  onDragStart={(e) => onRowDragStart(entry, e)}
+                  onDragEnd={onRowDragEnd}
+                  data-entry-path={entry.path}
+                >
+                  <FileThumb entry={entry} variant="grid" />
+                  {renameTarget === entry.path ? (
+                    <RenameInput
+                      entry={entry}
+                      showExtensions={showExtensions}
+                      onSubmit={(name) => onRenameSubmit(entry.path, name)}
+                      onCancel={onRenameCancel}
+                      variant="grid"
+                    />
+                  ) : (
+                    <div className="grid-name" title={entry.path}>
+                      {displayName(entry, showExtensions)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
