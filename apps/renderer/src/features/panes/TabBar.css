@@ -128,6 +128,31 @@
   cursor: pointer;
 }
 
+/* 新建标签按钮 — 固定显示在 tab 列表末尾 */
+.tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm, 4px);
+  color: var(--fg-tertiary, #999);
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  user-select: none;
+}
+
+.tab-add:hover {
+  background: var(--bg-hover, #2a2a2a);
+  color: var(--fg-primary, #e6e6e6);
+}
+
 .tab-chip:hover .tab-close {
   display: inline-flex;
 }

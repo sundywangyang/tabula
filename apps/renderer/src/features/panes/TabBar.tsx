@@ -15,7 +15,7 @@
  */
 import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, useState, useCallback } from 'react';
 import type { LayoutNode, Tab } from '@tabula/bridge';
-import { useFileStore } from '../../stores/file-store';
+import { useFileStore, makeFolderTab } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
 import './TabBar.css';
 
@@ -272,6 +272,20 @@ export function TabBar({
           </div>
         );
       })}
+
+      {/* 新建标签按钮 */}
+      <button
+        type="button"
+        className="tab-add"
+        onClick={() => {
+          const tab = makeFolderTab('', '新标签');
+          useLayoutStore.getState().pane.openTab(paneId, tab);
+        }}
+        title="新建标签 (Ctrl+T)"
+        aria-label="新建标签"
+      >
+        +
+      </button>
 
       {/* 关闭当前窗格按钮 — 多窗格时显示 */}
       {countPanes() > 1 && (
