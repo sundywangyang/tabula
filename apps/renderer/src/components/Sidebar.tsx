@@ -13,6 +13,7 @@ import { type DragEvent as ReactDragEvent, useEffect, useState } from 'react';
 import type { DriveInfo } from '@tabula/bridge';
 import { useFileStore } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
+import { useLayoutStore } from '../stores/layout-store';
 import './Sidebar.css';
 
 function formatBytes(n: number): string {
@@ -498,13 +499,20 @@ function ExtensionPanels() {
           key={panel.id}
           className="sidebar-item"
           onClick={() => {
-            // P6 v2: panel 视图渲染待实现,先给用户一个明确提示而不是静默报错
-            // (扩展注册的 panel 渲染命令命名规范见 docs/PLAN.md — 待 P6 v2)
-            useFileStore.getState().showToast(
-              `面板 "${panel.title}" 渲染待 P6 v2 实现 (由 ${panel.extensionId} 提供)`,
-              'info',
-              3000,
-            );
+            // P6: 点 panel 入口 = 触发同名命令 (panel.id == command id)
+            // ext-host 收到命令后,读当前 pane 路径、统计、推 panelData 给 renderer
+            const activePanePath = useFileStore.getState().panes[
+              useLayoutStore.getState().activePaneId ?? ''
+            ]?.currentPath ?? '';
+            void window.tabula.extensions
+              .invokeCommand(panel.id, { panePath: activePanePath })
+              .catch((err) => {
+                useFileStore.getState().showToast(
+                  `打开面板失败: ${String(err)}`,
+                  'error',
+                  3000,
+                );
+              });
           }}
           title={`${panel.title} (${panel.extensionId})`}
         >

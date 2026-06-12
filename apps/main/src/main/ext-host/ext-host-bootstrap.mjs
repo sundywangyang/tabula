@@ -40,6 +40,11 @@ interface ExtensionContext {
   workspace: ExtContextWorkspace;
   rootPath: string;
   extensionId: string;
+  /**
+   * 推送 panel 数据到 renderer(主进程会广播到所有 BrowserWindow 的 ext:panel-data 频道)
+   * panelId 应与 panels.register() 的 id 一致
+   */
+  pushPanelData(panelId: string, payload: unknown): void;
 }
 
 interface RpcMessage {
@@ -69,6 +74,14 @@ class ExtensionContextImpl implements ExtensionContext {
   constructor(extensionId: string, rootPath: string) {
     this.extensionId = extensionId;
     this.rootPath = rootPath;
+  }
+
+  pushPanelData(panelId: string, payload: unknown): void {
+    sendNotification('mainHost.panelData', {
+      panelId,
+      extensionId: this.extensionId,
+      payload,
+    });
   }
 
   commands: ExtContextCommands = {

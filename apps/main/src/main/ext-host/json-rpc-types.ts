@@ -54,5 +54,6 @@ export const MainHostMethods = {
   REGISTER_PREVIEWER: 'mainHost.registerPreviewer',
   REGISTER_VIEW: 'mainHost.registerView',
   COMMAND_INVOKED: 'mainHost.commandInvoked',
+  PANEL_DATA: 'mainHost.panelData',
   ERROR: 'mainHost.error',
 } as const;

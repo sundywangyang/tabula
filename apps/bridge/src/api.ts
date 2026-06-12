@@ -183,6 +183,10 @@ export interface TabulaAPI {
     uninstall(id: string): Promise<void>;
     invokeCommand(command: string, ...args: unknown[]): Promise<unknown>;
     getPanels(): Promise<ExtensionPanel[]>;
+    /** 订阅 ext-host 推送的 panel 数据(主进程→renderer) */
+    onPanelData(
+      cb: (data: { panelId: string; extensionId: string; payload: unknown }) => void,
+    ): () => void;
   };
 
   // 配置

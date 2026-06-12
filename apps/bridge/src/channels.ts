@@ -73,6 +73,8 @@ export const IpcChannels = {
   EXT_UNINSTALL: 'ext:uninstall',
   EXT_INVOKE_COMMAND: 'ext:invoke-command',
   EXT_GET_PANELS: 'ext:get-panels',
+  // 主进程 → renderer 的 ext-host 推送(panel 数据等)
+  EXT_PANEL_DATA: 'ext:panel-data',
 
   // 配置
   CFG_GET: 'cfg:get',

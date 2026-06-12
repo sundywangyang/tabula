@@ -1,0 +1,137 @@
+/**
+ * ExtensionPanelView 浮层样式
+ *
+ * 浮在 .pane-content 上方,毛玻璃背景,右上角关闭/刷新
+ */
+.ext-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  animation: ext-panel-fade-in 0.15s ease-out;
+}
+
+@keyframes ext-panel-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.ext-panel-window {
+  width: min(520px, 90vw);
+  max-height: 80vh;
+  background: var(--bg-elevated, #1e1e1e);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: ext-panel-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes ext-panel-pop-in {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.ext-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border, #333);
+  background: var(--bg-base, #161616);
+}
+
+.ext-panel-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg-primary, #e6e6e6);
+}
+
+.ext-panel-subtitle {
+  font-size: 11px;
+  color: var(--fg-tertiary, #999);
+  font-family: var(--font-mono, monospace);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.ext-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm, 4px);
+  color: var(--fg-secondary, #aaa);
+  transition: background 0.1s, color 0.1s;
+  cursor: pointer;
+}
+
+.ext-panel-btn:hover {
+  background: var(--bg-hover, #2a2a2a);
+  color: var(--fg-primary, #e6e6e6);
+}
+
+.ext-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  font-size: 12px;
+  color: var(--fg-primary, #e6e6e6);
+  line-height: 1.6;
+}
+
+.ext-panel-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ext-panel-empty {
+  color: var(--fg-tertiary, #999);
+  font-style: italic;
+  text-align: center;
+  padding: 24px 0;
+}
+
+.ext-panel-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ext-panel-kv-row {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ext-panel-kv-row:last-child {
+  border-bottom: none;
+}
+
+.ext-panel-kv-key {
+  flex: 0 0 120px;
+  color: var(--fg-tertiary, #999);
+  font-weight: 500;
+}
+
+.ext-panel-kv-val {
+  flex: 1;
+  color: var(--fg-primary, #e6e6e6);
+  word-break: break-all;
+  font-family: var(--font-mono, monospace);
+}

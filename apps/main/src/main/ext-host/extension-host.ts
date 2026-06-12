@@ -7,7 +7,7 @@
  * - 贡献点注册（命令/面板/预览器）
  * - IPC 入口（ext:list/enable/disable/install/uninstall/invoke-command）
  */
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { IpcChannels } from '@tabula/bridge';
@@ -196,6 +196,21 @@ export class ExtensionHost {
       case MainHostMethods.EXTENSION_ACTIVATED: {
         const p = params as { id: string };
         console.log(`[ext-host] extension activated notification: ${p.id}`);
+        break;
+      }
+      case MainHostMethods.PANEL_DATA: {
+        // ext-host 推送的面板数据 → 广播到所有 renderer 窗口
+        const p = params as { panelId: string; extensionId: string; payload: unknown };
+        console.log(`[ext-host] panel data: ${p.panelId} from ${p.extensionId}`);
+        for (const win of BrowserWindow.getAllWindows()) {
+          try {
+            if (!win.isDestroyed()) {
+              win.webContents.send(IpcChannels.EXT_PANEL_DATA, p);
+            }
+          } catch {
+            // 忽略坏掉的目标
+          }
+        }
         break;
       }
       case MainHostMethods.ERROR: {

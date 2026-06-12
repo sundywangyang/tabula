@@ -22,6 +22,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { PropertiesPanel } from './features/file-list/PropertiesPanel';
 import { BatchRenameDialog } from './features/file-list/BatchRenameDialog';
 import { ContextMenu } from './components/ContextMenu';
+import { ExtensionPanelView } from './components/ExtensionPanelView';
 import {
   CommandPalette,
   openCommandPalette,
@@ -682,6 +683,9 @@ export function App() {
 
       {/* P3: 全局右键菜单(单例,挂在 App 顶层,从 data-pane-id 推断目标 pane) */}
       <ContextMenu />
+
+      {/* P6: 扩展面板浮层(订阅 ext:panel-data 推送,渲染 ext-host 推过来的数据) */}
+      <ExtensionPanelView />
 
       {/* P7 v1: 快捷命令面板(单例,Ctrl+Shift+P 打开) */}
       <CommandPalette />

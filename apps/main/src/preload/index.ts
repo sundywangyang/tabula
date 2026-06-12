@@ -188,6 +188,11 @@ const api: TabulaAPI = {
     uninstall: (id) => ipcRenderer.invoke(IpcChannels.EXT_UNINSTALL, id),
     invokeCommand: (cmd, ...args) => ipcRenderer.invoke(IpcChannels.EXT_INVOKE_COMMAND, cmd, args),
     getPanels: () => ipcRenderer.invoke(IpcChannels.EXT_GET_PANELS),
+    onPanelData: (cb: (data: { panelId: string; extensionId: string; payload: unknown }) => void) => {
+      const listener = (_e: IpcRendererEvent, data: { panelId: string; extensionId: string; payload: unknown }) => cb(data);
+      ipcRenderer.on(IpcChannels.EXT_PANEL_DATA, listener);
+      return () => ipcRenderer.removeListener(IpcChannels.EXT_PANEL_DATA, listener);
+    },
   },
 
   config: {
