@@ -230,7 +230,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
     .join(' ');
 
   return (
-    <div className="toolbar" onContextMenu={handleScrollContainerContextMenu}>
+    <div className="toolbar" data-no-context-menu onContextMenu={handleScrollContainerContextMenu}>
       {/* 左滚动按钮 */}
       {scrollState.left && (
         <button className="toolbar-scroll-btn toolbar-scroll-left" onClick={() => scrollBy(-80)} aria-label="向左滚动">
@@ -241,6 +241,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div
         className={scrollClass}
         ref={scrollRef}
+        data-no-context-menu
         onContextMenu={handleScrollContainerContextMenu}
       >
       {/* 前进/后退按钮组 */}

@@ -397,6 +397,12 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
       if (menuRef.current?.contains(e.target as Node)) return;
 
       const target = e.target as HTMLElement;
+
+      // 黑名单:chrome 区域(tabs/breadcrumb/toolbar/状态栏/侧边栏等)不弹菜单
+      if (target.closest('[data-no-context-menu]')) {
+        return;
+      }
+
       const paneEl = target.closest('[data-pane-id]') as HTMLElement | null;
       const rowEl = target.closest('[data-entry-path]') as HTMLElement | null;
 

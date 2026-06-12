@@ -231,6 +231,7 @@ export function PaneView({
     >
       <div
         className={`tab-bar-wrap ${tabDrag ? 'is-dragging' : ''}`}
+        data-no-context-menu
         onContextMenu={blockContextMenu}
       >
         <TabBar paneId={paneId} pane={pane} />
@@ -238,7 +239,7 @@ export function PaneView({
 
       {!isTrash && (
         <>
-          <div className="pane-toolbar" onContextMenu={blockContextMenu}>
+          <div className="pane-toolbar" data-no-context-menu onContextMenu={blockContextMenu}>
             <Breadcrumb
               segments={breadcrumb}
               onNavigate={(p) => {
