@@ -62,12 +62,12 @@
 }
 
 .file-list-body {
+  height: 0;
   flex: 1;
-  min-height: 0;
+  overflow-y: auto;
   position: relative;
   display: flex;
   flex-direction: column;
-  /* 不设置 height/overflow —滚动由 .file-list-body-virtual 内部处理 */
 }
 
 .file-list-body-virtual {
@@ -193,8 +193,13 @@
 
 .grid-view .file-list-body {
   flex: 1;
-  overflow-y: auto;
   min-height: 0;
+  overflow-y: auto;
+}
+
+.grid-view .file-list-body-virtual {
+  min-height: 0;
+  flex: 1;
 }
 
 /* 列表视图 */
@@ -208,8 +213,13 @@
 
 .list-view .file-list-body {
   flex: 1;
-  overflow-y: auto;
   min-height: 0;
+  overflow-y: auto;
+}
+
+.list-view .file-list-body-virtual {
+  min-height: 0;
+  flex: 1;
 }
 
 /* 详情视图 */
@@ -223,8 +233,13 @@
 
 .details-view .file-list-body {
   flex: 1;
-  overflow-y: auto;
   min-height: 0;
+  overflow-y: auto;
+}
+
+.details-view .file-list-body-virtual {
+  min-height: 0;
+  flex: 1;
 }
 
 .grid-row {
