@@ -498,9 +498,13 @@ function ExtensionPanels() {
           key={panel.id}
           className="sidebar-item"
           onClick={() => {
-            // 触发扩展面板命令: <extId>.<panelId>
-            const cmd = `${panel.extensionId}.${panel.id}`;
-            void window.tabula.extensions.invokeCommand(cmd);
+            // P6 v2: panel 视图渲染待实现,先给用户一个明确提示而不是静默报错
+            // (扩展注册的 panel 渲染命令命名规范见 docs/PLAN.md — 待 P6 v2)
+            useFileStore.getState().showToast(
+              `面板 "${panel.title}" 渲染待 P6 v2 实现 (由 ${panel.extensionId} 提供)`,
+              'info',
+              3000,
+            );
           }}
           title={`${panel.title} (${panel.extensionId})`}
         >

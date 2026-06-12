@@ -144,11 +144,9 @@ export class ExtensionHost {
 
   /** ext:invoke-command */
   async invokeCommand(command: string, ...args: unknown[]): Promise<unknown> {
-    const entry = this.registry.commands.get(command);
-    if (!entry) {
-      throw new Error(`Command not found: ${command}`);
-    }
-    // 通过 ext-host 调用插件命令
+    // 命令 handler 实际存在 ext-host 子进程的 commandHandlers map 里
+    // (REGISTER_COMMAND 只发元信息通知,handler 留在子进程)。
+    // 直接转发到 ext-host,ext-host 会处理 "Command not found" 错误。
     return this.rpcChannel.request(ExtHostMethods.INVOKE_COMMAND, { command, args });
   }
 
