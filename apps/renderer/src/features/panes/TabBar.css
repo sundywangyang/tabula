@@ -2,11 +2,14 @@
  * 标签栏 (macOS Big Sur+ 风格)
  *
  * - 全圆角 pill 形状
+ * - 固定 tab 宽度, 让位精确 (--tab-w 180px 默认)
  * - active tab 顶部 accent 高亮条
  * - P2 v2: 拖动相关视觉态(opacity、插入指示线)
  */
 
 .tab-bar {
+  --tab-w: 180px;             /* 单个 tab 的固定宽度 (含 padding) */
+  --tab-gap: 2px;              /* tab 之间的间距 (与下方 gap 一致) */
   display: flex;
   align-items: stretch;
   height: var(--tabbar-h);
@@ -14,8 +17,14 @@
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   padding: 4px 6px 0;
-  gap: 2px;
-  overflow: hidden;
+  gap: var(--tab-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;       /* 隐藏水平滚动条 */
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-chip {
@@ -23,8 +32,11 @@
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  flex-shrink: 1;
+  flex-shrink: 0;            /* 关键: 不再 shrink,保持固定宽度 */
+  flex-grow: 0;
   min-width: 28px;
+  max-width: var(--tab-w, 180px); /* 固定最大宽度, 拖动让位精确 */
+  width: var(--tab-w, 180px);      /* 固定宽度, 不依赖名称长度 */
   height: var(--tab-h);
   border-radius: var(--radius-md);
   font-size: 12px;
@@ -33,8 +45,29 @@
   border: 0.5px solid transparent;
   cursor: pointer;
   user-select: none;
+  touch-action: none;
   transition: background 0.15s, color 0.15s, opacity 0.15s, box-shadow 0.15s;
   position: relative;
+}
+
+/* 标题过长省略号截断 (max-width + text-overflow) */
+.tab-title {
+  flex: 1;
+  min-width: 0; /* 关键: 配合 max-width 让 text-overflow 生效 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+/* 关键: 关闭按钮、icon SVG 等子元素不能拦截 drag 事件,
+   必须让 pointer events 穿透到 .tab-chip 自己 */
+.tab-chip > * {
+  pointer-events: none;
+}
+/* 但关闭按钮自己需要能 click,所以单独恢复 */
+.tab-chip > .tab-close {
+  pointer-events: auto;
 }
 
 .tab-chip:hover {
@@ -77,38 +110,85 @@
   color: var(--accent);
 }
 
-/* P2 v2: 正在被拖动的源 tab 半透明 */
+/* P2 v2: 正在被拖动的源 tab 半透明 + 缩放 + 高亮提示 */
 .tab-chip.tab-dragging {
-  opacity: 0.4;
+  opacity: 0.35;
   pointer-events: none;
+  transform: scale(0.96);
+  filter: saturate(0.7);
 }
 
-/* P2 v2: 插入指示线 — 在 chip 左侧 */
+/* Step 1: Pointer Events 拖动中(active 状态由 TabBar.tsx 内联 style 控制) */
+.tab-chip.is-dragging-active {
+  opacity: 0.5; /* 拖动时半透明 */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--accent);
+  transition: none !important; /* 拖动中禁用 transition 避免延迟 */
+  background: var(--bg-elevated);
+  /* 拖动时尺寸减半: 180px → 90px */
+  width: 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+  /* 保持水平居中偏移(配合 transform: translateX 居中跟随光标) */
+  margin-left: 0;
+}
+
+/* 拖动时整条 tab-bar 视觉状态 (PaneView 加 .is-dragging 类) */
+.tab-bar-wrap.is-dragging .tab-bar {
+  cursor: grabbing;
+}
+
+/* 普通 tab 提示可拖 (HTML5 draggable=true) */
+.tab-chip[draggable="true"]:hover {
+  cursor: grab;
+}
+.tab-chip[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* pinned / placeholder tab 不可拖 → 拖动时 cursor 反馈 */
+.tab-chip[draggable="false"] {
+  cursor: default;
+}
+
+/* P2 v2: 插入指示线 — 在 chip 左侧 (macOS 风格:3px 宽 + 明显 glow 动画) */
 .tab-chip.drop-before::after {
   content: '';
   position: absolute;
-  left: -3px;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
+  left: -4px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
   background: var(--accent);
-  border-radius: 1px;
+  border-radius: 2px;
   z-index: 3;
-  box-shadow: 0 0 6px var(--accent);
+  box-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
+  animation: tabDropPulse 0.8s ease-in-out infinite alternate;
 }
 
 /* P2 v2: 插入指示线 — 在 chip 右侧 */
 .tab-chip.drop-after::after {
   content: '';
   position: absolute;
-  right: -3px;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
+  right: -4px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
   background: var(--accent);
-  border-radius: 1px;
+  border-radius: 2px;
   z-index: 3;
-  box-shadow: 0 0 6px var(--accent);
+  box-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
+  animation: tabDropPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes tabDropPulse {
+  from {
+    opacity: 0.7;
+    transform: scaleY(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
 }
 
 /* active 时不要 drop indicator */
