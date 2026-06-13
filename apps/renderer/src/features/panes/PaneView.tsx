@@ -75,21 +75,16 @@ export function PaneView({
     }
   }, [paneId, activeTab, activeTabPath, loadDir, isFocused, isTrash]);
 
-  // 全局兜底:监听 tab 拖动期间的 window dragend,确保清理(HTML5 dragend 在
-  // source 上触发,但有时快速拖出浏览器外会丢失)。挂一次即可。
-  useEffect(() => {
-    if (!tabDrag) return;
-    const handler = () => tabDragEnd();
-    window.addEventListener('dragend', handler, true);
-    window.addEventListener('drop', handler, true);
-    return () => {
-      window.removeEventListener('dragend', handler, true);
-      window.removeEventListener('drop', handler, true);
-    };
-  }, [tabDrag, tabDragEnd]);
+  // 全局兜底: tab 拖动走 Pointer Events,在 TabBar 内部用 ref 追踪 + window 监听器
+  // 不需要 PaneView 这层兜底了 (Pointer Events useEffect 在 TabBar 内部处理 cleanup)
 
   const onFocusPane = () => {
-    if (!isFocused) focusPane(paneId);
+    if (!isFocused) {
+      // 关键修复: 用 requestAnimationFrame 把 focus 推迟到下一帧
+      // 这样 mousedown → dragstart 完整事件链不受 React 重渲染干扰
+      // (setTimeout 0 在某些情况下会跟 dragstart 竞争, rAF 更稳定)
+      requestAnimationFrame(() => focusPane(paneId));
+    }
   };
 
   const handleOpen = async () => {
