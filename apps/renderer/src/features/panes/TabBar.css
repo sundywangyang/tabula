@@ -293,6 +293,34 @@
   color: var(--fg-primary);
 }
 
+/* =================== macOS 风格 chip 调整 ===================
+ * 1. 隐藏 folder icon (Safari/Chrome on macOS 风格: 标题文字直接铺开)
+ *    pinned/preview tab 的 icon 仍保留 (Pin/Eye 有意义, Folder 没意义)
+ * 2. close 按钮放最左 (用 flex order 改视觉顺序, DOM 顺序不动,
+ *    不影响拖动 hit-test 和 ctx menu 逻辑)
+ * 实现: 渲染时给 folder 类型的 .tab-icon 加 data-kind="folder",
+ * CSS 按 [data-kind] 选择器精确隐藏
+ */
+.tab-bar.is-mac .tab-icon[data-kind='folder'] {
+  display: none;
+}
+
+/* close 按钮 order 调到最左 (默认是 0, 设 -1 跑到 icon 前面) */
+.tab-bar.is-mac .tab-chip > .tab-close {
+  order: -1;
+  margin-left: 0;
+  margin-right: 2px;
+}
+/* macOS 下 title 紧跟 close 后面, 左边距归零 */
+.tab-bar.is-mac .tab-chip > .tab-title {
+  margin-left: 0;
+}
+/* macOS 调 padding: 右侧 10, 左侧 8 (close 按钮视觉呼吸) */
+.tab-bar.is-mac .tab-chip {
+  padding: 0 10px 0 8px;
+  gap: 4px;
+}
+
 /* =================== 极窄 pane渐进收缩 ===================
  * .pane-view 已设置 container-type: inline-size / container-name: pane
  * (Toolbar.css)，tabs 响应 pane 实际宽度收缩。

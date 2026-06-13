@@ -28,7 +28,11 @@ import { Eye, Folder, Pin, X } from 'lucide-react';
 import type { LayoutNode, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
+import { getCachedPlatform } from '../../platform-cache';
 import './TabBar.css';
+
+/** macOS 下 tab chip 不显示 folder icon, 关闭按钮放最左 (Safari 风格) */
+const IS_MAC = getCachedPlatform() === 'macos';
 
 /** HTML5 DnD mime 标识:跟 P3 文件拖放(application/x-tabula-paths)区分 */
 export const TAB_DND_MIME = 'application/x-tabula-tab';
@@ -336,7 +340,7 @@ export function TabBar({
 
   return (
     <div
-      className="tab-bar"
+      className={`tab-bar ${IS_MAC ? 'is-mac' : ''}`}
       onClick={handleClick}
     >
       {pane.tabs.map((tab, index) => {
@@ -404,7 +408,11 @@ export function TabBar({
             onDragOver={(e) => onTabDragOver(e, tab, index)}
             onDrop={(e) => onTabDrop(e, tab, index)}
           >
-            <span className="tab-icon" aria-hidden>
+            <span
+              className="tab-icon"
+              aria-hidden
+              data-kind={tab.pinned ? 'pinned' : tab.type === 'preview' ? 'preview' : 'folder'}
+            >
               {tab.pinned ? <Pin size={12} /> : tab.type === 'preview' ? <Eye size={12} /> : <Folder size={12} />}
             </span>
             <span className="tab-title">{tab.title || '空'}</span>
