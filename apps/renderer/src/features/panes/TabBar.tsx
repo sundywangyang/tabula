@@ -14,6 +14,7 @@
  *   - dataTransfer mime: application/x-tabula-tab
  */
 import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, useState, useCallback } from 'react';
+import { Eye, Folder, Pin, X } from 'lucide-react';
 import type { LayoutNode, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
@@ -255,7 +256,7 @@ export function TabBar({
             onDrop={(e) => onTabDrop(e, tab, index)}
           >
             <span className="tab-icon" aria-hidden>
-              {tab.pinned ? '📌' : tab.type === 'preview' ? '👁' : '📁'}
+              {tab.pinned ? <Pin size={12} /> : tab.type === 'preview' ? <Eye size={12} /> : <Folder size={12} />}
             </span>
             <span className="tab-title">{tab.title || '空'}</span>
             {tab.closable && (
@@ -268,7 +269,7 @@ export function TabBar({
                 aria-label="关闭标签"
                 disabled={isTabDragging}
               >
-                ×
+                <X size={11} />
                            </button>
             )}
           </div>
@@ -317,7 +318,7 @@ export function TabBar({
                 closeCtxMenu();
               }}
             >
-              <span className="tab-ctx-icon">📌</span>
+              <span className="tab-ctx-icon"><Pin size={13} /></span>
               <span>取消固定</span>
             </button>
           ) : (
@@ -328,7 +329,7 @@ export function TabBar({
                 closeCtxMenu();
               }}
             >
-              <span className="tab-ctx-icon">📌</span>
+              <span className="tab-ctx-icon"><Pin size={13} /></span>
               <span>固定标签</span>
             </button>
           )}

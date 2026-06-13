@@ -10,6 +10,7 @@
  * 拖放:P3 已支持 — favorites / drives / 当前 都作为 drop target。
  */
 import { type DragEvent as ReactDragEvent, useEffect, useState } from 'react';
+import { Clock, Folder, HardDrive, Plug, Star, Trash2, X } from 'lucide-react';
 import type { DriveInfo } from '@tabula/bridge';
 import { useFileStore } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
@@ -203,7 +204,7 @@ export function Sidebar({
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') onOpenPath(f.path); }}
               >
-                <span className="sidebar-icon">★</span>
+                <span className="sidebar-icon"><Star size={13} /></span>
                 {isRenaming ? (
                   <input
                     className="sidebar-rename-input"
@@ -230,7 +231,7 @@ export function Sidebar({
                     showToast('已从收藏移除', 'info', 1500);
                   }}
                 >
-                  ✕
+                  <X size={12} />
                 </button>
               </div>
             );
@@ -253,7 +254,7 @@ export function Sidebar({
           }}
           title="回收站"
         >
-          <span className="sidebar-icon">🗑</span>
+          <span className="sidebar-icon"><Trash2 size={13} /></span>
           <span className="sidebar-name">回收站</span>
           {trashItems.length > 0 && (
             <span className="sidebar-badge">{trashItems.length}</span>
@@ -306,7 +307,7 @@ export function Sidebar({
                 onDrop={(e) => void handleItemDrop(e, d.mount)}
                 title={d.mount}
               >
-                <span className="sidebar-icon">💾</span>
+                <span className="sidebar-icon"><HardDrive size={13} /></span>
                 <span className="sidebar-name">
                   {labelDisplay}
                   {sizeText && <span className="sidebar-meta">{sizeText}</span>}
@@ -357,7 +358,7 @@ export function Sidebar({
               onClick={clearHistory}
               title="清空历史"
             >
-              ✕
+              <X size={12} />
             </button>
           )}
         </div>
@@ -516,7 +517,7 @@ function ExtensionPanels() {
           }}
           title={`${panel.title} (${panel.extensionId})`}
         >
-          <span className="sidebar-icon">{panel.icon ?? '🔌'}</span>
+          <span className="sidebar-icon">{panel.icon ?? <Plug size={13} />}</span>
           <span className="sidebar-name">{panel.title}</span>
         </button>
       ))}

@@ -1,6 +1,8 @@
 .status-bar {
   height: var(--statusbar-h);
-  background: var(--bg-elevated);
+  background: var(--bg-translucent);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -10,13 +12,19 @@
   color: var(--fg-tertiary);
   flex-shrink: 0;
   font-family: var(--font-mono);
+  letter-spacing: -0.1px;
+}
+
+/* 毛玻璃降级 */
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .status-bar { background: var(--bg-elevated); }
 }
 
 .status-left,
 .status-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .status-item {
@@ -24,11 +32,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 600px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .status-divider {
   color: var(--fg-tertiary);
-  opacity: 0.5;
+  opacity: 0.4;
+  user-select: none;
 }
 
 .status-selected {
@@ -39,7 +51,7 @@
 .status-clipboard {
   color: var(--accent);
   font-weight: 500;
-  background: rgba(99, 102, 241, 0.10);
+  background: var(--accent-soft);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   font-size: 10px;
@@ -47,7 +59,7 @@
 
 .status-clipboard-cut {
   color: var(--warning);
-  background: rgba(245, 158, 11, 0.12);
+  background: rgba(255, 159, 10, 0.12);
 }
 
 .status-progress {
@@ -66,7 +78,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(99, 102, 241, 0.10);
+  background: var(--accent-soft);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   color: var(--accent);
@@ -95,7 +107,7 @@
 }
 
 .status-filter-clear:hover {
-  background: rgba(99, 102, 241, 0.2);
+  background: var(--accent-soft-hover);
   color: var(--accent-hover);
 }
 
@@ -105,18 +117,18 @@
   font-size: 10px;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .status-hint kbd {
   display: inline-block;
-  padding: 0 4px;
+  padding: 0 5px;
   background: var(--bg-base);
   border: 1px solid var(--border-strong);
-  border-bottom-width: 2px;
-  border-radius: 3px;
+  border-bottom-width: 1.5px;
+  border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--fg-secondary);
-  line-height: 1.4;
+  line-height: 1.5;
 }

@@ -10,13 +10,18 @@
   position: fixed;
   inset: 0;
   z-index: 9500;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 14vh;
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
   animation: cp-fade-in 0.12s ease-out;
+}
+
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .cp-overlay { background: rgba(0, 0, 0, 0.5); }
 }
 
 @keyframes cp-fade-in {
@@ -31,14 +36,20 @@
 .cp-panel {
   width: min(640px, 92vw);
   max-height: 70vh;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
+  background: var(--bg-translucent-elevated);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: cp-pop-in 0.16s ease-out;
+}
+
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .cp-panel { background: var(--bg-elevated); border-color: var(--border-strong); }
 }
 
 @keyframes cp-pop-in {

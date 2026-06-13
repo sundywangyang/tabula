@@ -407,3 +407,35 @@
     transform: rotate(360deg);
   }
 }
+
+/* =================== 文件图标颜色 (lucide SVG) =================== */
+.row-icon,
+.grid-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.row-icon svg,
+.grid-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.grid-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* macOS Finder 风格:不同文件类型有语义化颜色 */
+.file-icon-folder { color: var(--accent); }
+.file-icon-image  { color: #34c759; } /* system green */
+.file-icon-video  { color: #ff3b30; } /* system red */
+.file-icon-audio  { color: #af52de; } /* system purple */
+.file-icon-archive{ color: #ff9500; } /* system orange */
+.file-icon-exec   { color: var(--fg-tertiary); }
+.file-icon-doc    { color: #5856d6; } /* system indigo */
+.file-icon-code   { color: #ff9500; } /* system orange */
+.file-icon-text   { color: var(--fg-secondary); }
+.file-icon-default{ color: var(--fg-tertiary); }

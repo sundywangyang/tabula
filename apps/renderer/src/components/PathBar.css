@@ -4,25 +4,36 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 60px;
   z-index: 100;
-  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+}
+
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .path-bar-overlay { background: rgba(0, 0, 0, 0.5); }
 }
 
 .path-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: min(720px, 90%);
-  background: var(--bg-elevated);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  background: var(--bg-translucent-elevated);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .path-bar { background: var(--bg-elevated); border-color: var(--border-strong); }
 }
 
 .path-bar-prefix {

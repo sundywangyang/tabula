@@ -1,27 +1,39 @@
 .sidebar {
   width: var(--sidebar-w);
-  background: var(--bg-elevated);
+  background: var(--bg-translucent);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 10px 8px;
+  gap: 14px;
+}
+
+/* 毛玻璃不支持时降级到纯色 */
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .sidebar { background: var(--bg-elevated); }
 }
 
 .sidebar-section {
-  padding: 0 8px;
-  margin-bottom: 16px;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .sidebar-header {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
   color: var(--fg-tertiary);
-  padding: 4px 8px;
-  margin-bottom: 4px;
+  padding: 6px 8px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .sidebar-header-row {
@@ -62,12 +74,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
   color: var(--fg-secondary);
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
   transition: background 0.1s, color 0.1s;
+  position: relative;
 }
 
 .sidebar-item:hover:not(:disabled) {
@@ -76,12 +89,12 @@
 }
 
 .sidebar-item.active {
-  background: var(--bg-active);
-  color: var(--fg-primary);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .sidebar-item.drag-over {
-  background: rgba(99, 102, 241, 0.18);
+  background: var(--accent-soft-hover);
   color: var(--accent);
   outline: 1px dashed var(--accent);
   outline-offset: -2px;
@@ -93,10 +106,18 @@
 }
 
 .sidebar-icon {
-  width: 16px;
+  width: 18px;
   text-align: center;
   flex-shrink: 0;
   font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .sidebar-name {
@@ -120,7 +141,7 @@
 
 .sidebar-rename-input {
   flex: 1;
-  font-size: 12px;
+  font-size: 13px;
   padding: 2px 6px;
   background: var(--bg-overlay);
   border: 1px solid var(--accent);
@@ -130,18 +151,18 @@
 }
 
 .sidebar-current-path {
-  padding: 4px 8px;
+  padding: 6px 8px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-tertiary);
   word-break: break-all;
-  background: var(--bg-base);
+  background: var(--bg-overlay);
   border-radius: var(--radius-sm);
   transition: background 0.1s, color 0.1s;
 }
 
 .sidebar-current-path.drag-over {
-  background: rgba(99, 102, 241, 0.18);
+  background: var(--accent-soft-hover);
   color: var(--accent);
   outline: 1px dashed var(--accent);
   outline-offset: -2px;
@@ -150,30 +171,39 @@
 .sidebar-ctxmenu {
   position: fixed;
   z-index: 9999;
-  min-width: 140px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
+  min-width: 160px;
+  background: var(--bg-translucent-elevated);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   padding: 4px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+}
+
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .sidebar-ctxmenu { background: var(--bg-elevated); border-color: var(--border-strong); }
 }
 
 .sidebar-ctxmenu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--fg-primary);
   transition: background 0.1s;
 }
 
 .sidebar-ctxmenu-item:hover {
-  background: var(--bg-hover);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .sidebar-ctxmenu-item.danger {
@@ -181,13 +211,13 @@
 }
 
 .sidebar-ctxmenu-item.danger:hover {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(255, 59, 48, 0.12);
 }
 
 /* 回收站 badge */
 .sidebar-badge {
   margin-left: auto;
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: 10px;
   background: var(--accent);
   color: white;
@@ -196,6 +226,7 @@
   min-width: 16px;
   text-align: center;
   flex-shrink: 0;
+  font-weight: 600;
 }
 
 /* P5: 收藏夹项移除按钮 */
@@ -203,7 +234,7 @@
   display: none;
   width: 16px;
   height: 16px;
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
   color: var(--fg-tertiary);
   font-size: 10px;
   line-height: 1;
@@ -212,6 +243,11 @@
   justify-content: center;
   transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
+}
+
+.sidebar-remove-btn svg {
+  width: 10px;
+  height: 10px;
 }
 
 .sidebar-item:hover .sidebar-remove-btn {
@@ -225,8 +261,8 @@
 
 /* 折叠按钮 */
 .sidebar-collapse-btn {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

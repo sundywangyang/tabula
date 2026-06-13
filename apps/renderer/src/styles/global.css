@@ -1,5 +1,5 @@
 /**
- * Tabula 全局样式
+ * Tabula 全局样式 (macOS Big Sur+ 设计语言)
  *
  * 主题系统(P5):
  * - :root 上没有 data-theme 时,默认为暗色(向后兼容)
@@ -7,88 +7,122 @@
  * - :root[data-theme="light"] 浅色
  * - --accent 由 theme-store 运行时注入(document.documentElement.style.setProperty)
  * - 切换通过 data-theme 替换 → 整页 CSS 变量重新解析,无 reload
+ *
+ * macOS 风格 token (P6+ 重构):
+ * - accent #007AFF (macOS 系统蓝,可在 theme-store 覆盖)
+ * - 圆角加大: sm=6, md=10, lg=14, xl=20
+ * - 毛玻璃: --blur-sm/md/lg + --bg-translucent(半透明背景层)
+ * - 阴影: 4 档 (sm/md/lg/xl),更柔和
+ * - 字体: SF Pro 优先栈
  */
 
 :root {
-  /* 字体 / 尺寸 (主题无关) */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable', 'Segoe UI',
-    system-ui, 'Microsoft YaHei', '微软雅黑', sans-serif;
-  --font-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  /* =================== 字体 (主题无关) =================== */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'SF Pro Display', 'Helvetica Neue', 'PingFang SC',
+    'Microsoft YaHei', '微软雅黑', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', Menlo, Monaco,
+    'Cascadia Code', Consolas, monospace;
+  --font-display: -apple-system, BlinkMacSystemFont,
+    'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  /* =================== 圆角 (加大) =================== */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 
+  /* =================== 尺寸 (主题无关) =================== */
   --titlebar-h: 32px;
-  --statusbar-h: 24px;
-  --sidebar-w: 220px;
+  --statusbar-h: 22px;
+  --sidebar-w: 240px;
   --breadcrumb-h: 36px;
+  --tabbar-h: 36px;
+  --tab-h: 30px;
 
-  /* 默认重点色;theme-store hydrate 后会用 setProperty 覆盖 */
-  --accent: #6366f1;
+  /* =================== 毛玻璃 (macOS Big Sur+ 标志) =================== */
+  --blur-sm: blur(12px) saturate(150%);
+  --blur-md: blur(20px) saturate(180%);
+  --blur-lg: blur(30px) saturate(200%);
+
+  /* =================== Accent (默认 macOS 系统蓝) =================== */
+  --accent: #007AFF;
+  --accent-hover: #1A8CFF;
+  --accent-active: #0066D6;
+  --accent-soft: rgba(0, 122, 255, 0.15);
+  --accent-soft-hover: rgba(0, 122, 255, 0.22);
+
+  /* =================== 阴影 (4 档,更柔和) =================== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.35);
+
+  /* =================== 滚动条尺寸 =================== */
+  --scrollbar-w: 8px;
 
   color-scheme: dark;
 }
 
-/* =================== 暗色主题(默认 + 显式 dark)=================== */
+/* =================== 暗色主题(默认 + 显式 dark) =================== */
 :root,
 :root[data-theme='dark'] {
-  --bg-base: #1a1a1f;
-  --bg-elevated: #22232a;
-  --bg-overlay: #2a2c34;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-active: rgba(255, 255, 255, 0.08);
+  --bg-base: #1c1c1e;
+  --bg-elevated: #2c2c2e;
+  --bg-overlay: #3a3a3c;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.10);
+  --bg-translucent: rgba(30, 30, 32, 0.72);
+  --bg-translucent-elevated: rgba(44, 44, 46, 0.85);
 
-  --fg-primary: #e6e6ec;
-  --fg-secondary: #a8a8b3;
-  --fg-tertiary: #6c6c78;
+  --fg-primary: #f5f5f7;
+  --fg-secondary: #aeaeb2;
+  --fg-tertiary: #8e8e93;
 
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
 
-  --accent-hover: #7c7ff5;
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --success: #10b981;
+  --danger: #ff453a;
+  --warning: #ff9f0a;
+  --success: #30d158;
 
-  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
   --scrollbar-track: transparent;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
 
   color-scheme: dark;
 }
 
 /* =================== 浅色主题 =================== */
 :root[data-theme='light'] {
-  --bg-base: #fafafc;
+  --bg-base: #f5f5f7;
   --bg-elevated: #ffffff;
-  --bg-overlay: #f3f4f8;
+  --bg-overlay: #ececef;
   --bg-hover: rgba(0, 0, 0, 0.04);
-  --bg-active: rgba(0, 0, 0, 0.07);
+  --bg-active: rgba(0, 0, 0, 0.08);
+  --bg-translucent: rgba(246, 246, 248, 0.78);
+  --bg-translucent-elevated: rgba(255, 255, 255, 0.92);
 
-  --fg-primary: #1f1f24;
-  --fg-secondary: #5a5a66;
-  --fg-tertiary: #9090a0;
+  --fg-primary: #1d1d1f;
+  --fg-secondary: #6e6e73;
+  --fg-tertiary: #8e8e93;
 
   --border: rgba(0, 0, 0, 0.08);
   --border-strong: rgba(0, 0, 0, 0.16);
 
-  --accent-hover: #4f52d4;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --success: #059669;
+  --accent-hover: #0066D6;
+  --accent-active: #0050A0;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --accent-soft-hover: rgba(0, 122, 255, 0.18);
 
-  --scrollbar-thumb: rgba(0, 0, 0, 0.18);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+  --danger: #ff3b30;
+  --warning: #ff9500;
+  --success: #34c759;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.20);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
   --scrollbar-track: transparent;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
 
   color-scheme: light;
 }
@@ -109,9 +143,11 @@ body,
   color: var(--fg-primary);
   font-family: var(--font-sans);
   font-size: 13px;
+  line-height: 1.4;
   user-select: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   /* 主题切换零闪烁:背景色过渡 */
   transition: background-color 0.12s ease, color 0.12s ease;
 }
@@ -123,6 +159,7 @@ button {
   background: transparent;
   border: none;
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
 input,
@@ -142,9 +179,10 @@ textarea:focus {
   border-color: var(--accent);
 }
 
+/* =================== 滚动条 (macOS 风格) =================== */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: var(--scrollbar-w);
+  height: var(--scrollbar-w);
 }
 
 ::-webkit-scrollbar-track {
@@ -153,13 +191,18 @@ textarea:focus {
 
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 5px;
+  border-radius: 4px;
   border: 2px solid transparent;
   background-clip: padding-box;
+  transition: background 0.15s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
   background-clip: padding-box;
   border: 2px solid transparent;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

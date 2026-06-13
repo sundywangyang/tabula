@@ -7,7 +7,7 @@
  * Windows / Linux: 保留右侧最小化/最大化/关闭按钮。
  */
 import { useState, useEffect } from 'react';
-import { PanelLeft, PanelLeftClose } from 'lucide-react';
+import { PanelLeft, PanelLeftClose, Settings, Terminal } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { getCachedPlatform } from '../platform-cache';
 import './TitleBar.css';
@@ -63,10 +63,10 @@ export function TitleBar({ version, sidebarVisible, onToggleSidebar, onSettingsO
           onClick={onSettingsOpen}
           title="设置 (Ctrl+,)"
         >
-          ⚙
+          <Settings size={14} />
         </button>
         <button className="win-btn" onClick={() => window.tabula.app.openDevTools()} title="DevTools">
-          ⌨
+          <Terminal size={14} />
         </button>
 
         {/* 自定义窗口控制按钮 — 仅在非 macOS 平台显示 */}

@@ -7,12 +7,17 @@
   position: fixed;
   inset: 0;
   z-index: 8000;
-  background: rgba(0, 0, 0, 0.78);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: var(--blur-lg);
+  backdrop-filter: var(--blur-lg);
   animation: preview-fade-in 0.15s ease-out;
+}
+
+@supports not ((backdrop-filter: blur(30px)) or (-webkit-backdrop-filter: blur(30px))) {
+  .preview-overlay { background: rgba(0, 0, 0, 0.78); }
 }
 
 @keyframes preview-fade-in {
@@ -27,15 +32,21 @@
 .preview-panel {
   width: min(92vw, 1200px);
   height: min(88vh, 820px);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
+  background: var(--bg-translucent-elevated);
+  -webkit-backdrop-filter: var(--blur-md);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-xl);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   outline: none;
   animation: preview-pop-in 0.18s ease-out;
+}
+
+@supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
+  .preview-panel { background: var(--bg-elevated); border-color: var(--border-strong); }
 }
 
 @keyframes preview-pop-in {

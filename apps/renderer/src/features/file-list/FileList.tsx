@@ -17,6 +17,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { Archive, File as FileIcon, FileCode2, FileText, Film, Folder, Image, Music, Settings } from 'lucide-react';
 import type { FsEntry } from '@tabula/bridge';
 import { useFileStore, isThumbnailable, type SortField } from '../../stores/file-store';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
@@ -652,7 +653,9 @@ function FileThumb({ entry, variant }: { entry: FsEntry; variant: 'row' | 'grid'
   const className = variant === 'grid' ? 'grid-icon-thumb' : 'row-icon-thumb';
 
   if (entry.isDirectory) {
-    return <span className={variant === 'grid' ? 'grid-icon' : 'row-icon'}>📁</span>;
+    return <span className={variant === 'grid' ? 'grid-icon' : 'row-icon'}>
+      <Folder size={14} className="file-icon-folder" />
+    </span>;
   }
   if (isThumbnailable(entry.ext) && dataUrl) {
     return (
@@ -666,7 +669,7 @@ function FileThumb({ entry, variant }: { entry: FsEntry; variant: 'row' | 'grid'
       />
     );
   }
-  // 回退到 emoji
+  // 回退到 lucide 图标
   return <span className={variant === 'grid' ? 'grid-icon' : 'row-icon'}>{iconFor(entry)}</span>;
 }
 
@@ -1198,34 +1201,42 @@ function formatDate(ms: number): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
-function iconFor(entry: FsEntry): string {
-  if (entry.isDirectory) return '📁';
+function iconFor(entry: FsEntry) {
+  if (entry.isDirectory) {
+    return <Folder size={14} className="file-icon-folder" />;
+  }
   const ext = entry.ext;
-  if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'].includes(ext)) return '🖼';
-  if (['.mp4', '.mov', '.avi', '.mkv', '.webm'].includes(ext)) return '🎬';
-  if (['.mp3', '.wav', '.flac', '.ogg', '.m4a'].includes(ext)) return '🎵';
-  if (['.zip', '.tar', '.gz', '.7z', '.rar'].includes(ext)) return '📦';
-  if (['.exe', '.msi'].includes(ext)) return '⚙';
-  if (['.md', '.markdown'].includes(ext)) return '📝';
+  if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico', '.heic', '.avif'].includes(ext)) {
+    return <Image size={14} className="file-icon-image" />;
+  }
+  if (['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'].includes(ext)) {
+    return <Film size={14} className="file-icon-video" />;
+  }
+  if (['.mp3', '.wav', '.flac', '.ogg', '.m4a'].includes(ext)) {
+    return <Music size={14} className="file-icon-audio" />;
+  }
+  if (['.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz'].includes(ext)) {
+    return <Archive size={14} className="file-icon-archive" />;
+  }
+  if (['.exe', '.msi', '.dmg', '.app', '.pkg', '.deb'].includes(ext)) {
+    return <Settings size={14} className="file-icon-exec" />;
+  }
+  if (['.md', '.markdown'].includes(ext)) {
+    return <FileText size={14} className="file-icon-doc" />;
+  }
   if (
     [
-      '.js',
-      '.ts',
-      '.tsx',
-      '.jsx',
-      '.json',
-      '.py',
-      '.rs',
-      '.go',
-      '.java',
-      '.c',
-      '.cpp',
-      '.h',
+      '.js', '.ts', '.tsx', '.jsx', '.json', '.py', '.rs', '.go',
+      '.java', '.c', '.cpp', '.h', '.hpp', '.css', '.scss', '.html',
+      '.php', '.rb', '.swift', '.kt', '.sql', '.sh', '.yaml', '.yml',
     ].includes(ext)
-  )
-    return '📜';
-  if (['.txt', '.log'].includes(ext)) return '📄';
-  return '📄';
+  ) {
+    return <FileCode2 size={14} className="file-icon-code" />;
+  }
+  if (['.txt', '.log', '.csv', '.xml'].includes(ext)) {
+    return <FileText size={14} className="file-icon-text" />;
+  }
+  return <FileIcon size={14} className="file-icon-default" />;
 }
 
 function parentOf(p: string): string {
