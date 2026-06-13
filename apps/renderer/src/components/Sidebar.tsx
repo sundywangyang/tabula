@@ -67,7 +67,7 @@ export function Sidebar({
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState<string>('');
-  const [historyCollapsed, setHistoryCollapsed] = useState(false);
+  const [historyCollapsed, setHistoryCollapsed] = useState(true);
 
   // 拉驱动器列表(组件挂载时一次 + 手动刷新按钮)
   useEffect(() => {
