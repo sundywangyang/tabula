@@ -2,7 +2,7 @@
  * 面包屑导航
  * P3: 每个路径段作为拖放目标
  */
-import { type DragEvent as ReactDragEvent } from 'react';
+import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import './Breadcrumb.css';
 import { useFileStore } from '../stores/file-store';
 import type { BreadcrumbSegment } from '../stores/file-store';
@@ -43,12 +43,35 @@ export function Breadcrumb({
     endDrag();
   };
 
+  // 双击 .breadcrumb-path 空白处 → 复制当前文件夹路径
+  // e.target === e.currentTarget 避开 segment 按钮和 › 分隔符
+  const handlePathDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const last = segments[segments.length - 1]?.path;
+    if (!last) {
+      useFileStore.getState().showToast('当前没有路径可复制', 'warn', 1800);
+      return;
+    }
+    void navigator.clipboard
+      ?.writeText(last)
+      .then(() => {
+        useFileStore.getState().showToast(`已复制: ${last}`, 'success', 1800);
+      })
+      .catch(() => {
+        useFileStore.getState().showToast('复制失败 (剪贴板权限?)', 'error', 2000);
+      });
+  };
+
   return (
     <div className="breadcrumb">
       <button className="breadcrumb-picker" onClick={onOpenPicker} title="打开文件夹 (Ctrl+O)">
         📁
       </button>
-      <div className="breadcrumb-path">
+      <div
+        className="breadcrumb-path"
+        onDoubleClick={handlePathDoubleClick}
+        title="双击空白处复制当前路径"
+      >
         {segments.length === 0 ? (
           <span className="breadcrumb-empty">未选择目录</span>
         ) : (
