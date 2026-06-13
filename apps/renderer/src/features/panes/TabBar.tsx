@@ -121,8 +121,8 @@ export function TabBar({
   // 按下时鼠标在 tab 内的 X 偏移(相对 tab 左边缘) — 用于保持"抓取点"稳定
   const [grabOffsetX, setGrabOffsetX] = useState(0);
   // 固定 tab 宽度 + gap, 让位精确 (与 .tab-bar 的 --tab-w + --tab-gap 一致)
-  const TAB_W = 180;
-  const DRAG_W = 90; // 拖动中显示宽度(原始一半)
+  const TAB_W = 160; // tab 最大宽度 (与 .tab-bar 的 --tab-w 一致)
+  const DRAG_W = 80; // 拖动中显示宽度(原始一半)
   const TAB_GAP = 2;
   const dropSlotWidth = TAB_W + TAB_GAP;
   const tabBarRef = useRef<HTMLDivElement | null>(null);

@@ -8,7 +8,7 @@
  */
 
 .tab-bar {
-  --tab-w: 180px;             /* 单个 tab 的固定宽度 (含 padding) */
+  --tab-w: 160px;             /* 单个 tab 的最大宽度 (含 padding) */
   --tab-gap: 2px;              /* tab 之间的间距 (与下方 gap 一致) */
   display: flex;
   align-items: stretch;
@@ -32,11 +32,10 @@
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  flex-shrink: 0;            /* 关键: 不再 shrink,保持固定宽度 */
-  flex-grow: 0;
-  min-width: 28px;
-  max-width: var(--tab-w, 180px); /* 固定最大宽度, 拖动让位精确 */
-  width: var(--tab-w, 180px);      /* 固定宽度, 不依赖名称长度 */
+  flex: 0 1 var(--tab-w, 160px); /* grow 0 不放大, shrink 1 空间不足时缩, basis 160 */
+  min-width: 20px;                /* 最小宽度 (极度压缩时保留可点击区域) */
+  max-width: 160px;               /* 最大宽度, tab-bar-wrap 宽于 tab 总和时按 160 排 */
+  width: var(--tab-w, 160px);     /* 期望宽度, 浏览器按 flex 实际算 */
   height: var(--tab-h);
   border-radius: var(--radius-md);
   font-size: 12px;
@@ -299,7 +298,39 @@
  * (Toolbar.css)，tabs 响应 pane 实际宽度收缩。
  */
 
-/* 极窄 pane:icon-only 模式，隐藏标题文字 */
+/* =================== tab 自身宽度过窄的渐进收缩 ===================
+ * tab-bar 总宽 < N × 160 时, flex 会把每个 chip 缩到 < 160
+ * 用 chip 自身的 container query 让 title/close 在不同时机隐藏
+ * .tab-chip 已设置 container-type: inline-size / container-name: tab
+ */
+.tab-chip {
+  container-type: inline-size;
+  container-name: tab;
+}
+
+/* chip 宽度 < 100px: 隐藏 title (只剩 icon + close) */
+@container tab (max-width: 100px) {
+  .tab-chip .tab-title {
+    display: none;
+  }
+  .tab-chip {
+    padding: 0 6px;
+    gap: 4px;
+    justify-content: center;
+  }
+}
+
+/* chip 宽度 < 50px: 隐藏 close 按钮 (只剩 icon) */
+@container tab (max-width: 50px) {
+  .tab-chip .tab-close {
+    display: none;
+  }
+  .tab-chip {
+    padding: 0 4px;
+  }
+}
+
+/* 极窄 pane: 渐进收缩 tab 整体 (icon-only 模式) */
 @container pane (max-width: 280px) {
   .tab-chip {
     flex-shrink: 1;
@@ -312,7 +343,7 @@
   }
 }
 
-/* 更窄:只保留 icon 和 close */
+/* 更窄: 只保留 icon 和 close */
 @container pane (max-width: 200px) {
   .tab-chip {
     flex-shrink: 1;
