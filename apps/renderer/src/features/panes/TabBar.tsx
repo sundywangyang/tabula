@@ -157,15 +157,13 @@ export function TabBar({
       if (!d) return;
       const dx = e.clientX - d.startX;
       const dy = e.clientY - d.startY;
-      // 调试: 实时打印光标位置
-      console.log('[TabBar] pointermove', { dx: Math.round(dx), dy: Math.round(dy), active: d.active, x: e.clientX, y: e.clientY });
       if (!d.active && Math.hypot(dx, dy) < 4) return;
       if (!d.active) {
         d.active = true;
         effectFnsRef.current.tabDragStart(d.paneId, d.tabId, d.index);
         setDraggingTabId(d.tabId);
       }
-      // Step 1: 让被拖的 tab 跟着光标水平移动
+      // 让被拖的 tab 跟着光标水平移动(中心对齐)
       setDragOffsetX(dx);
       // 找光标下的 tab chip (用 data-tab-index 标识)
       const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -173,7 +171,6 @@ export function TabBar({
       if (chip) {
         const targetIndex = Number(chip.dataset.tabIndex);
         const targetPaneId = chip.dataset.paneId;
-        console.log('[TabBar] hit target', { paneId: targetPaneId, index: targetIndex });
         if (targetPaneId && !isNaN(targetIndex)) {
           const rect = chip.getBoundingClientRect();
           const midX = rect.left + rect.width / 2;
@@ -181,32 +178,40 @@ export function TabBar({
           effectFnsRef.current.setDropTarget({ paneId: targetPaneId, index: targetIndex, side });
         }
       } else {
-        console.log('[TabBar] no target under cursor');
         effectFnsRef.current.setDropTarget(null);
       }
     };
     const onUp = (e: PointerEvent) => {
       const d = pointerDragRef.current;
-      console.log('[TabBar] pointerup', { active: d?.active, x: e.clientX });
       if (!d || !d.active) {
         pointerDragRef.current = null;
         return;
       }
+      // 决定 drop 目标: 优先精准(落点 chip), fallback 到 last-known-good tabDrag.dropTarget
+      // (鼠标可能滑到 tab-bar 空白处或 pane 边缘), 都没有则拖回原位
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const chip = el?.closest<HTMLElement>('[data-tab-index]');
+      let targetPaneId: string | undefined;
+      let toIndex = d.index;
       if (chip) {
+        targetPaneId = chip.dataset.paneId;
         const targetIndex = Number(chip.dataset.tabIndex);
-        const targetPaneId = chip.dataset.paneId;
         const rect = chip.getBoundingClientRect();
         const midX = rect.left + rect.width / 2;
         const before = e.clientX < midX;
-        const toIndex = before ? targetIndex : targetIndex + 1;
-        if (targetPaneId === d.paneId && d.index === targetIndex) {
-          // 落到自己身上 → no-op
+        toIndex = before ? targetIndex : targetIndex + 1;
+      } else {
+        const dt = useLayoutStore.getState().tabDrag?.dropTarget;
+        if (dt) {
+          targetPaneId = dt.paneId;
+          toIndex = dt.side === 'left' ? dt.index : dt.index + 1;
         } else {
-          console.log('[TabBar] moveTab', { from: d.index, to: toIndex, pane: targetPaneId });
-          effectFnsRef.current.moveTab(d.paneId, d.tabId, targetPaneId!, toIndex);
+          targetPaneId = d.paneId; // 拖回原位
         }
+      }
+      // 跨 pane → store 内部自动 focusPane(toPaneId) + loadDir, 同 pane 走 reorder
+      if (targetPaneId && (targetPaneId !== d.paneId || toIndex !== d.index)) {
+        effectFnsRef.current.moveTab(d.paneId, d.tabId, targetPaneId, toIndex);
       }
       pointerDragRef.current = null;
       effectFnsRef.current.tabDragEnd();
@@ -233,7 +238,6 @@ export function TabBar({
 
   // pointerdown 启动拖动候选(等用户拖过 4px 才认作 drag)
   const onTabPointerDown = (e: ReactPointerEvent<HTMLDivElement>, tab: Tab, index: number) => {
-    console.log('[TabBar] pointerdown', { tab: tab.title, button: e.button, draggable: isDraggableTab(tab), x: e.clientX, y: e.clientY });
     if (e.button !== 0) return; // 只响应左键
     if (!isDraggableTab(tab)) return;
     // 测量被拖 tab 相对 .tab-bar 容器的 left (后续用 position: absolute 时定位)
