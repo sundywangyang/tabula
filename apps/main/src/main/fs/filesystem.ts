@@ -278,7 +278,18 @@ async function macosListDrives(): Promise<DriveInfo[]> {
   // macOS: df 列出所有挂载卷;label 和 type 从 mount 命令拿
   // - df: Filesystem 1024-blocks Used Avail Capacity iused ifree %iused Mounted
   // - mount: 形如 /dev/disk1s1 on / (apfs, sealed, local, read-only, journaled) ...
-  const SKIP_MOUNTS = ['devfs', '/dev/', 'fdesc', 'procfs', 'autofs', 'tmpfs', 'sysfs', 'map auto', '/System/Volumes/Preboot', '/System/Volumes/VM', '/System/Volumes/Update', '/System/Volumes/xarts', '/System/Volumes/iSCPreboot', '/System/Volumes/Hardware'];
+  // 跳过的系统内部 mount: 虚拟 FS + APFS 子卷(Data/Preboot/VM/Update...)
+  // 注意 macOS 13+ 把主卷拆成 / (sealed, read-only) + /System/Volumes/Data (rw)
+  // 这俩共享同一物理磁盘, sidebar 显示重复, 必须把 Data 也跳过
+  const SKIP_MOUNTS = [
+    'devfs', '/dev/', 'fdesc', 'procfs', 'autofs', 'tmpfs', 'sysfs', 'map auto',
+    // APFS 系统子卷 — 全部在 /System/Volumes/ 下, 一次性 prefix 过滤
+    '/System/Volumes/Preboot', '/System/Volumes/VM', '/System/Volumes/Update',
+    '/System/Volumes/xarts', '/System/Volumes/iSCPreboot', '/System/Volumes/Hardware',
+    '/System/Volumes/Data',
+    // 旧版 macOS (12 及之前) 的 /private/var/* 子挂载
+    '/private/var',
+  ];
   try {
     const dfOut = execSync('df -k', { encoding: 'utf-8', timeout: 5000 }).trim();
     const lines = dfOut.split('\n').slice(1);
@@ -299,8 +310,8 @@ async function macosListDrives(): Promise<DriveInfo[]> {
       const parts = line.split(/\s+/);
       if (parts.length < 9) continue;
       const mount = parts[parts.length - 1];
-      // 跳过虚拟文件系统
-      if (SKIP_MOUNTS.some((s) => mount.startsWith(s) || mount.includes(s + '/'))) continue;
+      // 跳过虚拟文件系统 + APFS 子卷
+      if (SKIP_MOUNTS.some((s) => mount === s || mount.startsWith(s + '/'))) continue;
 
       // df -k 用 1024 字节块为单位
       const totalBytes = Number(parts[1]) * 1024;
