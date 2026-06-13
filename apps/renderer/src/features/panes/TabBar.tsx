@@ -75,6 +75,28 @@ export function TabBar({
     setCtxMenu({ tab, x: e.clientX, y: e.clientY });
   };
 
+  // 菜单打开时挂全局 pointerdown 监听, 点击菜单外任意位置关闭
+  // 菜单自身 stopPropagation 阻止冒泡到 window, 所以菜单内点击不会关
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const onDocPointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      // 菜单 DOM 内的点击忽略 (菜单自己 stopPropagation 已挡, 双保险)
+      if (target?.closest('.tab-ctx-menu')) return;
+      closeCtxMenu();
+    };
+    // Esc 也关
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCtxMenu();
+    };
+    window.addEventListener('pointerdown', onDocPointerDown, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDocPointerDown, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [ctxMenu, closeCtxMenu]);
+
   // 点击其他地方关闭菜单
   const handleClick = useCallback(() => {
     if (ctxMenu) closeCtxMenu();
