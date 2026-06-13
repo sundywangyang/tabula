@@ -8,12 +8,22 @@
  * - 中键关闭
  * - P3: 文件拖到 tab = 移动/复制文件到 tab.path(沿用 P3 的 mime: application/x-tabula-paths)
  * - P2 v2: tab 拖动
- *   - 自身可拖(draggable=true,普通 tab;pinned/placeholder 不可拖)
+ *   - 自身可拖(pinned/placeholder 不可拖)
  *   - 拖到另一 tab chip = 重排/跨 pane
  *   - 拖到 pane 边缘 = 新建窗口
- *   - dataTransfer mime: application/x-tabula-tab
+ *
+ * 实现说明: 用 Pointer Events 自己实现拖动,不用 HTML5 drag API。
+ * HTML5 drag 在 Electron 33 + StrictMode + 嵌套容器下不稳定,改用 Pointer Events 可靠。
  */
-import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, useState, useCallback } from 'react';
+import {
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+} from 'react';
 import { Eye, Folder, Pin, X } from 'lucide-react';
 import type { LayoutNode, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from '../../stores/file-store';
@@ -100,7 +110,22 @@ export function TabBar({
     }
   };
 
-  // =================== P2 v2: tab 拖动 ===================
+  // =================== P2 v2: tab 拖动 (Pointer Events 自实现) ===================
+
+  // 拖动中跟随光标的视觉位移(像素) — Step 1: 实时同步 X 坐标
+  const [dragOffsetX, setDragOffsetX] = useState(0);
+  // 被拖的 tab id (用于给 .tab-chip 加 transform)
+  const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
+  // 被拖 tab 原始 left (px, 相对 .tab-bar 容器)
+  const [dragSourceLeft, setDragSourceLeft] = useState(0);
+  // 按下时鼠标在 tab 内的 X 偏移(相对 tab 左边缘) — 用于保持"抓取点"稳定
+  const [grabOffsetX, setGrabOffsetX] = useState(0);
+  // 固定 tab 宽度 + gap, 让位精确 (与 .tab-bar 的 --tab-w + --tab-gap 一致)
+  const TAB_W = 180;
+  const DRAG_W = 90; // 拖动中显示宽度(原始一半)
+  const TAB_GAP = 2;
+  const dropSlotWidth = TAB_W + TAB_GAP;
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
 
   /** 一个 tab 是否可拖(pinned/placeholder 不可拖) */
   const isDraggableTab = (tab: Tab): boolean => {
@@ -109,45 +134,144 @@ export function TabBar({
     return true;
   };
 
-  const onTabDragStart = (e: ReactDragEvent<HTMLDivElement>, tab: Tab, index: number) => {
-    if (!isDraggableTab(tab)) {
-      e.preventDefault();
-      return;
-    }
-    const payload: TabDragPayload = { paneId, tabId: tab.id, index };
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData(TAB_DND_MIME, JSON.stringify(payload));
-    // 写一个 fallback 文本 mime(部分浏览器需要非空 dataTransfer 才能拖动)
-    e.dataTransfer.setData('text/plain', tab.path ?? tab.title);
-    tabDragStart(paneId, tab.id, index);
-  };
+  // Pointer Events 拖动状态(用 ref 避免重渲染)
+  const pointerDragRef = useRef<{
+    paneId: string;
+    tabId: string;
+    index: number;
+    startX: number;
+    startY: number;
+    active: boolean;
+  } | null>(null);
 
-  const onTabDragEnd = () => {
-    // drop 成功后会清状态;这里也兜底:cancel/异常退出时清理
-    tabDragEnd();
+  // 全局 pointermove / pointerup 监听 (在拖动期间挂上, 结束后清掉)
+  // 关键修复: deps 不含 tabDrag / moveTab / setDropTarget 等会变化的引用
+  // 这些函数会变化 → effect 反复 cleanup/挂载 → 中间丢失 pointermove
+  // 用 ref 缓存函数引用,deps 永远空数组
+  const effectFnsRef = useRef({ tabDragStart, tabDragEnd, setDropTarget, moveTab });
+  effectFnsRef.current = { tabDragStart, tabDragEnd, setDropTarget, moveTab };
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const d = pointerDragRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      // 调试: 实时打印光标位置
+      console.log('[TabBar] pointermove', { dx: Math.round(dx), dy: Math.round(dy), active: d.active, x: e.clientX, y: e.clientY });
+      if (!d.active && Math.hypot(dx, dy) < 4) return;
+      if (!d.active) {
+        d.active = true;
+        effectFnsRef.current.tabDragStart(d.paneId, d.tabId, d.index);
+        setDraggingTabId(d.tabId);
+      }
+      // Step 1: 让被拖的 tab 跟着光标水平移动
+      setDragOffsetX(dx);
+      // 找光标下的 tab chip (用 data-tab-index 标识)
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const chip = el?.closest<HTMLElement>('[data-tab-index]');
+      if (chip) {
+        const targetIndex = Number(chip.dataset.tabIndex);
+        const targetPaneId = chip.dataset.paneId;
+        console.log('[TabBar] hit target', { paneId: targetPaneId, index: targetIndex });
+        if (targetPaneId && !isNaN(targetIndex)) {
+          const rect = chip.getBoundingClientRect();
+          const midX = rect.left + rect.width / 2;
+          const side: 'left' | 'right' = e.clientX < midX ? 'left' : 'right';
+          effectFnsRef.current.setDropTarget({ paneId: targetPaneId, index: targetIndex, side });
+        }
+      } else {
+        console.log('[TabBar] no target under cursor');
+        effectFnsRef.current.setDropTarget(null);
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      const d = pointerDragRef.current;
+      console.log('[TabBar] pointerup', { active: d?.active, x: e.clientX });
+      if (!d || !d.active) {
+        pointerDragRef.current = null;
+        return;
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const chip = el?.closest<HTMLElement>('[data-tab-index]');
+      if (chip) {
+        const targetIndex = Number(chip.dataset.tabIndex);
+        const targetPaneId = chip.dataset.paneId;
+        const rect = chip.getBoundingClientRect();
+        const midX = rect.left + rect.width / 2;
+        const before = e.clientX < midX;
+        const toIndex = before ? targetIndex : targetIndex + 1;
+        if (targetPaneId === d.paneId && d.index === targetIndex) {
+          // 落到自己身上 → no-op
+        } else {
+          console.log('[TabBar] moveTab', { from: d.index, to: toIndex, pane: targetPaneId });
+          effectFnsRef.current.moveTab(d.paneId, d.tabId, targetPaneId!, toIndex);
+        }
+      }
+      pointerDragRef.current = null;
+      effectFnsRef.current.tabDragEnd();
+      effectFnsRef.current.setDropTarget(null);
+      setDragOffsetX(0);
+      setDraggingTabId(null);
+    };
+    const onCancel = () => {
+      pointerDragRef.current = null;
+      effectFnsRef.current.tabDragEnd();
+      effectFnsRef.current.setDropTarget(null);
+      setDragOffsetX(0);
+      setDraggingTabId(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+    };
+  }, []); // deps 永远空,只在 TabBar 挂载/卸载时跑一次
+
+  // pointerdown 启动拖动候选(等用户拖过 4px 才认作 drag)
+  const onTabPointerDown = (e: ReactPointerEvent<HTMLDivElement>, tab: Tab, index: number) => {
+    console.log('[TabBar] pointerdown', { tab: tab.title, button: e.button, draggable: isDraggableTab(tab), x: e.clientX, y: e.clientY });
+    if (e.button !== 0) return; // 只响应左键
+    if (!isDraggableTab(tab)) return;
+    // 测量被拖 tab 相对 .tab-bar 容器的 left (后续用 position: absolute 时定位)
+    const tabBar = e.currentTarget.parentElement;
+    if (tabBar) {
+      const tabRect = e.currentTarget.getBoundingClientRect();
+      const barRect = tabBar.getBoundingClientRect();
+      const sourceLeft = tabRect.left - barRect.left;
+      setDragSourceLeft(sourceLeft);
+      // 记录鼠标按下时相对 tab 左边缘的偏移, 拖动时让"抓取点"跟随光标
+      // (无论在 tab 哪个位置按下, 抓取点都是同一点, 不会突然跳到中心)
+      setGrabOffsetX(e.clientX - tabRect.left);
+    }
+    pointerDragRef.current = {
+      paneId,
+      tabId: tab.id,
+      index,
+      startX: e.clientX,
+      startY: e.clientY,
+      active: false,
+    };
+    // 关键: 不用 e.preventDefault() 阻止默认,因为 Chromium 33 在某些情况下
+    // 会用 preventDefault 阻止后续 pointermove 事件。
+    // 改用 capture phase 监听器 + setPointerCapture 来确保我们拿到所有 pointer 事件。
+    if (e.currentTarget.setPointerCapture && e.pointerId !== undefined) {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // 某些元素不支持 setPointerCapture,忽略
+      }
+    }
   };
 
   /**
-   * tab chip 上 dragover:决定插入位置(左/右)
-   * 注意:必须先识别 mime,如果是文件拖(P3)走老的逻辑,tab 拖走新逻辑
+   * tab chip 上 dragover(仅文件拖放,HTML5 drag API):
+   * 注意: tab 自己拖动走 Pointer Events;这里只剩 P3 文件拖到 tab 的逻辑
    */
-  const onTabDragOver = (e: ReactDragEvent<HTMLDivElement>, tab: Tab, index: number) => {
-    // 优先识别 tab 拖动
-    const types = e.dataTransfer.types;
-    const hasTabMime = Array.from(types).includes(TAB_DND_MIME);
-    if (hasTabMime) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
-      // 决定插入方向:鼠标在 chip 左半 → before(在 tab 左侧显示指示线),右半 → after
-      if (!tabDrag || tabDrag.tabId !== tab.id) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        const side: 'left' | 'right' = e.clientX < midX ? 'left' : 'right';
-        setDropTarget({ paneId, index, side });
-      }
-      return;
-    }
+  const onTabDragOver = (e: ReactDragEvent<HTMLDivElement>, tab: Tab, _index: number) => {
     // 文件拖放(P3) — 老的逻辑
     if (fileDragState && tab.path) {
       e.preventDefault();
@@ -158,41 +282,16 @@ export function TabBar({
     }
   };
 
-  const onTabDragLeave = (_e: ReactDragEvent<HTMLDivElement>, _tab: Tab, index: number) => {
-    // 鼠标离开 chip 到非 drop 区:清掉自己这块的 dropTarget
-    if (tabDrag && tabDrag.dropTarget && tabDrag.dropTarget.paneId === paneId) {
-      // 只有当 dropTarget 指向这个 tab 时才清(避免相邻 chip dragleave 抖动)
-      if (tabDrag.dropTarget.index === index) {
-        setDropTarget(null);
-      }
-    }
-  };
-
-  const onTabDrop = (e: ReactDragEvent<HTMLDivElement>, tab: Tab, index: number) => {
-    // 优先处理 tab 拖放
-    const tabPayload = e.dataTransfer.getData(TAB_DND_MIME);
-    if (tabPayload) {
+  const onTabDrop = (e: ReactDragEvent<HTMLDivElement>, tab: Tab, _index: number) => {
+    // tab 拖动走 Pointer Events 不进这里;这里只处理 P3 文件拖到 tab
+    if (fileDragState && tab.path) {
       e.preventDefault();
       e.stopPropagation();
-      try {
-        const payload = JSON.parse(tabPayload) as TabDragPayload;
-        // 落到自己身上 → no-op(防止 reorderTabs 把源 tab 误移到相邻位置)
-        if (payload.paneId === paneId && payload.tabId === tab.id) {
-          return;
-        }
-        // 决定插入索引:before → 目标 index;after → 目标 index + 1
-        // 同 pane 时 fromIndex < toIndex 的修正由 reorderTabs 内部处理
-        const rect = e.currentTarget.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        const before = e.clientX < midX;
-        const toIndex = before ? index : index + 1;
-        moveTab(payload.paneId, payload.tabId, paneId, toIndex);
-      } catch (err) {
-        console.warn('[TabBar] invalid tab drag payload', err);
-      } finally {
-        tabDragEnd();
-      }
-      return;
+      const state = useFileStore.getState().dragState;
+      if (!state) return;
+      const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
+      void performBulk(state.paths, tab.path, mode, state.sourcePaneId);
+      endFileDrag();
     }
     // 文件拖放(P3)
     e.preventDefault();
@@ -212,7 +311,6 @@ export function TabBar({
   return (
     <div
       className="tab-bar"
-      onMouseDown={(e) => e.stopPropagation()}
       onClick={handleClick}
     >
       {pane.tabs.map((tab, index) => {
@@ -228,6 +326,30 @@ export function TabBar({
           fileDragState &&
           fileDragState.targetKind === 'tab' &&
           fileDragState.targetPath === tab.path;
+        const isBeingDragged = draggingTabId === tab.id;
+
+        // Step 2.7: 拖动中 tab 缩到一半 (90px) + 透明度 50%, tab 中心 = 鼠标 X
+        // 鼠标按下时, 鼠标在 tab 上的 X = dragSourceLeft + grabOffsetX (在 .tab-bar 坐标系)
+        // 鼠标当前 X = (dragSourceLeft + grabOffsetX) + dragOffsetX
+        // 期望: tab 中心 (现在宽 DRAG_W) = 鼠标当前 X
+        //   → tab 左边缘 = 鼠标 X - DRAG_W/2
+        // tab 现在 absolute 在 dragSourceLeft + transform
+        //   → transform = (dragSourceLeft + grabOffsetX + dragOffsetX) - DRAG_W/2 - dragSourceLeft
+        //   → transform = grabOffsetX + dragOffsetX - DRAG_W/2
+        const halfDragW = DRAG_W / 2; // 45
+        let chipStyle: React.CSSProperties | undefined;
+        if (isBeingDragged) {
+          chipStyle = {
+            position: 'absolute',
+            left: `${dragSourceLeft}px`,
+            top: 4,
+            zIndex: 100,
+            transform: `translateX(${grabOffsetX + dragOffsetX - halfDragW}px)`,
+            willChange: 'transform',
+          };
+        }
+        // 不再做"让位 transform", 依赖 flex 流自动塌缩 (无闪烁)
+
         const className = [
           'tab-chip',
           active ? 'tab-active' : '',
@@ -236,6 +358,7 @@ export function TabBar({
           dropSide === 'left' ? 'drop-before' : '',
           dropSide === 'right' ? 'drop-after' : '',
           isFileDropOver ? 'drag-over' : '',
+          isBeingDragged ? 'is-dragging-active' : '',
         ]
           .filter(Boolean)
           .join(' ');
@@ -245,14 +368,14 @@ export function TabBar({
             key={tab.id}
             className={className}
             title={tab.path ?? tab.title}
+            data-tab-index={index}
+            data-pane-id={paneId}
+            style={chipStyle}
             onClick={(e) => onClickTab(tab, e)}
+            onPointerDown={(e) => onTabPointerDown(e, tab, index)}
             onAuxClick={(e) => onAuxClick(tab, e)}
             onContextMenu={(e) => onTabCtxMenu(tab, e)}
-            draggable={isDraggableTab(tab) && !isTabDragging}
-            onDragStart={(e) => onTabDragStart(e, tab, index)}
-            onDragEnd={onTabDragEnd}
             onDragOver={(e) => onTabDragOver(e, tab, index)}
-            onDragLeave={(e) => onTabDragLeave(e, tab, index)}
             onDrop={(e) => onTabDrop(e, tab, index)}
           >
             <span className="tab-icon" aria-hidden>
