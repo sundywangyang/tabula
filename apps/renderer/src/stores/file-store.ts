@@ -411,19 +411,46 @@ const inflightThumbnails = new Map<string, Promise<ThumbnailEntry | null>>();
 
 function pathToBreadcrumb(p: string): BreadcrumbSegment[] {
   if (!p) return [];
-  const parts = p.split(/[\\/]/).filter(Boolean);
   const segments: BreadcrumbSegment[] = [];
-  let acc = '';
+
   const isWindows = /^[a-zA-Z]:[\\/]?/.test(p);
+  const isPosixAbs = p.startsWith('/');
 
   if (isWindows) {
+    // Windows: C:\Users\foo
+    const parts = p.split(/[\\/]/).filter(Boolean);
     const drive = parts.shift()!;
-    acc = drive + '\\';
+    let acc = drive + '\\';
     segments.push({ name: drive, path: acc });
+    for (const part of parts) {
+      acc = acc + '\\' + part;
+      segments.push({ name: part, path: acc });
+    }
+    return segments;
   }
 
+  if (isPosixAbs) {
+    // POSIX: /Users/fafa
+    // 根目录 `/` 作为一个独立段
+    if (p === '/') {
+      segments.push({ name: '/', path: '/' });
+      return segments;
+    }
+    segments.push({ name: '/', path: '/' });
+    const parts = p.slice(1).split('/').filter(Boolean);
+    let acc = '';
+    for (const part of parts) {
+      acc = acc + '/' + part;
+      segments.push({ name: part, path: acc });
+    }
+    return segments;
+  }
+
+  // 相对路径(兜底,理论上不该出现)
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  let acc = '';
   for (const part of parts) {
-    acc = acc ? acc + '\\' + part : part;
+    acc = acc ? acc + '/' + part : part;
     segments.push({ name: part, path: acc });
   }
   return segments;
