@@ -23,6 +23,7 @@ import { useLayoutStore } from './stores/layout-store';
 import { useThemeStore, type ThemeMode } from './stores/theme-store';
 import { useSettingsStore } from './stores/settings-store';
 import { useUiDialogsStore } from './stores/ui-dialogs-store';
+import { getCachedRootPath } from './platform-cache';
 
 /** 工具:取父路径(供 file.duplicate 用) */
 function parentPath(p: string): string {
@@ -39,7 +40,14 @@ function parentPath(p: string): string {
 
 /** 渲染端默认 pane path(未 hydrate 时兜底) */
 function defaultPath(): string {
-  return navigator.platform.toLowerCase().includes('win') ? 'C:\\Users' : '/';
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  let p: string;
+  try {
+    p = getCachedRootPath();
+  } catch {
+    p = '/';
+  }
+  return p;
 }
 
 /** 取当前 active pane(若不存在返回 null) — 仅返回 node */

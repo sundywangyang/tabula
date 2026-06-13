@@ -130,6 +130,8 @@ export interface DriveInfo {
   /** 字节;0 = 未知 */
   freeBytes: number;
   type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'unknown';
+  /** 文件系统类型(可选项,Mac/Linux 才有;Windows 留空) */
+  fsType?: string;
 }
 
 // =================== 标签 ===================

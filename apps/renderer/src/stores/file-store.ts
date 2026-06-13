@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 import type { FsEntry, TrashEntry } from '@tabula/bridge';
 import { useLayoutStore } from './layout-store';
+import { getCachedRootPath } from '../platform-cache';
 
 export interface BreadcrumbSegment {
   name: string;
@@ -1556,8 +1557,8 @@ export const useFileStore = create<FileStore>((set, get) => {
       const activePaneId = layout.activePaneId;
       const paneNode = findPaneInLayout(layout.rootLayout, activePaneId);
       const rootPath = paneNode?.type === 'pane'
-        ? get().getPanePath(activePaneId) || 'C:\\'
-        : 'C:\\';
+        ? get().getPanePath(activePaneId) || getCachedRootPath()
+        : getCachedRootPath();
 
       set({
         globalSearch: {
@@ -1645,7 +1646,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       const cur = get().globalSearch;
       // 如果有 query 且和之前不同,触发递归搜索
       if (q.trim() && q.trim() !== cur.query) {
-        void get().runGlobalSearch(q.trim(), cur.rootPath || cur.rootPath || 'C:\\', cur.fileType);
+        void get().runGlobalSearch(q.trim(), cur.rootPath || getCachedRootPath(), cur.fileType);
       }
       set({
         globalSearch: {
@@ -1659,7 +1660,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       const cur = get().globalSearch;
       // 重新搜索
       if (cur.query.trim()) {
-        void get().runGlobalSearch(cur.query, cur.rootPath || 'C:\\', fileType);
+        void get().runGlobalSearch(cur.query, cur.rootPath || getCachedRootPath(), fileType);
       }
       set({
         globalSearch: {

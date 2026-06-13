@@ -98,6 +98,10 @@ export const IpcChannels = {
   APP_OPEN_DEVTOOLS: 'app:open-devtools',
   APP_RELOAD: 'app:reload',
 
+  // 平台检测
+  PLATFORM_GET: 'platform:get',
+  PLATFORM_DEFAULT_ROOT: 'platform:default-root',
+
   // 性能埋点 (P7 v1)
   PERF_REPORT: 'perf:report',            // 渲染端 → 主进程上报埋点
   PERF_SNAPSHOT: 'perf:snapshot',        // 主进程 → 渲染端拉取当前快照

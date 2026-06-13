@@ -38,6 +38,8 @@ import type {
   UpdateStatus,
 } from './types';
 
+export type PlatformType = 'windows' | 'macos' | 'linux';
+
 export interface TabulaAPI {
   // 系统
   app: {
@@ -45,6 +47,14 @@ export interface TabulaAPI {
     ready(): Promise<void>;
     openDevTools(): Promise<void>;
     reload(): Promise<void>;
+  };
+
+  /** 平台检测 (渲染进程调用) */
+  platform: {
+    /** 当前平台: windows | macos | linux */
+    get(): Promise<PlatformType>;
+    /** 默认根路径: Windows 'C:\Users' | Unix '/' */
+    defaultRootPath(): Promise<string>;
   };
 
   // 性能埋点 (P7 v1)

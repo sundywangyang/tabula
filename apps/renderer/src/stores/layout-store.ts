@@ -31,14 +31,15 @@
 import { create } from 'zustand';
 import type { LayoutNode, SplitDirection, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from './file-store';
+import { getCachedRootPath } from '../platform-cache';
 
 function makeEmptyTab(): Tab {
-  const rootPath = 'C:\\';
+  const rootPath = getCachedRootPath();
   return {
     id: `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     type: 'folder',
     path: rootPath,
-    title: 'C:\\',
+    title: rootPath,
     pinned: false,
     closable: true,
     history: [rootPath],
@@ -157,10 +158,7 @@ function makePaneId(): string {
 }
 
 function defaultPath(): string {
-  if (typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('win')) {
-    return 'C:\\Users';
-  }
-  return '/';
+  return getCachedRootPath();
 }
 
 function makeDefaultLayout(): { root: LayoutNode; activePaneId: string } {

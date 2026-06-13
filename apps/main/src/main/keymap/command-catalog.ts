@@ -163,25 +163,43 @@ const RESERVED_COMBOS: KeyCombo[] = [
   parseKeyCombo('Ctrl+Alt+L')!,   // 锁屏(Linux/Win 一些桌面)
 ].filter((c, idx, arr) => c && arr.findIndex((x) => isSameCombo(x, c)) === idx);
 
-/** 显式保留清单 — 上面那段我们不屏蔽 Ctrl+W(浏览器那种"关闭标签"语义本身正是我们要做的),做白名单更稳 */
-const HARD_RESERVED: KeyCombo[] = [
-  parseKeyCombo('Meta+Q')!,
-  parseKeyCombo('Alt+F4')!,
-  parseKeyCombo('Meta+Tab')!,
-  parseKeyCombo('Alt+Tab')!,
-  parseKeyCombo('Ctrl+Alt+Delete')!,
-  parseKeyCombo('Meta+Escape')!,
-  parseKeyCombo('Meta+L')!,
-  parseKeyCombo('Ctrl+Alt+L')!,
-  parseKeyCombo('Meta+M')!,   // macOS 最小化窗口
-  parseKeyCombo('Meta+H')!,   // macOS 隐藏窗口
-  parseKeyCombo('Meta+Space')!, // macOS Spotlight
-];
-
 /** 判定某个组合是否被系统保留(任何用户命令都不能占用) */
 export function isReservedCombo(combo: KeyCombo | null): boolean {
   if (!combo) return false;
-  return HARD_RESERVED.some((c) => isSameCombo(c, combo));
+  return getPlatformReserved().some((c) => isSameCombo(c, combo));
+}
+
+/** 按平台返回系统保留键列表 */
+function getPlatformReserved(): KeyCombo[] {
+  const base: KeyCombo[] = [
+    parseKeyCombo('Alt+F4')!,         // Win/Linux 关闭
+    parseKeyCombo('Alt+Tab')!,        // Win/Linux 切应用
+    parseKeyCombo('Ctrl+Alt+Delete')!, // Win 强制任务管理器
+  ];
+
+  if (process.platform === 'darwin') {
+    return [
+      ...base,
+      parseKeyCombo('Meta+Q')!,        // macOS 退出
+      parseKeyCombo('Meta+Tab')!,      // macOS 切应用
+      parseKeyCombo('Meta+Escape')!,   // macOS Mission Control
+      parseKeyCombo('Meta+L')!,        // macOS 锁屏
+      parseKeyCombo('Meta+M')!,        // macOS 最小化窗口
+      parseKeyCombo('Meta+H')!,        // macOS 隐藏窗口
+      parseKeyCombo('Meta+Space')!,    // macOS Spotlight
+    ];
+  }
+
+  if (process.platform === 'linux') {
+    return [
+      ...base,
+      parseKeyCombo('Meta+L')!,        // Linux 锁屏
+      parseKeyCombo('Ctrl+Alt+L')!,   // Linux 一些桌面锁屏
+      parseKeyCombo('Meta+Tab')!,      // Linux 切应用
+    ];
+  }
+
+  return base;
 }
 
 // =================== 内置命令清单 ===================

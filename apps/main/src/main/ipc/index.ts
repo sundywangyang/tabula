@@ -43,6 +43,17 @@ export function registerIpcHandlers(ctx: IpcContext) {
     ctx.windowManager.getMainWindow()?.webContents.reload();
   });
 
+  // =================== Platform ===================
+  ipcMain.handle(IpcChannels.PLATFORM_GET, () => {
+    if (process.platform === 'win32') return 'windows';
+    if (process.platform === 'darwin') return 'macos';
+    return 'linux';
+  });
+  ipcMain.handle(IpcChannels.PLATFORM_DEFAULT_ROOT, () => {
+    if (process.platform === 'darwin' || process.platform === 'linux') return '/';
+    return 'C:\\Users';
+  });
+
   // =================== FS ===================
   ipcMain.handle(IpcChannels.FS_LIST_DIR, (_e, p: string) => {
   // eslint-disable-next-line no-console
@@ -140,15 +151,22 @@ export function registerIpcHandlers(ctx: IpcContext) {
   ipcMain.handle(IpcChannels.FS_OPEN_WITH_DIALOG, async (_e, p: string) => {
     const win = ctx.windowManager.getMainWindow();
     if (!win) return;
-    // 显示「打开方式」对话框（Windows）
+
     const result = await dialog.showOpenDialog(win, {
       title: '选择要使用的程序',
       properties: ['openFile'],
     });
     if (result.canceled || !result.filePaths[0]) return;
     const program = result.filePaths[0];
-    const { spawn } = await import('node:child_process');
-    spawn(program, [p], { detached: true, windowsHide: true });
+
+    if (process.platform === 'win32') {
+      const { spawn } = await import('node:child_process');
+      spawn(program, [p], { detached: true, windowsHide: true });
+    } else {
+      // macOS/Linux: open -a <program> <file>
+      const { spawn } = await import('node:child_process');
+      spawn('open', ['-a', program, p], { detached: true });
+    }
   });
 
   // =================== Thumbnail (P7 v1) ===================

@@ -36,6 +36,11 @@ const api: TabulaAPI = {
     reload: () => ipcRenderer.invoke(IpcChannels.APP_RELOAD),
   },
 
+  platform: {
+    get: () => ipcRenderer.invoke(IpcChannels.PLATFORM_GET),
+    defaultRootPath: () => ipcRenderer.invoke(IpcChannels.PLATFORM_DEFAULT_ROOT),
+  },
+
   // P7 启动屏
   splash: {
     ready: () => {

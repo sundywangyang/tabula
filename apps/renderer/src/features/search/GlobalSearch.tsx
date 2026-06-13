@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFileStore, type FileTypeFilter } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
+import { getCachedRootPath } from '../../platform-cache';
 import './GlobalSearch.css';
 
 const MAX_VISIBLE = 50;
@@ -115,7 +116,7 @@ export function GlobalSearch() {
 
   const handleSearch = () => {
     if (gs.query.trim()) {
-      void runSearch(gs.query, gs.rootPath || 'C:\\', gs.fileType);
+      void runSearch(gs.query, gs.rootPath || getCachedRootPath(), gs.fileType);
     }
   };
 

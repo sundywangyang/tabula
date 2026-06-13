@@ -45,9 +45,9 @@ export class WindowManager {
       minHeight: 500,
       show: false,            // 先隐藏,准备好再显示(避免白闪)
       frame: false,           // 自定义标题栏(现代化)
-      titleBarStyle: 'hidden',
+      titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
       backgroundColor: '#1a1a1f',
-      autoHideMenuBar: true,
+      autoHideMenuBar: process.platform !== 'darwin', // macOS 菜单栏在顶部,不隐藏
       webPreferences: {
         preload: this.resolvePreload(),
         contextIsolation: true,

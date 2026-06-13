@@ -44,6 +44,7 @@ import { useUiDialogsStore } from './stores/ui-dialogs-store';
 import { makeFolderTab } from './stores/file-store';
 import { usePerfStore } from './stores/perf-store';
 import { reportFirstPaint, pullStartupTimings } from './perf/perf-client';
+import { initPlatformCache, getCachedRootPath } from './platform-cache';
 import './styles/app.css';
 
 // P7:重组件懒加载(仅在用户首次触发时下载对应的 chunk)
@@ -169,6 +170,8 @@ export function App() {
     void pullStartupTimings().then(usePerfStore.getState().setStartupTimings).catch(() => undefined);
 
     void (async () => {
+      // 平台信息缓存 (同步供 onKey handler 使用)
+      await initPlatformCache();
       // P5: 先 hydrate 主题(影响整体样式),再 hydrate favorites / settings / file-config / layout
       await hydrateTheme();
       await hydrateSettings();
@@ -213,7 +216,7 @@ export function App() {
         }
         initPath = bootPath;
       } else if (!initPath) {
-        initPath = navigator.platform.toLowerCase().includes('win') ? 'C:\\Users' : '/';
+        initPath = getCachedRootPath();
         await loadDir(active, initPath);
         const newTab = makeFolderTab(initPath, '主页');
         useLayoutStore.getState().pane.openTab(active, newTab);
@@ -391,7 +394,7 @@ export function App() {
       // Ctrl+T:在 active pane 新开 tab
       if (isMeta && !isAlt && !isShift && (key === 't' || key === 'T')) {
         e.preventDefault();
-        const initPath = navigator.platform.toLowerCase().includes('win') ? 'C:\\Users' : '/';
+        const initPath = getCachedRootPath();
         const tab = makeFolderTab(initPath, '新标签');
         useLayoutStore.getState().pane.openTab(activePaneId, tab);
         return;
