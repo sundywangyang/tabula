@@ -267,11 +267,12 @@
   flex-shrink: 0;
 }
 
-/* 新建标签按钮 — 固定显示在 tab 列表末尾 */
+/* 新建标签按钮 — 固定显示在 tab 列表末尾, 纵向居中 */
 .tab-add {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  align-self: center;          /* 父 .tab-bar 是 align-items: stretch, 显式居中 */
   width: 22px;
   height: 22px;
   border-radius: var(--radius-sm);
@@ -280,7 +281,7 @@
   line-height: 1;
   flex-shrink: 0;
   margin-left: 4px;
-  margin-top: 5px;
+  /* margin-top: 5px 删掉 — 之前硬编码偏移导致底部差 9px 不居中 */
   background: transparent;
   border: 0;
   cursor: pointer;
