@@ -60,6 +60,7 @@ export function Sidebar({
   const [renameValue, setRenameValue] = useState<string>('');
   const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [drivesCollapsed, setDrivesCollapsed] = useState(true);
+  const [favoritesCollapsed, setFavoritesCollapsed] = useState(false);
 
   // 拉驱动器列表(组件挂载时一次 + 手动刷新按钮)
   useEffect(() => {
@@ -162,16 +163,25 @@ export function Sidebar({
       {/* 快速访问 */}
       <div className="sidebar-section">
         <div className="sidebar-header-row">
-          <span className="sidebar-header">快速访问</span>
           <button
-            className="sidebar-header-btn"
-            onClick={handleAddCurrent}
-            title={`收藏当前目录${currentPath ? `: ${currentPath}` : ''}`}
+            className="sidebar-collapse-btn"
+            onClick={() => setFavoritesCollapsed((v) => !v)}
+            title={favoritesCollapsed ? '展开快速访问' : '折叠快速访问'}
           >
-            ＋
+            <span className={`sidebar-chevron ${favoritesCollapsed ? 'collapsed' : ''}`}>▶</span>
           </button>
+          <span className="sidebar-header">快速访问</span>
+          {!favoritesCollapsed && (
+            <button
+              className="sidebar-header-btn"
+              onClick={handleAddCurrent}
+              title={`收藏当前目录${currentPath ? `: ${currentPath}` : ''}`}
+            >
+              ＋
+            </button>
+          )}
         </div>
-        {favorites.length === 0 ? (
+        {!favoritesCollapsed && (favorites.length === 0 ? (
           <div className="sidebar-empty">右键当前目录或点 ＋ 收藏</div>
         ) : (
           favorites.map((f) => {
@@ -228,7 +238,7 @@ export function Sidebar({
               </div>
             );
           })
-        )}
+        ))}
       </div>
 
       {/* 此电脑 / 驱动器 */}
