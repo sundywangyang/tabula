@@ -267,6 +267,9 @@ export function TabBar({
   const onTabPointerDown = (e: ReactPointerEvent<HTMLDivElement>, tab: Tab, index: number) => {
     if (e.button !== 0) return; // 只响应左键
     if (!isDraggableTab(tab)) return;
+    // 防御: 只在 chip 自身 (currentTarget) 按下才启动 drag, 子元素 (close button
+    // 已有 onPointerDown stopPropagation, 此处双保险) 不会进入 drag 候选
+    if (e.target !== e.currentTarget) return;
     // 测量被拖 tab 相对 .tab-bar 容器的 left (后续用 position: absolute 时定位)
     const tabBar = e.currentTarget.parentElement;
     if (tabBar) {
@@ -423,6 +426,10 @@ export function TabBar({
                 className="tab-close"
                 onClick={(e) => onClose(tab, e)}
                 onMouseDown={(e) => e.stopPropagation()}
+                // 阻止 pointerdown 冒泡到 chip 的 onTabPointerDown
+                // 否则 chip 会 setPointerCapture(pointerId), 把后续 pointer 事件
+                // 全 capture 到 chip, close button 的 mousedown/mouseup/click 链断裂
+                onPointerDown={(e) => e.stopPropagation()}
                 title="关闭 (Ctrl+W)"
                 aria-label="关闭标签"
                 disabled={isTabDragging}
