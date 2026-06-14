@@ -68,6 +68,7 @@ export function Sidebar({
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState<string>('');
   const [historyCollapsed, setHistoryCollapsed] = useState(true);
+  const [drivesCollapsed, setDrivesCollapsed] = useState(true);
 
   // 拉驱动器列表(组件挂载时一次 + 手动刷新按钮)
   useEffect(() => {
@@ -265,23 +266,32 @@ export function Sidebar({
       {/* 此电脑 / 驱动器 */}
       <div className="sidebar-section">
         <div className="sidebar-header-row">
-          <span className="sidebar-header">此电脑</span>
           <button
-            className="sidebar-header-btn"
-            onClick={async () => {
-              try {
-                const list = await window.tabula.fs.listDrives();
-                setDrives(Array.isArray(list) ? list : []);
-              } catch (e) {
-                console.warn('[Sidebar] refresh drives failed', e);
-              }
-            }}
-            title="刷新驱动器列表"
+            className="sidebar-collapse-btn"
+            onClick={() => setDrivesCollapsed((v) => !v)}
+            title={drivesCollapsed ? '展开此电脑' : '折叠此电脑'}
           >
-            ⟳
+            <span className={`sidebar-chevron ${drivesCollapsed ? 'collapsed' : ''}`}>▶</span>
           </button>
+          <span className="sidebar-header">此电脑</span>
+          {!drivesCollapsed && (
+            <button
+              className="sidebar-header-btn"
+              onClick={async () => {
+                try {
+                  const list = await window.tabula.fs.listDrives();
+                  setDrives(Array.isArray(list) ? list : []);
+                } catch (e) {
+                  console.warn('[Sidebar] refresh drives failed', e);
+                }
+              }}
+              title="刷新驱动器列表"
+            >
+              ⟳
+            </button>
+          )}
         </div>
-        {drives.length === 0 ? (
+        {!drivesCollapsed && (drives.length === 0 ? (
           <div className="sidebar-empty">未检测到驱动器</div>
         ) : (
           drives.map((d) => {
@@ -315,7 +325,7 @@ export function Sidebar({
               </button>
             );
           })
-        )}
+        ))}
       </div>
 
       {/* P6 v1:扩展面板 — 渲染扩展注册的面板入口 */}
