@@ -83,6 +83,11 @@ interface LayoutStore {
     goForward(paneId: string): void;
     navigate(paneId: string, path: string): void; // 当前 active tab 跳路径
     replaceTabPath(paneId: string, tabId: string, path: string): void;
+    /**
+     * 克隆 tab: 拷贝 source tab 全部字段, 生成新 id, 插入到 source tab 紧邻的下一个位置,
+     * 激活新 tab。与 openTab 不同: 不会去重, 强制复制, 支持任意 tab type。
+     */
+    cloneTab(paneId: string, sourceTabId: string): void;
     /** P2 v2: 同 pane 内重排 tab(从 fromIndex 移到 toIndex) */
     reorderTabs(paneId: string, fromIndex: number, toIndex: number): void;
     /**
@@ -666,6 +671,44 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           return { ...p, tabs: newTabs };
         });
         setState({ rootLayout: newRoot });
+      },
+
+      /**
+       * 克隆 tab: 拷贝 source tab 全部字段, 生成新 id, 插入到 source tab 紧邻的下一个位置,
+       * 激活新 tab。与 openTab 不同: 不会去重, 强制复制, 支持任意 tab type。
+       * pinned tab 也允许克隆 (openTab 的去重不限制它, 但 clone 显式允许 pinned source)。
+       */
+      cloneTab: (paneId, sourceTabId) => {
+        const newRoot = mapPane(get().rootLayout, paneId, (p) => {
+          const idx = p.tabs.findIndex((t) => t.id === sourceTabId);
+          if (idx < 0) return p;
+          const source = p.tabs[idx];
+          if (!source) return p;
+          // 深拷可变的嵌套字段 (history 数组, viewState 对象)
+          // 其它基本字段 spread 即可
+          const cloned: Tab = {
+            ...source,
+            id: `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+            history: [...source.history],
+            viewState: source.viewState ? { ...source.viewState } : undefined,
+          };
+          const newTabs = [
+            ...p.tabs.slice(0, idx + 1),
+            cloned,
+            ...p.tabs.slice(idx + 1),
+          ];
+          return { ...p, tabs: newTabs, activeTabId: cloned.id };
+        });
+        setState({ rootLayout: newRoot, activePaneId: paneId });
+        // 克隆后新 tab 激活, 触发 file-store.loadDir (沿用 moveTab 同样的 ensurePane + loadDir 模式)
+        const updatedPane = findPane(get().rootLayout, paneId);
+        if (updatedPane?.type === 'pane') {
+          const active = updatedPane.tabs.find((t) => t.id === updatedPane.activeTabId);
+          if (active?.path) {
+            useFileStore.getState().ensurePane(paneId);
+            void useFileStore.getState().loadDir(paneId, active.path);
+          }
+        }
       },
 
       // ============ P2 v2: tab 重排(同 pane)============

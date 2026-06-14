@@ -24,7 +24,7 @@ import {
   useRef,
   useEffect,
 } from 'react';
-import { Eye, Folder, Pin, X } from 'lucide-react';
+import { Copy, Eye, Folder, Pin, X } from 'lucide-react';
 import type { LayoutNode, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
@@ -63,6 +63,7 @@ export function TabBar({
   const setDropTarget = useLayoutStore((s) => s.tabDragOps.setDropTarget);
   const pinTab = useLayoutStore((s) => s.pane.pinTab);
   const unpinTab = useLayoutStore((s) => s.pane.unpinTab);
+  const cloneTab = useLayoutStore((s) => s.pane.cloneTab);
 
   // =================== 右键菜单 ===================
   const [ctxMenu, setCtxMenu] = useState<{
@@ -490,6 +491,17 @@ export function TabBar({
               <span>固定标签</span>
             </button>
           )}
+          <div className="tab-ctx-divider" />
+          <button
+            className="tab-ctx-item"
+            onClick={() => {
+              cloneTab(paneId, ctxMenu.tab.id);
+              closeCtxMenu();
+            }}
+          >
+            <span className="tab-ctx-icon"><Copy size={13} /></span>
+            <span>克隆标签</span>
+          </button>
           <div className="tab-ctx-divider" />
           <button
             className="tab-ctx-item danger"
