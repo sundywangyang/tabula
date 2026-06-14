@@ -374,14 +374,16 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
       },
 
       closeTab: (paneId, tabId) => {
-        const newRoot = mapPane(get().rootLayout, paneId, (p) => {
+        const root = get().rootLayout;
+        const newRoot = mapPane(root, paneId, (p) => {
           const idx = p.tabs.findIndex((t) => t.id === tabId);
           if (idx < 0) return p;
           const tab = p.tabs[idx];
           if (!tab.closable) return p; // 不可关
           const newTabs = p.tabs.filter((t) => t.id !== tabId);
           // 关闭最后一个 tab → pane 留空 (tabs=[], activeTabId=null)
-          // App 层 useEffect 监听: 顶层唯一 pane 空了 → 关窗
+          // - 顶层唯一 pane: App 层 useEffect 监听 → 关窗
+          // - 多 pane 场景: closeTab 末尾检测 paneCount>1 → 立即 mergePane 移除空 pane
           if (newTabs.length === 0) {
             return { ...p, tabs: [], activeTabId: null };
           }
@@ -394,6 +396,17 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           return { ...p, tabs: newTabs, activeTabId: nextActive };
         });
         setState({ rootLayout: newRoot });
+        // 多 pane + 此 pane 变空 → 立刻 mergePane 把空 pane 节点从 layout 树中摘掉
+        // (single-pane 由 App.tsx useEffect 触发关窗, 不调 mergePane 因为 mergePane 对顶层 pane no-op)
+        if (countPanesInTree(newRoot) > 1) {
+          const stillEmpty = (() => {
+            const node = findPane(newRoot, paneId);
+            return node?.type === 'pane' && node.tabs.length === 0;
+          })();
+          if (stillEmpty) {
+            get().pane.mergePane(paneId);
+          }
+        }
       },
 
       activateTab: (paneId, tabId) => {
