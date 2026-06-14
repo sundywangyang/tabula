@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tabula app icon (1024×1024 master) v3 — 提升填充度
+
+  设计方向: "多 tab 文件夹"
+  - 底层符号: 经典 macOS Finder 风格文件夹 (带顶部翻边 tab)
+  - Tabula 区别于 Finder 的核心: 顶部 3 个 tab pill (暗示多 tab)
+  - 第二特性: 中间一条细分割线 + split handle (暗示 split pane)
+  - Finder 蓝渐变: 让人一眼联想到 macOS Finder/Windows Explorer
+
+  v3 改动: 文件夹主体从 640×368 (62%×36%) 扩到 864×584 (84%×57%),
+  视觉上"撑满" icon 中心, 减少空白感.
+
+  元素几何 (1024 viewBox):
+  - Squircle 背景: 0,0 - 1024,1024, rx=229 (22.37% macOS Big Sur+)
+  - 文件夹主体: x=80 y=220, w=864 h=584, rx=72
+  - 翻边 tab: x=80 起, 与主体融合
+  - 3 个 tab pill: y=300, h=72, 起点 x=152
+    选中 (中心): x=440, 216×72, rx=36
+    左 tab: x=152
+    右 tab: x=728
+  - split handle 中心: y=552
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- 外层 squircle 背景: 顶部明亮, 底部深沉, 立体感 -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#1F6FE5"/>
+      <stop offset="55%"  stop-color="#1252B8"/>
+      <stop offset="100%" stop-color="#0A3478"/>
+    </linearGradient>
+
+    <!-- 顶部高光带 (macOS icon 标志) -->
+    <linearGradient id="topGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="40%" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- 文件夹主体: 浅蓝白渐变 (Finder 风格, 跟背景蓝区分) -->
+    <linearGradient id="folderGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D6E7FA"/>
+    </linearGradient>
+
+    <!-- 文件夹左侧 tab 翻边: 略深一档 -->
+    <linearGradient id="folderTabGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#E8F1FC"/>
+      <stop offset="100%" stop-color="#B6CFEC"/>
+    </linearGradient>
+
+    <!-- tab pill 选中态: 实心 accent + 高光 -->
+    <linearGradient id="tabActiveGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C9DFF7"/>
+    </linearGradient>
+
+    <linearGradient id="tabDimGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.30"/>
+    </linearGradient>
+
+    <!-- squircle 剪裁 -->
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="229" ry="229"/>
+    </clipPath>
+
+    <!-- 文件夹阴影: 落地感, 让 icon 有 3D 立体 -->
+    <filter id="folderShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feGaussianBlur stdDeviation="6" in="SourceAlpha"/>
+      <feOffset dx="0" dy="10"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 1. squircle 背景 -->
+  <rect width="1024" height="1024" rx="229" ry="229" fill="url(#bgGrad)"/>
+
+  <!-- 2. 顶部高光带 -->
+  <g clip-path="url(#squircle)">
+    <rect width="1024" height="600" fill="url(#topGloss)"/>
+  </g>
+
+  <!-- 3. 文件夹主体 (高填充度: 864×584, 占 ~84%×57%) -->
+  <g filter="url(#folderShadow)">
+    <!-- 左侧 tab 翻边: 经典 macOS 文件夹, 起点 x=80, 顶部 152 高 200 -->
+    <path d="M 80 300
+             Q 80 240 140 240
+             L 388 240
+             Q 416 240 432 264
+             L 472 320
+             L 140 320
+             Q 80 320 80 380
+             Z"
+          fill="url(#folderTabGrad)"/>
+
+    <!-- 文件夹主体: x=80 y=300 w=864 h=504, rx=72 (放大圆角匹配更厚的视觉) -->
+    <rect x="80" y="300"
+          width="864" height="504"
+          rx="72" ry="72"
+          fill="url(#folderGrad)"/>
+
+    <!-- 4. tab bar 区: y=384, h=72, x=152 到 x=872 (内边距 72) -->
+    <!-- 3 pill 几何: 宽 216, gap 32, 起点 x=152 (左) → 中心 512 → 右 728 -->
+    <g>
+      <!-- 左 tab -->
+      <rect x="152" y="384" width="216" height="72" rx="36" ry="36" fill="url(#tabDimGrad)"/>
+      <!-- 选中 tab (中心, 视觉焦点) -->
+      <rect x="404" y="384" width="216" height="72" rx="36" ry="36" fill="url(#tabActiveGrad)"/>
+      <!-- 右 tab -->
+      <rect x="656" y="384" width="216" height="72" rx="36" ry="36" fill="url(#tabDimGrad)"/>
+    </g>
+
+    <!-- 5. split pane 分割线 (文件夹中部) -->
+    <!-- y 中心 600, 长度 640, x 从 152 到 792, 中间断开给 handle -->
+    <line x1="152" y1="600" x2="476" y2="600"
+          stroke="#7AA5D6" stroke-width="4" stroke-linecap="round"/>
+    <line x1="548" y1="600" x2="872" y2="600"
+          stroke="#7AA5D6" stroke-width="4" stroke-linecap="round"/>
+    <!-- 中心 split handle 小方块 -->
+    <rect x="476" y="582" width="72" height="36" rx="10" ry="10"
+          fill="#FFFFFF" fill-opacity="0.96" stroke="#5A8AC2" stroke-width="2.5"/>
+    <!-- handle 中两条细竖线表示可拖动 -->
+    <line x1="500" y1="592" x2="500" y2="608" stroke="#5A8AC2" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="524" y1="592" x2="524" y2="608" stroke="#5A8AC2" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- 6. 1px 内描边 -->
+  <rect x="0.5" y="0.5" width="1023" height="1023" rx="228.5" ry="228.5"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.08"/>
+</svg>
