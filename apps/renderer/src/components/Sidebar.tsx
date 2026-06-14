@@ -318,26 +318,6 @@ export function Sidebar({
         )}
       </div>
 
-      {/* 当前路径 */}
-      {currentPath && (
-        <div className="sidebar-section">
-          <div className="sidebar-header">当前</div>
-          <div
-            className={`sidebar-current-path ${
-              dragState && dragState.targetKind === 'sidebar' && dragState.targetPath === currentPath
-                ? 'drag-over'
-                : ''
-            }`}
-            title={currentPath}
-            onDragOver={(e) => handleItemDragOver(e, currentPath)}
-            onDragLeave={() => setDragTarget(null, null, dragState?.effect ?? 'move')}
-            onDrop={(e) => void handleItemDrop(e, currentPath)}
-          >
-            {currentPath}
-          </div>
-        </div>
-      )}
-
       {/* P6 v1:扩展面板 — 渲染扩展注册的面板入口 */}
       <ExtensionPanels />
 
