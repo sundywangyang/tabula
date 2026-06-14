@@ -11,6 +11,7 @@ import type { SortField } from '../stores/file-store';
 import { useFileStore } from '../stores/file-store';
 import { useLayoutStore } from '../stores/layout-store';
 import { ThemeToggle } from './ThemeToggle';
+import { PanelLeft, PanelLeftClose, Settings, Terminal } from 'lucide-react';
 
 const SORT_LABELS: Record<SortField, string> = {
   name: '名称',
@@ -34,6 +35,9 @@ export function StatusBar({
   sortDir,
   paneCount,
   activePaneIndex,
+  sidebarVisible,
+  onToggleSidebar,
+  onSettingsOpen,
 }: {
   path: string;
   count: number;
@@ -43,6 +47,9 @@ export function StatusBar({
   sortDir: 'asc' | 'desc' | null;
   paneCount: number;
   activePaneIndex: number;
+  sidebarVisible: boolean;
+  onToggleSidebar: () => void;
+  onSettingsOpen?: () => void;
 }) {
   const sortDirText = sortDir === 'asc' ? '↑' : sortDir === 'desc' ? '↓' : '(无)';
   const clipboard = useFileStore((s) => s.clipboard);
@@ -54,6 +61,21 @@ export function StatusBar({
   return (
     <div className="status-bar">
       <div className="status-left">
+        <div className="status-logo">
+          <span className="logo-mark">▣</span>
+          <span className="logo-text">Tabula</span>
+          {version && <span className="logo-version">v{version}</span>}
+        </div>
+        <button
+          type="button"
+          className="status-sidebar-toggle"
+          onClick={onToggleSidebar}
+          title={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
+          aria-label={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
+        >
+          {sidebarVisible ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
+        </button>
+        <span className="status-divider">·</span>
         <span className="status-item" title={path}>📁 {path || '—'}</span>
         <span className="status-divider">·</span>
         <span className="status-item">
@@ -127,6 +149,21 @@ export function StatusBar({
         </span>
         <span className="status-divider">·</span>
         <span className="status-item">Tabula v{version}</span>
+        <span className="status-divider">·</span>
+        <button
+          className="status-icon-btn"
+          onClick={onSettingsOpen}
+          title="设置 (Ctrl+,)"
+        >
+          <Settings size={12} />
+        </button>
+        <button
+          className="status-icon-btn"
+          onClick={() => window.tabula.app.openDevTools()}
+          title="DevTools"
+        >
+          <Terminal size={12} />
+        </button>
         <span className="status-divider">·</span>
         <ThemeToggle />
       </div>

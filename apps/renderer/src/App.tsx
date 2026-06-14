@@ -655,12 +655,7 @@ export function App() {
 
   return (
     <div className="app-root">
-      <TitleBar
-        version={version}
-        sidebarVisible={sidebarVisible}
-        onToggleSidebar={() => setSidebarVisible((v) => !v)}
-        onSettingsOpen={() => setSettingsOpen(true)}
-      />
+      <TitleBar />
 
       <div className="app-body">
         {sidebarVisible && (
@@ -686,6 +681,9 @@ export function App() {
         sortDir={sortDir}
         paneCount={paneCount}
         activePaneIndex={activePaneIndex}
+        sidebarVisible={sidebarVisible}
+        onToggleSidebar={() => setSidebarVisible((v) => !v)}
+        onSettingsOpen={() => setSettingsOpen(true)}
       />
 
       {/* P3: 全局 dialog / toast */}

@@ -1,3 +1,13 @@
+/**
+ * 标题栏 (macOS 风格)
+ *
+ * 渲染内容已最小化: drag region (始终) + Win/Linux 平台窗口控制按钮。
+ * logo / version / sidebar toggle / settings / DevTools 全部在 StatusBar。
+ *
+ * macOS: traffic lights (红/黄/绿) 系统自动渲染在窗口最左侧,
+ *   3 个按钮总宽约 52px, 加 8px 边距 + 安全间距 = 80px, 给 traffic lights 留 80px 左边距。
+ */
+
 .title-bar {
   height: var(--titlebar-h);
   background: var(--bg-elevated);
@@ -8,9 +18,6 @@
   -webkit-app-region: drag;
 }
 
-/* macOS: traffic lights (红/黄/绿) 系统自动渲染在窗口最左侧 (x=8, y=8, 直径 12px),
-   3 个按钮总宽约 52px, 加 8px 边距 + 安全间距 = 80px。
-   给 title-bar 留 80px 左边距, 让 logo/version/sidebar-toggle 整体避开 traffic lights。 */
 .title-bar.is-mac {
   padding-left: 80px;
 }
@@ -20,89 +27,6 @@
   display: flex;
   align-items: center;
   padding: 0 12px;
-  gap: 4px;
-}
-
-.title-bar-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--fg-secondary);
-  line-height: 1;
-}
-
-.logo-mark {
-  color: var(--accent);
-  font-size: 13px;
-  display: inline-block;
-  line-height: 1;
-  transform: translateY(-0.5px);
-}
-
-.logo-text {
-  font-weight: 600;
-  color: var(--fg-primary);
-  letter-spacing: 0.3px;
-  line-height: 1;
-}
-
-.logo-version {
-  font-size: 9px;
-  color: var(--fg-tertiary);
-  font-family: var(--font-mono);
-  padding: 0 4px;
-  background: var(--bg-base);
-  border-radius: 3px;
-  line-height: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-}
-
-/* 侧边栏切换按钮 — 跟 logo 区在同一行, 紧跟在 version 后面, 高度与 .win-ctrl-btn 视觉对齐 */
-.title-bar-sidebar-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  color: var(--fg-secondary);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition: background 0.1s, color 0.1s;
-}
-
-.title-bar-sidebar-toggle:hover {
-  background: var(--bg-hover);
-  color: var(--fg-primary);
-}
-
-.title-bar-actions {
-  display: flex;
-  align-items: center;
-  -webkit-app-region: no-drag;
-  padding: 0 8px;
-  gap: 4px;
-}
-
-.win-btn {
-  width: 28px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  color: var(--fg-secondary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.1s, color 0.1s;
-}
-
-.win-btn:hover {
-  background: var(--bg-hover);
-  color: var(--fg-primary);
 }
 
 /* 窗口控制按钮 — 仅 Windows / Linux 显示 */

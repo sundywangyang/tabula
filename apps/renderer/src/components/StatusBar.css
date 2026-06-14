@@ -132,3 +132,79 @@
   color: var(--fg-secondary);
   line-height: 1.5;
 }
+
+/* =================== 标题栏元素迁入 status bar =================== */
+
+/* Tabula logo (原 title-bar-logo): mark + text + version, 紧凑排版适配 22-24px status bar */
+.status-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-secondary);
+  line-height: 1;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+.status-logo .logo-mark {
+  color: var(--accent);
+  font-size: 12px;
+  display: inline-block;
+  line-height: 1;
+}
+.status-logo .logo-text {
+  font-weight: 600;
+  color: var(--fg-primary);
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+.status-logo .logo-version {
+  font-size: 9px;
+  color: var(--fg-tertiary);
+  font-family: var(--font-mono);
+  padding: 0 4px;
+  background: var(--bg-base);
+  border-radius: 3px;
+  line-height: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 侧边栏切换按钮 — 18px 见方, 跟 status-bar 高度视觉对齐 */
+.status-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-secondary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.status-sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+/* icon-only 按钮 (Settings / DevTools) */
+.status-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-secondary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.status-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}

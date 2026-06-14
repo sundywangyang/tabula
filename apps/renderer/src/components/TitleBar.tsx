@@ -1,25 +1,18 @@
 /**
- * 自定义标题栏
+ * 自定义标题栏 (macOS 风格)
  *
- * macOS:  系统 traffic lights (红/黄/绿) 在窗口最左侧。
- *         隐藏右侧自定义窗口控制按钮,给 traffic lights 留 80px 空间。
- *         logo/version/sidebar-toggle 整体右移避开 traffic lights。
- * Windows / Linux: 保留右侧最小化/最大化/关闭按钮。
+ * 渲染内容 (最少化):
+ *  - macOS: 只留 drag region, 系统 traffic lights 在窗口最左侧自动渲染
+ *  - Win/Linux: drag region + 右侧自定义窗口控制按钮 (min/max/close)
+ *
+ * logo / version / sidebar toggle / settings / DevTools 全部移到 status-bar。
+ * 见 StatusBar.tsx。
  */
 import { useState, useEffect } from 'react';
-import { PanelLeft, PanelLeftClose, Settings, Terminal } from 'lucide-react';
-import { Tooltip } from './Tooltip';
 import { getCachedPlatform } from '../platform-cache';
 import './TitleBar.css';
 
-interface TitleBarProps {
-  version: string;
-  sidebarVisible: boolean;
-  onToggleSidebar: () => void;
-  onSettingsOpen?: () => void;
-}
-
-export function TitleBar({ version, sidebarVisible, onToggleSidebar, onSettingsOpen }: TitleBarProps) {
+export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
   const isMac = getCachedPlatform() === 'macos';
 
@@ -39,38 +32,7 @@ export function TitleBar({ version, sidebarVisible, onToggleSidebar, onSettingsO
 
   return (
     <div className={`title-bar ${isMac ? 'is-mac' : 'is-win'}`}>
-      <div className="title-bar-drag">
-        <div className="title-bar-logo">
-          <span className="logo-mark">▣</span>
-          <span className="logo-text">Tabula</span>
-          {version && <span className="logo-version">v{version}</span>}
-        </div>
-        <Tooltip label={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}>
-          <button
-            type="button"
-            className="title-bar-btn title-bar-sidebar-toggle"
-            onClick={onToggleSidebar}
-            aria-label={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
-          >
-            {sidebarVisible ? <PanelLeftClose size={14} /> : <PanelLeft size={14} />}
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className="title-bar-actions">
-        <button
-          className="win-btn"
-          onClick={onSettingsOpen}
-          title="设置 (Ctrl+,)"
-        >
-          <Settings size={14} />
-        </button>
-        <button className="win-btn" onClick={() => window.tabula.app.openDevTools()} title="DevTools">
-          <Terminal size={14} />
-        </button>
-
-        {/* 自定义窗口控制按钮 — 仅在非 macOS 平台显示 */}
-      </div>
+      <div className="title-bar-drag" />
       {!isMac && (
         <div className="title-bar-window-controls">
           <button
