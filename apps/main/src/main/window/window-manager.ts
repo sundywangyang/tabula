@@ -39,6 +39,17 @@ export class WindowManager {
     };
     const bounds = { ...defaultBounds, ...opts.bounds };
 
+    // 平台最优 icon: macOS .icns / Windows .ico / 其他 512.png
+    // dev 模式从仓库 build-assets/icon/ 取, 打包后从 process.resourcesPath/resources/ 取
+    const iconDir = this.isDev
+      ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon')
+      : join(process.resourcesPath, 'resources');
+    const platformIcon = process.platform === 'darwin'
+      ? join(iconDir, this.isDev ? 'Tabula.icns' : 'Tabula.icns')
+      : process.platform === 'win32'
+        ? join(iconDir, this.isDev ? 'Tabula.ico' : 'Tabula.ico')
+        : join(iconDir, 'png', '512.png');
+
     const win = new BrowserWindow({
       ...bounds,
       minWidth: 800,
@@ -48,6 +59,7 @@ export class WindowManager {
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
       backgroundColor: '#1a1a1f',
       autoHideMenuBar: process.platform !== 'darwin', // macOS 菜单栏在顶部,不隐藏
+      icon: platformIcon,
       webPreferences: {
         preload: this.resolvePreload(),
         contextIsolation: true,

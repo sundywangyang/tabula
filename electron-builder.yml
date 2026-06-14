@@ -11,12 +11,43 @@ files:
   - 'package.json'
   - '!**/*.{md,map,ts}'
 
+# 把生成好的多尺寸 icon 资源打进 release 包 (resources/ 与 out/ 平级)
+extraResources:
+  - from: 'build-assets/icon/Tabula.icns'
+    to: 'resources/Tabula.icns'
+  - from: 'build-assets/icon/Tabula.ico'
+    to: 'resources/Tabula.ico'
+  - from: 'build-assets/icon/png/512.png'
+    to: 'resources/icon.png'
+  - from: 'build-assets/icon/png/16.png'
+    to: 'resources/16.png'
+  - from: 'build-assets/icon/png/32.png'
+    to: 'resources/32.png'
+  - from: 'build-assets/icon/png/64.png'
+    to: 'resources/64.png'
+  - from: 'build-assets/icon/png/128.png'
+    to: 'resources/128.png'
+  - from: 'build-assets/icon/png/256.png'
+    to: 'resources/256.png'
+
 asarUnpack:
   - 'resources/**'
   - 'out/main/ext-host/**'
   - 'out/preload/**'
 
+# 平台主 icon (electron-builder 默认会从 buildResources 找 icon.{icns,ico,png},
+# 这里显式指定以避免约定混乱)
+mac:
+  icon: build-assets/icon/Tabula.icns
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.productivity
+
 win:
+  icon: build-assets/icon/Tabula.ico
   target:
     - target: nsis
       arch:
@@ -34,15 +65,8 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Tabula
 
-mac:
-  target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
-  category: public.app-category.productivity
-
 linux:
+  icon: build-assets/icon/png/512.png
   target:
     - AppImage
     - deb
