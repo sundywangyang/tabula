@@ -280,6 +280,19 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePath]);
 
+  // 关窗: 顶层唯一 pane 且 tabs 全空 (closeTab 关闭最后一个真实 tab 后状态)
+  // - 单 pane + 0 tabs → 关整个窗口
+  // - 多 pane: 子 pane 留空不会触发 (其它 pane 还活着, 不应关窗)
+  useEffect(() => {
+    if (!hydrated) return;
+    if (paneCount !== 1) return;
+    const root = useLayoutStore.getState().rootLayout;
+    if (root.type !== 'pane') return;
+    if (root.tabs.length > 0) return;
+    // 关窗 (走主进程 IPC, 同步会让主进程误以为渲染端崩了所以放在 useEffect 里)
+    void window.tabula.windows.closeCurrent();
+  }, [hydrated, paneCount, rootLayout]);
+
   // P3: 监听 toolbar 触发的"新建文件夹/文件"事件
   useEffect(() => {
     const onNewFolder = (e: Event) => {
