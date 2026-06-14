@@ -33,6 +33,20 @@ import type { LayoutNode, SplitDirection, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from './file-store';
 import { getCachedRootPath } from '../platform-cache';
 
+function makeEmptyTab(): Tab {
+  const rootPath = getCachedRootPath();
+  return {
+    id: `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    type: 'folder',
+    path: rootPath,
+    title: rootPath,
+    pinned: false,
+    closable: true,
+    history: [rootPath],
+    historyIndex: 0,
+  };
+}
+
 const PERSIST_KEY = 'layoutV1';
 const PERSIST_DEBOUNCE_MS = 200;
 
@@ -375,17 +389,22 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
 
       closeTab: (paneId, tabId) => {
         const root = get().rootLayout;
+        const isMultiPane = countPanesInTree(root) > 1;
         const newRoot = mapPane(root, paneId, (p) => {
           const idx = p.tabs.findIndex((t) => t.id === tabId);
           if (idx < 0) return p;
           const tab = p.tabs[idx];
           if (!tab.closable) return p; // 不可关
           const newTabs = p.tabs.filter((t) => t.id !== tabId);
-          // 关闭最后一个 tab → pane 留空 (tabs=[], activeTabId=null)
-          // - 顶层唯一 pane: App 层 useEffect 监听 → 关窗
-          // - 多 pane 场景: closeTab 末尾检测 paneCount>1 → 立即 mergePane 移除空 pane
+          // 关闭最后一个 tab:
+          // - 多 pane 场景: pane 留空, closeTab 末尾 mergePane 移除空 pane 节点
+          // - 单 pane 场景: 补一个 makeEmptyTab, 避免内容区空着(用户期望: 关 tab 不关窗)
           if (newTabs.length === 0) {
-            return { ...p, tabs: [], activeTabId: null };
+            if (isMultiPane) {
+              return { ...p, tabs: [], activeTabId: null };
+            }
+            const empty = makeEmptyTab();
+            return { ...p, tabs: [empty], activeTabId: empty.id };
           }
           // 激活相邻 tab(优先选右边的)
           let nextActive: string | null = p.activeTabId;
@@ -397,8 +416,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         });
         setState({ rootLayout: newRoot });
         // 多 pane + 此 pane 变空 → 立刻 mergePane 把空 pane 节点从 layout 树中摘掉
-        // (single-pane 由 App.tsx useEffect 触发关窗, 不调 mergePane 因为 mergePane 对顶层 pane no-op)
-        if (countPanesInTree(newRoot) > 1) {
+        if (isMultiPane) {
           const stillEmpty = (() => {
             const node = findPane(newRoot, paneId);
             return node?.type === 'pane' && node.tabs.length === 0;
