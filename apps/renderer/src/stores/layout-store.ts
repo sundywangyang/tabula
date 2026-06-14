@@ -33,20 +33,6 @@ import type { LayoutNode, SplitDirection, Tab } from '@tabula/bridge';
 import { useFileStore, makeFolderTab } from './file-store';
 import { getCachedRootPath } from '../platform-cache';
 
-function makeEmptyTab(): Tab {
-  const rootPath = getCachedRootPath();
-  return {
-    id: `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    type: 'folder',
-    path: rootPath,
-    title: rootPath,
-    pinned: false,
-    closable: true,
-    history: [rootPath],
-    historyIndex: 0,
-  };
-}
-
 const PERSIST_KEY = 'layoutV1';
 const PERSIST_DEBOUNCE_MS = 200;
 
@@ -396,15 +382,10 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           const tab = p.tabs[idx];
           if (!tab.closable) return p; // 不可关
           const newTabs = p.tabs.filter((t) => t.id !== tabId);
-          // 关闭最后一个 tab:
-          // - 多 pane 场景: pane 留空, closeTab 末尾 mergePane 移除空 pane 节点
-          // - 单 pane 场景: 补一个 makeEmptyTab, 避免内容区空着(用户期望: 关 tab 不关窗)
+          // 关闭最后一个 tab → pane 留空 (tabs=[], activeTabId=null)
+          // PaneView 会显示"暂无打开的文件夹"空态, 用户要恢复浏览就点 + 新建
           if (newTabs.length === 0) {
-            if (isMultiPane) {
-              return { ...p, tabs: [], activeTabId: null };
-            }
-            const empty = makeEmptyTab();
-            return { ...p, tabs: [empty], activeTabId: empty.id };
+            return { ...p, tabs: [], activeTabId: null };
           }
           // 激活相邻 tab(优先选右边的)
           let nextActive: string | null = p.activeTabId;
@@ -416,6 +397,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         });
         setState({ rootLayout: newRoot });
         // 多 pane + 此 pane 变空 → 立刻 mergePane 把空 pane 节点从 layout 树中摘掉
+        // 单 pane 变空: 保留空 pane 节点, PaneView 显示空态 (用户期望)
         if (isMultiPane) {
           const stillEmpty = (() => {
             const node = findPane(newRoot, paneId);
