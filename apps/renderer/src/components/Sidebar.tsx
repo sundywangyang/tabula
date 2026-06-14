@@ -10,7 +10,7 @@
  * 拖放:P3 已支持 — favorites / drives / 当前 都作为 drop target。
  */
 import { type DragEvent as ReactDragEvent, useEffect, useState } from 'react';
-import { Clock, Folder, HardDrive, Plug, Star, Trash2, X } from 'lucide-react';
+import { Clock, Folder, HardDrive, Plug, Star, X } from 'lucide-react';
 import type { DriveInfo } from '@tabula/bridge';
 import { useFileStore } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
@@ -32,10 +32,7 @@ function formatBytes(n: number): string {
 type ContextMenuState =
   | { kind: 'favorite'; path: string; x: number; y: number }
   | { kind: 'history'; path: string; x: number; y: number }
-  | { kind: 'trash'; x: number; y: number }
   | null;
-
-const TRASH_PATH = 'trash:///';
 
 export function Sidebar({
   currentPath,
@@ -49,12 +46,6 @@ export function Sidebar({
   const endDrag = useFileStore((s) => s.endDrag);
   const performBulk = useFileStore((s) => s.performBulk);
   const showToast = useFileStore((s) => s.showToast);
-
-  // P3: 回收站状态
-  const trashItems = useFileStore((s) => s.trashItems);
-  const trashLoading = useFileStore((s) => s.trashLoading);
-  const loadTrash = useFileStore((s) => s.loadTrash);
-  const emptyTrash = useFileStore((s) => s.emptyTrash);
 
   const favorites = useFavoritesStore((s) => s.favorites);
   const history = useFavoritesStore((s) => s.history);
@@ -240,29 +231,7 @@ export function Sidebar({
         )}
       </div>
 
-      {/* 回收站 (P3) */}
-      <div className="sidebar-section">
-        <div className="sidebar-header-row">
-          <span className="sidebar-header">系统</span>
-        </div>
-        <button
-          className={`sidebar-item ${currentPath === TRASH_PATH ? 'active' : ''}`}
-          onClick={() => onOpenPath(TRASH_PATH)}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setCtxMenu({ kind: 'trash', x: e.clientX, y: e.clientY });
-          }}
-          title="回收站"
-        >
-          <span className="sidebar-icon"><Trash2 size={13} /></span>
-          <span className="sidebar-name">回收站</span>
-          {trashItems.length > 0 && (
-            <span className="sidebar-badge">{trashItems.length}</span>
-          )}
-        </button>
-      </div>
-
+      {/* 此电脑 / 驱动器 */}
       {/* 此电脑 / 驱动器 */}
       <div className="sidebar-section">
         <div className="sidebar-header-row">
@@ -426,32 +395,6 @@ export function Sidebar({
               打开
             </button>
           )}
-          {ctxMenu.kind === 'trash' && (
-            <>
-              <button
-                className="sidebar-ctxmenu-item"
-                onClick={() => {
-                  void loadTrash();
-                  setCtxMenu(null);
-                }}
-              >
-                刷新
-              </button>
-              <button
-                className="sidebar-ctxmenu-item danger"
-                onClick={async () => {
-                  setCtxMenu(null);
-                  if (trashItems.length === 0) {
-                    showToast('回收站已经是空的', 'info', 2000);
-                    return;
-                  }
-                  await emptyTrash();
-                }}
-              >
-                清空回收站
-              </button>
-            </>
-          )}
         </div>
       )}
     </aside>
@@ -463,6 +406,7 @@ function ExtensionPanels() {
   const [panels, setPanels] = useState<
     Array<{ id: string; extensionId: string; title: string; icon?: string; location: string }>
   >([]);
+  const [extCollapsed, setExtCollapsed] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -483,9 +427,16 @@ function ExtensionPanels() {
   return (
     <div className="sidebar-section">
       <div className="sidebar-header-row">
+        <button
+          className="sidebar-collapse-btn"
+          onClick={() => setExtCollapsed((v) => !v)}
+          title={extCollapsed ? '展开扩展' : '折叠扩展'}
+        >
+          <span className={`sidebar-chevron ${extCollapsed ? 'collapsed' : ''}`}>▶</span>
+        </button>
         <span className="sidebar-header">扩展</span>
       </div>
-      {panels.map((panel) => (
+      {!extCollapsed && panels.map((panel) => (
         <button
           key={panel.id}
           className="sidebar-item"
