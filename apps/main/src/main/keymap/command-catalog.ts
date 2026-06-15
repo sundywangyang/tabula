@@ -156,8 +156,8 @@ export function isReservedCombo(combo: KeyCombo | null): boolean {
   return getPlatformReserved().some((c) => isSameCombo(c, combo));
 }
 
-/** 按平台返回系统保留键列表 */
-function getPlatformReserved(): KeyCombo[] {
+/** 按平台返回系统保留键列表 — module-level 一次性计算, isReservedCombo 不重新解析 */
+const PLATFORM_RESERVED: KeyCombo[] = (() => {
   const base: KeyCombo[] = [
     parseKeyCombo('Alt+F4')!,         // Win/Linux 关闭
     parseKeyCombo('Alt+Tab')!,        // Win/Linux 切应用
@@ -187,6 +187,11 @@ function getPlatformReserved(): KeyCombo[] {
   }
 
   return base;
+})();
+
+/** 内部用的 getter, 保持调用点不变 */
+function getPlatformReserved(): KeyCombo[] {
+  return PLATFORM_RESERVED;
 }
 
 // =================== 内置命令清单 ===================
