@@ -187,8 +187,8 @@ export interface TabulaAPI {
   // 扩展
   extensions: {
     list(): Promise<ExtensionManifest[]>;
-    enable(id: string): Promise<void>;
-    disable(id: string): Promise<void>;
+    enable(id: string): Promise<Result<void>>;
+    disable(id: string): Promise<Result<void>>;
     install(path: string): Promise<Result<ExtensionManifest>>;
     uninstall(id: string): Promise<void>;
     invokeCommand(command: string, ...args: unknown[]): Promise<unknown>;

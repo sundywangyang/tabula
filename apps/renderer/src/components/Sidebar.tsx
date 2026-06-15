@@ -10,7 +10,7 @@
  * 拖放:P3 已支持 — favorites / drives / 当前 都作为 drop target。
  */
 import { type DragEvent as ReactDragEvent, useEffect, useState } from 'react';
-import { Clock, Folder, HardDrive, Plug, Star, X } from 'lucide-react';
+import { Folder, HardDrive, Plug, Star, X } from 'lucide-react';
 import type { DriveInfo } from '@tabula/bridge';
 import { useFileStore } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';

@@ -8,4 +8,3 @@
 export * from './fs/path';
 export * from './mime';
 export * from './id';
-export * from './platform';

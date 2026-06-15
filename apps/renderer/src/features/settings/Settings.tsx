@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from '../../stores/theme-store';
 import { useSettingsStore, type SortField, type SortDir, type Language } from '../../stores/settings-store';
+import { useFileStore } from '../../stores/file-store';
 import { Shortcuts } from './Shortcuts';
 import './Settings.css';
 
@@ -417,18 +418,16 @@ function ExtensionManager() {
   }, []);
 
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
-    try {
-      if (enabled) {
-        await window.tabula.extensions.enable(id);
-      } else {
-        await window.tabula.extensions.disable(id);
-      }
-      setExtensions((prev) =>
-        prev.map((ext) => (ext.id === id ? { ...ext, enabled } : ext)),
-      );
-    } catch (e) {
-      console.warn('[ExtensionManager] toggle failed', e);
+    const r = enabled
+      ? await window.tabula.extensions.enable(id)
+      : await window.tabula.extensions.disable(id);
+    if (!r.ok) {
+      useFileStore.getState().showToast(`操作失败: ${r.error.message}`, 'error', 2500);
+      return;
     }
+    setExtensions((prev) =>
+      prev.map((ext) => (ext.id === id ? { ...ext, enabled } : ext)),
+    );
   }, []);
 
   if (loading) return <div className="settings-loading">加载中…</div>;

@@ -8,7 +8,7 @@
  * - 中键关闭
  * - P3: 文件拖到 tab = 移动/复制文件到 tab.path(沿用 P3 的 mime: application/x-tabula-paths)
  * - P2 v2: tab 拖动
- *   - 自身可拖(pinned/placeholder 不可拖)
+ *   - 自身可拖(pinned 不可拖)
  *   - 拖到另一 tab chip = 重排/跨 pane
  *   - 拖到 pane 边缘 = 新建窗口
  *

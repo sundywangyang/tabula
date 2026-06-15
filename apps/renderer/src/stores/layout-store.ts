@@ -92,7 +92,7 @@ interface LayoutStore {
     reorderTabs(paneId: string, fromIndex: number, toIndex: number): void;
     /**
      * P2 v2: 跨 pane 移动 tab。
-     *  - 内部做:从源 pane 移除(空 pane 自动加 placeholder)→ 插入目标 pane 的 toIndex → 目标 pane 激活并聚焦这个 tab。
+     *  - 内部做:从源 pane 移除(空 pane 留空,PaneView 显示空态)→ 插入目标 pane 的 toIndex → 目标 pane 激活并聚焦这个 tab。
      *  - 同 pane 时退化为 reorder(toIndex 自动修正)。
      */
     moveTab(

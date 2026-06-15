@@ -102,23 +102,25 @@ export class ExtensionHost {
   }
 
   /** ext:enable */
-  async enable(id: string): Promise<void> {
+  async enable(id: string): Promise<Result<void>> {
     const ext = this.discovered.find((e) => e.id === id);
-    if (!ext) throw new Error(`Extension not found: ${id}`);
+    if (!ext) return { ok: false, error: { code: 'ENOENT', message: `Extension not found: ${id}` } };
     ext.enabled = true;
     // 重新激活（如果之前已激活过）
     if (this.activationManager.isActivated(id)) {
       await this.activationManager.activate(ext, this.rpcChannel);
     }
+    return { ok: true, data: undefined };
   }
 
   /** ext:disable */
-  async disable(id: string): Promise<void> {
+  async disable(id: string): Promise<Result<void>> {
     const ext = this.discovered.find((e) => e.id === id);
-    if (!ext) throw new Error(`Extension not found: ${id}`);
+    if (!ext) return { ok: false, error: { code: 'ENOENT', message: `Extension not found: ${id}` } };
     ext.enabled = false;
     // 停用
     await this.activationManager.deactivate(id, this.rpcChannel);
+    return { ok: true, data: undefined };
   }
 
   /** ext:install */

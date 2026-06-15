@@ -144,7 +144,7 @@
   cursor: grabbing;
 }
 
-/* pinned / placeholder tab 不可拖 → 拖动时 cursor 反馈 */
+/* pinned tab 不可拖 → 拖动时 cursor 反馈 */
 .tab-chip[draggable="false"] {
   cursor: default;
 }

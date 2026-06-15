@@ -183,7 +183,7 @@ export function App() {
 
       // P2 v2: 检查 boot 路径(由 win:open-with-tab 注入的开窗初始路径)
       // 如果有,说明这个窗口是被「拖出 tab」开的,把 boot 路径记下来
-      // 并替换默认 placeholder tab 的 path。
+      // 并写入当前 pane 的 path。
       let bootPath: string | null = null;
       try {
         bootPath = await window.tabula.windows.getBootPath();
