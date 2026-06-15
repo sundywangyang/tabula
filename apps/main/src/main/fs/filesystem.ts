@@ -5,7 +5,6 @@
  * 后续可加缓存、权限校验、跨盘移动优化等。
  */
 import { promises as fs, statfsSync } from 'node:fs';
-import { execSync } from 'node:child_process';
 import { join, basename, extname } from 'node:path';
 import type { DriveInfo, FsEntry, ListDirResult, MoveOrCopyRequest, Result, SearchRequest, SearchResult, SearchHit, FileTypeFilter } from '@tabula/bridge';
 
@@ -224,205 +223,16 @@ export async function stat(path: string): Promise<Result<FsEntry>> {
   }
 }
 
-// =================== P5: 驱动器列表 ===================
+// =================== P5: 驱动器列表 (P7: 委托给 DriveProvider) ===================
 
-/**
- * 列出所有挂载的卷/驱动器 (跨平台)
- * Windows: PowerShell Get-PSDrive
- * macOS:   df -h 输出所有挂载点
- * Linux:   df -h
- */
+import { getDriveProvider } from '../providers/drive';
+
+/** 列出所有挂载的卷/驱动器 — 实现见 providers/drive/{windows,macos,linux}.ts */
 export async function listDrives(): Promise<DriveInfo[]> {
-  if (process.platform === 'win32') {
-    return windowsListDrives();
-  }
-  if (process.platform === 'darwin') {
-    return macosListDrives();
-  }
-  return linuxListDrives();
+  return getDriveProvider().listDrives();
 }
 
-async function windowsListDrives(): Promise<DriveInfo[]> {
-  try {
-    const ps = execSync(
-      'powershell.exe -NoProfile -NonInteractive -Command ' +
-        '"Get-PSDrive -PSProvider FileSystem | Select-Object Name,@{n=\'Label\';e={$_.VolumeLabel}},@{n=\'Total\';e={if($_.Used+$_.Free){$_.Used+$_.Free}else{0}}},@{n=\'Free\';e={if($_.Free){$_.Free}else{0}}},@{n=\'Root\';e={$_.Root}} | ConvertTo-Json -Compress"',
-      { encoding: 'utf-8', timeout: 5000, windowsHide: true },
-    ).trim();
-    if (!ps) return [{ mount: 'C:\\', label: 'C:', totalBytes: 0, freeBytes: 0, type: 'fixed' }];
-    const parsed = JSON.parse(ps);
-    const arr = Array.isArray(parsed) ? parsed : [parsed];
-    const drives: DriveInfo[] = arr
-      .filter((d: any) => d && d.Root)
-      .map((d: any) => {
-        const mount: string = d.Root;
-        const total = Number(d.Total) || 0;
-        const free = Number(d.Free) || 0;
-        return {
-          mount,
-          label: d.Label && String(d.Label).trim() ? String(d.Label) : mount.replace(/\\$/, ''),
-          totalBytes: total,
-          freeBytes: free,
-          type: 'fixed',
-        };
-      });
-    if (drives.length === 0) return [{ mount: 'C:\\', label: 'C:', totalBytes: 0, freeBytes: 0, type: 'fixed' }];
-    return drives;
-  } catch (err) {
-    console.warn('[fs] windowsListDrives failed, fallback:', (err as Error).message);
-    return [{ mount: 'C:\\', label: 'C:', totalBytes: 0, freeBytes: 0, type: 'fixed' }];
-  }
-}
 
-async function macosListDrives(): Promise<DriveInfo[]> {
-  // macOS: df 列出所有挂载卷;label 和 type 从 mount 命令拿
-  // - df: Filesystem 1024-blocks Used Avail Capacity iused ifree %iused Mounted
-  // - mount: 形如 /dev/disk1s1 on / (apfs, sealed, local, read-only, journaled) ...
-  // 跳过的系统内部 mount: 虚拟 FS + APFS 子卷(Data/Preboot/VM/Update...)
-  // 注意 macOS 13+ 把主卷拆成 / (sealed, read-only) + /System/Volumes/Data (rw)
-  // 这俩共享同一物理磁盘, sidebar 显示重复, 必须把 Data 也跳过
-  const SKIP_MOUNTS = [
-    'devfs', '/dev/', 'fdesc', 'procfs', 'autofs', 'tmpfs', 'sysfs', 'map auto',
-    // APFS 系统子卷 — 全部在 /System/Volumes/ 下, 一次性 prefix 过滤
-    '/System/Volumes/Preboot', '/System/Volumes/VM', '/System/Volumes/Update',
-    '/System/Volumes/xarts', '/System/Volumes/iSCPreboot', '/System/Volumes/Hardware',
-    '/System/Volumes/Data',
-    // 旧版 macOS (12 及之前) 的 /private/var/* 子挂载
-    '/private/var',
-  ];
-  try {
-    const dfOut = execSync('df -k', { encoding: 'utf-8', timeout: 5000 }).trim();
-    const lines = dfOut.split('\n').slice(1);
-    const drives: DriveInfo[] = [];
-
-    // 读 mount 输出拿文件系统类型
-    const mountOut = execSync('mount', { encoding: 'utf-8', timeout: 5000 }).trim();
-    const mountMap = new Map<string, string>(); // mount point -> fs type
-    for (const m of mountOut.split('\n')) {
-      // 形如: /dev/disk1s1 on / (apfs, ...) or map auto_home on /System/Volumes/Data/home (autofs, ...)
-      const match = m.match(/ on (\S+) \(([^,)]+)/);
-      if (match) {
-        mountMap.set(match[1], match[2]);
-      }
-    }
-
-    for (const line of lines) {
-      const parts = line.split(/\s+/);
-      if (parts.length < 9) continue;
-      const mount = parts[parts.length - 1];
-      // 跳过虚拟文件系统 + APFS 子卷
-      if (SKIP_MOUNTS.some((s) => mount === s || mount.startsWith(s + '/'))) continue;
-
-      // df -k 用 1024 字节块为单位
-      const totalBytes = Number(parts[1]) * 1024;
-      const freeBytes = Number(parts[3]) * 1024;
-
-      // 从 mount 拿 fs 类型和设备
-      const fsInfo = mountMap.get(mount) ?? '';
-      const fsType = fsInfo.split(' ')[0] ?? 'unknown';
-
-      // 判断是否外部卷 (USB/Thunderbolt/外置磁盘)
-      const mountLine = mountOut.split('\n').find((m) => m.includes(` on ${mount} `)) ?? '';
-      const isExternal = /\bexternal\b/i.test(mountLine) || /\/dev\/disk[2-9]/.test(mountLine);
-      const isReadOnly = /\bread-only\b/.test(mountLine);
-      const type: 'fixed' | 'removable' = isExternal || isReadOnly ? 'removable' : 'fixed';
-
-      // label = 挂载点最后一段
-      const label = mount === '/' ? 'Macintosh HD' : (mount.split('/').pop() || mount);
-
-      drives.push({
-        mount,
-        label,
-        totalBytes,
-        freeBytes,
-        type,
-        fsType,
-      });
-    }
-
-    if (drives.length === 0) {
-      return [{ mount: '/', label: 'Macintosh HD', totalBytes: 0, freeBytes: 0, type: 'fixed' }];
-    }
-    return drives;
-  } catch (err) {
-    console.warn('[fs] macosListDrives failed:', (err as Error).message);
-    return [{ mount: '/', label: 'Macintosh HD', totalBytes: 0, freeBytes: 0, type: 'fixed' }];
-  }
-}
-
-async function linuxListDrives(): Promise<DriveInfo[]> {
-  // Linux: df + findmnt (util-linux) 拿 fs 类型
-  // - df -k: Filesystem 1024-blocks Used Available Use% Mounted
-  // - findmnt: TARGET SOURCE FSTYPE OPTIONS
-  const SKIP_MOUNTS = ['devfs', 'fdesc', 'procfs', 'autofs', 'devtmpfs', 'tmpfs', 'overlay', 'shm', 'efivarfs', 'cgroup', 'cgroup2', 'pstore', 'bpf', 'configfs', 'debugfs', 'fusectl', 'hugetlbfs', 'mqueue', 'nsfs', 'pipefs', 'proc', 'ramfs', 'rpc_pipefs', 'securityfs', 'selinuxfs', 'sockfs', 'sysfs', 'tracefs', 'vboxsf'];
-  try {
-    const dfOut = execSync('df -k', { encoding: 'utf-8', timeout: 5000 }).trim();
-    const lines = dfOut.split('\n').slice(1);
-    const drives: DriveInfo[] = [];
-
-    // 读 findmnt 拿 fs 类型 (如不可用,降级到 /proc/mounts)
-    let mountMap = new Map<string, string>();
-    try {
-      const findmntOut = execSync('findmnt -rn -o TARGET,FSTYPE,SIZE', { encoding: 'utf-8', timeout: 5000 }).trim();
-      for (const m of findmntOut.split('\n')) {
-        const parts = m.split(/\s+/);
-        if (parts.length >= 2) mountMap.set(parts[0], parts[1]);
-      }
-    } catch {
-      // 降级到 /proc/mounts
-      try {
-        const { readFileSync } = await import('node:fs');
-        const procOut = readFileSync('/proc/mounts', 'utf-8');
-        for (const m of procOut.split('\n')) {
-          const parts = m.split(/\s+/);
-          if (parts.length >= 3) mountMap.set(parts[1], parts[2]);
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    for (const line of lines) {
-      const parts = line.split(/\s+/);
-      if (parts.length < 6) continue;
-      const mount = parts[parts.length - 1];
-      // 跳过虚拟文件系统
-      if (SKIP_MOUNTS.some((s) => mount === '/' + s || mount === s)) continue;
-      if (mount.startsWith('/sys/') || mount.startsWith('/proc/') || mount.startsWith('/run/')) continue;
-
-      const totalBytes = Number(parts[1]) * 1024;
-      const freeBytes = Number(parts[3]) * 1024;
-
-      const fsType = mountMap.get(mount) ?? 'unknown';
-      // 光盘、远程、外部盘算 removable
-      const type: 'fixed' | 'removable' = (
-        fsType === 'iso9660' || fsType === 'udf' ||
-        fsType === 'nfs' || fsType === 'nfs4' || fsType === 'cifs' || fsType === 'smbfs' ||
-        fsType === 'vfat' || fsType === 'exfat' || fsType === 'fuseblk' ||
-        fsType === 'usbfs' || fsType === 'devpts'
-      ) ? 'removable' : 'fixed';
-
-      const label = mount === '/' ? '根分区' : (mount.split('/').pop() || mount);
-
-      drives.push({
-        mount,
-        label,
-        totalBytes,
-        freeBytes,
-        type,
-        fsType,
-      });
-    }
-
-    if (drives.length === 0) {
-      return [{ mount: '/', label: '根分区', totalBytes: 0, freeBytes: 0, type: 'fixed' }];
-    }
-    return drives;
-  } catch (err) {
-    console.warn('[fs] linuxListDrives failed:', (err as Error).message);
-    return [{ mount: '/', label: '根分区', totalBytes: 0, freeBytes: 0, type: 'fixed' }];
-  }
-}
 
 // =================== P4 v1: 递归搜索 ===================
 
