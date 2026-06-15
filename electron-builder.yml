@@ -72,8 +72,10 @@ linux:
     - deb
   category: FileManager
   desktop:
-    Name: Tabula
-    Comment: A modern file manager for Windows, Mac, and Linux
+    # 26.x schema: 只能用 entry (Desktop Entry metadata) 或 desktopActions
+    entry:
+      Name: Tabula
+      Comment: A modern file manager for Windows, Mac, and Linux
 
 publish:
   provider: github
