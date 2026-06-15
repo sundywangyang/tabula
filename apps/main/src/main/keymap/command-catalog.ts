@@ -144,26 +144,13 @@ export function isSameCombo(a: KeyCombo | null, b: KeyCombo | null): boolean {
 // =================== 系统保留组合 ===================
 
 /**
- * 系统保留组合(任何用户命令都不能占用)。这些组合是 OS / 桌面 / 浏览器保留的,
- * 重新绑定会破坏用户预期(例如 Cmd+Q 退出应用)。
+ * 判定某个组合是否被系统保留(任何用户命令都不能占用)。
+ * 不同平台的保留键不同(见 getPlatformReserved):
+ *  - Windows/Linux: Alt+F4, Alt+Tab, Ctrl+Alt+Delete
+ *  - macOS: 上面 + Cmd+Q/Tab/Escape/L/M/H/Space
+ *  - Linux: 上面 + Meta+L, Ctrl+Alt+L
+ * 重新绑定这些键会破坏用户预期(例如 Cmd+Q 退出应用)。
  */
-const RESERVED_COMBOS: KeyCombo[] = [
-  // 退出 / 关闭
-  parseKeyCombo('Meta+Q')!,       // macOS 退出
-  parseKeyCombo('Alt+F4')!,       // Win/Linux 关闭
-  parseKeyCombo('Ctrl+W') ? { ...parseKeyCombo('Ctrl+W')!, key: 'w' } : ({} as KeyCombo), // (示例:不过滤,看下面)
-  // 切窗口 / 切应用
-  parseKeyCombo('Meta+Tab')!,
-  parseKeyCombo('Alt+Tab')!,
-  parseKeyCombo('Ctrl+Alt+Delete')!,
-  parseKeyCombo('Meta+Escape')!,
-  // 锁屏 / 关机
-  parseKeyCombo('Ctrl+Alt+Delete')!,
-  parseKeyCombo('Meta+L')!,        // 锁屏(macOS)
-  parseKeyCombo('Ctrl+Alt+L')!,   // 锁屏(Linux/Win 一些桌面)
-].filter((c, idx, arr) => c && arr.findIndex((x) => isSameCombo(x, c)) === idx);
-
-/** 判定某个组合是否被系统保留(任何用户命令都不能占用) */
 export function isReservedCombo(combo: KeyCombo | null): boolean {
   if (!combo) return false;
   return getPlatformReserved().some((c) => isSameCombo(c, combo));
