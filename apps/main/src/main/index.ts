@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WindowManager } from './window/window-manager';
 import { registerIpcHandlers } from './ipc';
+import { getWindowProvider } from './providers/window';
 import { loadConfig } from './store/config';
 import { initExtensionHost } from './ext-host/extension-host';
 import { initLogger } from './infra/logger';
@@ -67,19 +68,12 @@ async function bootstrap() {
 
   // macOS: BrowserWindow 的 icon option 在 macOS 上无效 (dock 用 Info.plist CFBundleIconFile)
   // 必须在 dev 模式手动 setIcon, 否则 dock 显示旧/默认 icon
-  if (process.platform === 'darwin' && app.dock) {
-    const __dirname = fileURLToPath(new URL('.', import.meta.url));
-    const dockIcon = isDev
-      ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon', 'Tabula.icns')
-      : join(process.resourcesPath, 'resources', 'Tabula.icns');
-    try {
-      app.dock.setIcon(dockIcon);
-    } catch (err) {
-      // 加载失败不致命, 继续启动
-      // eslint-disable-next-line no-console
-      console.warn('[main] dock.setIcon failed:', err);
-    }
-  }
+  // macOS 下由 WindowProvider 内部处理 (Windows/Linux no-op)
+  const __dirname = fileURLToPath(new URL('.', import.meta.url));
+  const dockIcon = isDev
+    ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon', 'Tabula.icns')
+    : join(process.resourcesPath, 'resources', 'Tabula.icns');
+  getWindowProvider().setDockIcon(dockIcon);
 
   // P7: 启动屏(splash)
   // 必须在主窗口创建之前,这样用户不会看到空白

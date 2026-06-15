@@ -10,6 +10,7 @@ import { BrowserWindow, shell, app, screen } from 'electron';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { WindowBounds } from '@tabula/bridge';
+import { getWindowProvider } from '../providers/window';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -44,11 +45,8 @@ export class WindowManager {
     const iconDir = this.isDev
       ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon')
       : join(process.resourcesPath, 'resources');
-    const platformIcon = process.platform === 'darwin'
-      ? join(iconDir, this.isDev ? 'Tabula.icns' : 'Tabula.icns')
-      : process.platform === 'win32'
-        ? join(iconDir, this.isDev ? 'Tabula.ico' : 'Tabula.ico')
-        : join(iconDir, 'png', '512.png');
+    const winProvider = getWindowProvider();
+    const platformIcon = winProvider.getIconPath(iconDir, process.resourcesPath);
 
     const win = new BrowserWindow({
       ...bounds,
@@ -56,9 +54,9 @@ export class WindowManager {
       minHeight: 500,
       show: false,            // 先隐藏,准备好再显示(避免白闪)
       frame: false,           // 自定义标题栏(现代化)
-      titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+      titleBarStyle: winProvider.getTitleBarStyle(),
       backgroundColor: '#1a1a1f',
-      autoHideMenuBar: process.platform !== 'darwin', // macOS 菜单栏在顶部,不隐藏
+      autoHideMenuBar: winProvider.getAutoHideMenuBar(),
       icon: platformIcon,
       webPreferences: {
         preload: this.resolvePreload(),
