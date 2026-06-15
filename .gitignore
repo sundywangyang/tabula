@@ -46,6 +46,9 @@ coverage/
 .opencode/
 .claude/
 
+# OMC (oh-my-claudecode) tool internal state
+.omc/
+
 # Local debug artifacts (build logs, pids, smoke-test output)
 .harness/*.log
 .harness/*.err
