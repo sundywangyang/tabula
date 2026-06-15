@@ -14,6 +14,7 @@ import * as trashService from '../fs/trash';
 import { getThumbnail } from '../fs/thumbnail';
 import { getConfig, setConfig, getAllConfig } from '../store/config';
 import { extensionHost } from '../ext-host/extension-host';
+import { licenseManager } from '../license/license-manager';
 import { getLogPaths, readTail, installLogSink } from '../infra/logger';
 import { closeSplash, markRendererReady } from '../infra/splash';
 import {
@@ -333,4 +334,19 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // 仅注册 IPC handler,内存采样定时器由 main/index.ts bootstrap 单独启动
   // (避免 IPC 注册被混入定时器副作用,也便于 perf 模块职责单一)
   registerPerfIpcHandlers(ctx);
+
+  // =================== P-License v1: 许可证 ===================
+  // 启动时 init 一次(从 electron-store 加载缓存)
+  licenseManager.init();
+
+  ipcMain.handle(IpcChannels.LICENSE_VERIFY, async (_e, key: string) => {
+    return licenseManager.verify(key);
+  });
+  ipcMain.handle(IpcChannels.LICENSE_GET_STATUS, () => {
+    return licenseManager.getStatus();
+  });
+  ipcMain.handle(IpcChannels.LICENSE_CLEAR, async () => {
+    return licenseManager.clear();
+  });
+  // 注: LICENSE_STATUS_CHANGED 由 licenseManager.broadcastStatus() 直接 send,无需 handler
 }

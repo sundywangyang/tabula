@@ -206,6 +206,18 @@ const api: TabulaAPI = {
     all: () => ipcRenderer.invoke(IpcChannels.CFG_ALL),
   },
 
+  // P-License v1 骨架
+  license: {
+    verify: (key) => ipcRenderer.invoke(IpcChannels.LICENSE_VERIFY, key),
+    getStatus: () => ipcRenderer.invoke(IpcChannels.LICENSE_GET_STATUS),
+    clear: () => ipcRenderer.invoke(IpcChannels.LICENSE_CLEAR),
+    onStatusChanged: (cb: (info: any) => void) => {
+      const listener = (_e: IpcRendererEvent, info: any) => cb(info);
+      ipcRenderer.on(IpcChannels.LICENSE_STATUS_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IpcChannels.LICENSE_STATUS_CHANGED, listener);
+    },
+  },
+
   // P7 快捷键 (sibling p7-shortcuts)
   shortcuts: {
     getAll: () => ipcRenderer.invoke(IpcChannels.SHORTCUTS_GET_ALL),

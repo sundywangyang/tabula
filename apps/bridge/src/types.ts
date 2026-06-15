@@ -420,6 +420,47 @@ export interface ThumbnailResult {
   size: number;
 }
 
+// =================== 许可证 (P-License v1 骨架) ===================
+
+/** 许可证状态:未激活 / 活跃(订阅中) / 过期 */
+export type LicenseStatus = 'inactive' | 'active' | 'expired';
+
+/** 订阅计划 */
+export type LicensePlan = 'free' | 'pro' | 'team';
+
+/** 许可证信息(主进程持久化 + 推送给渲染端) */
+export interface LicenseInfo {
+  status: LicenseStatus;
+  plan: LicensePlan;
+  /** ISO 时间戳,status='active' 时有效 */
+  expiresAt: string | null;
+  /** 激活的 license key(脱敏:前 4 + ... + 后 4,用户可见) */
+  maskedKey: string | null;
+  /** 距离过期多少天(status='active' 时;过期/未激活为 null) */
+  daysUntilExpiry: number | null;
+}
+
+export type LicenseErrorCode =
+  | 'NETWORK_ERROR'      // outbound HTTP 失败 / 超时
+  | 'INVALID_LICENSE'    // 服务端签名不通过 / key 格式错
+  | 'EXPIRED'            // 服务端确认已过期
+  | 'SERVER_ERROR'       // 5xx
+  | 'NOT_ACTIVATED'      // 还没激活过任何 key
+  | 'UNKNOWN';
+
+export interface LicenseError {
+  code: LicenseErrorCode;
+  message: string;
+}
+
+/** verify() 返回的 discriminated union,data 字段直接给 LicenseInfo */
+export type LicenseVerifyResult =
+  | { ok: true; data: LicenseInfo }
+  | { ok: false; error: LicenseError };
+
+/** getStatus / clear 返回的 Result<T>(同 FsError 概念,暂不复用避免类型交叉) */
+export type LicenseResult<T> = { ok: true; data: T } | { ok: false; error: LicenseError };
+
 // =================== 性能埋点 (P7 v1) ===================
 
 /** 一条埋点(渲染端 → 主进程) */
