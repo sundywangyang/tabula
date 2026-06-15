@@ -5,9 +5,27 @@
  * 数据从主进程 IPC 拉取,通过 onStatusChanged 推送保持最新。
  *
  * 没有持久化:所有持久化在主进程 electron-store,这里只是 UI 缓存。
+ *
+ * 错误反馈: 与 file-store 等其他 store 保持一致 — IPC 失败时调
+ * useFileStore.getState().showToast(...) 弹 toast, console.warn 仅做开发态日志。
+ * lastError 仍保留给 UI 字段级展示(等 Settings 加 license tab 时用)。
  */
 import { create } from 'zustand';
 import type { LicenseError, LicenseInfo } from '@tabula/bridge';
+import { useFileStore } from './file-store';
+
+const EMPTY_LICENSE_INFO: LicenseInfo = {
+  status: 'inactive',
+  plan: 'free',
+  expiresAt: null,
+  maskedKey: null,
+  daysUntilExpiry: null,
+};
+
+/** 失败时弹 toast, 同时保留 lastError 给 Settings 等 UI 字段级展示 */
+function reportError(err: LicenseError, fallback: string): void {
+  useFileStore.getState().showToast(err.message || fallback, 'error', 3000);
+}
 
 export interface LicenseState {
   /** 当前许可证信息;null = 还在 hydrate */
@@ -40,16 +58,18 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
       const r = await window.tabula.license.getStatus();
       if (r.ok) {
         set({ info: r.data, hydrated: true, lastError: null });
-      } else {
-        // NOT_ACTIVATED 是初始态,不当作错误
-        set({
-          info: { status: 'inactive', plan: 'free', expiresAt: null, maskedKey: null, daysUntilExpiry: null },
-          hydrated: true,
-          lastError: r.error.code === 'NOT_ACTIVATED' ? null : r.error,
-        });
+        return;
       }
+      // NOT_ACTIVATED 是初始态, 不弹 toast(没错误可言)
+      if (r.error.code === 'NOT_ACTIVATED') {
+        set({ info: EMPTY_LICENSE_INFO, hydrated: true, lastError: null });
+        return;
+      }
+      // 其他错误(理论上不发生, 但 IPC 仍可能返 NETWORK_ERROR 等)→ toast
+      reportError(r.error, '拉取许可证状态失败');
+      set({ info: EMPTY_LICENSE_INFO, hydrated: true, lastError: r.error });
     } catch (e) {
-      // 静默:启动时不应该因为 IPC 失败阻塞
+      // 启动期 IPC 故障: 静默 console.warn, 不阻塞启动
       console.warn('[license-store] hydrate failed', e);
       set({ hydrated: true });
     }
@@ -64,12 +84,12 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
         return true;
       }
       set({ verifying: false, lastError: r.error });
+      reportError(r.error, '许可证验证失败');
       return false;
     } catch (e) {
-      set({
-        verifying: false,
-        lastError: { code: 'UNKNOWN', message: String(e) },
-      });
+      const err: LicenseError = { code: 'UNKNOWN', message: String(e) };
+      set({ verifying: false, lastError: err });
+      useFileStore.getState().showToast(err.message, 'error', 3000);
       return false;
     }
   },
@@ -77,12 +97,15 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
   clear: async () => {
     set({ verifying: true });
     try {
-      await window.tabula.license.clear();
-      set({
-        info: { status: 'inactive', plan: 'free', expiresAt: null, maskedKey: null, daysUntilExpiry: null },
-        verifying: false,
-        lastError: null,
-      });
+      const r = await window.tabula.license.clear();
+      if (r.ok) {
+        set({ info: EMPTY_LICENSE_INFO, verifying: false, lastError: null });
+        useFileStore.getState().showToast('已注销许可证', 'info', 2000);
+        return;
+      }
+      // clear 失败的 contract: 当前 service 不会返 ok:false, 但防御性处理
+      set({ verifying: false });
+      reportError(r.error, '注销失败');
     } catch (e) {
       console.warn('[license-store] clear failed', e);
       set({ verifying: false });

@@ -400,7 +400,11 @@ export type RunCommandResult =
 
 // =================== IPC 响应包装 ===================
 
-export type Result<T> = { ok: true; data: T } | { ok: false; error: FsError };
+/**
+ * 通用 IPC Result 包装。error 域开放为 E,默认 FsError 保持向后兼容。
+ * 新 domain (license / extension) 可写 `Result<T, LicenseError>` 等。
+ */
+export type Result<T, E = FsError> = { ok: true; data: T } | { ok: false; error: E };
 
 /** 缩略图结果(主进程 → 渲染端) */
 export interface ThumbnailResult {
@@ -454,12 +458,10 @@ export interface LicenseError {
 }
 
 /** verify() 返回的 discriminated union,data 字段直接给 LicenseInfo */
-export type LicenseVerifyResult =
-  | { ok: true; data: LicenseInfo }
-  | { ok: false; error: LicenseError };
+export type LicenseVerifyResult = Result<LicenseInfo, LicenseError>;
 
-/** getStatus / clear 返回的 Result<T>(同 FsError 概念,暂不复用避免类型交叉) */
-export type LicenseResult<T> = { ok: true; data: T } | { ok: false; error: LicenseError };
+/** getStatus / clear 返回的 Result<T, LicenseError>(沿用通用 Result 包装) */
+export type LicenseResult<T> = Result<T, LicenseError>;
 
 // =================== 性能埋点 (P7 v1) ===================
 

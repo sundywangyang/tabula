@@ -31,7 +31,6 @@ const REQUEST_TIMEOUT_MS = 10_000;
 interface LicenseStoreSchema {
   info: LicenseInfo;
   fingerprint: string;
-  rawKey: string;
 }
 
 function makeEmptyInfo(): LicenseInfo {
@@ -67,7 +66,6 @@ export class LicenseService {
   private store: Store<LicenseStoreSchema> | null = null;
   /** 当前内存里的 LicenseInfo(每次 verify/clear 更新,startup 从 store 加载) */
   private current: LicenseInfo = makeEmptyInfo();
-  private currentRawKey = '';
   private fingerprint = '';
 
   /** 启动时调用一次:加载 store、读取缓存 */
@@ -80,7 +78,6 @@ export class LicenseService {
     } else {
       this.current = makeEmptyInfo();
     }
-    this.currentRawKey = this.store.get('rawKey') ?? '';
     // 启动时如果状态是 active 但 expiresAt 早已过期 → 自动降级为 expired
     if (this.current.status === 'active' && this.current.expiresAt) {
       if (new Date(this.current.expiresAt).getTime() < Date.now()) {
@@ -187,23 +184,13 @@ export class LicenseService {
         daysUntilExpiry: daysBetween(new Date(), expires),
       };
       this.current = info;
-      this.currentRawKey = key;
       this.persist();
       return { ok: true, data: info };
     }
 
     if (key === 'test-expired') {
-      const info: LicenseInfo = {
-        status: 'expired',
-        plan: 'pro',
-        expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
-        maskedKey: maskKey(key),
-        daysUntilExpiry: 0,
-      };
-      // 过期状态不入缓存(不占用有效 slot)
-      this.current = makeEmptyInfo();
-      this.currentRawKey = '';
-      this.persist();
+      // 失败路径不修改 this.current / this.currentRawKey — 用户的有效 license 不该
+      // 因为新 key 验证失败而被抹掉。state 变更只在 init() 启动检测过期时发生。
       return { ok: false, error: { code: 'EXPIRED', message: 'License has expired' } };
     }
 
@@ -214,7 +201,6 @@ export class LicenseService {
   /** 注销 */
   clear(): void {
     this.current = makeEmptyInfo();
-    this.currentRawKey = '';
     this.persist();
   }
 
@@ -231,7 +217,6 @@ export class LicenseService {
   private persist(): void {
     if (!this.store) return;
     this.store.set('info', this.current);
-    this.store.set('rawKey', this.currentRawKey);
     this.store.set('fingerprint', this.fingerprint);
   }
 }

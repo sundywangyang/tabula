@@ -242,12 +242,8 @@ export function registerIpcHandlers(ctx: IpcContext) {
 
   // =================== Extensions (P6) ===================
   ipcMain.handle(IpcChannels.EXT_LIST, () => extensionHost.list());
-  ipcMain.handle(IpcChannels.EXT_ENABLE, async (_e, id: string) => {
-    await extensionHost.enable(id);
-  });
-  ipcMain.handle(IpcChannels.EXT_DISABLE, async (_e, id: string) => {
-    await extensionHost.disable(id);
-  });
+  ipcMain.handle(IpcChannels.EXT_ENABLE, (_e, id: string) => extensionHost.enable(id));
+  ipcMain.handle(IpcChannels.EXT_DISABLE, (_e, id: string) => extensionHost.disable(id));
   ipcMain.handle(IpcChannels.EXT_INSTALL, async (_e, sourcePath: string) => {
     try {
       const userExtensionsDir = getConfig('extensionsDir');
