@@ -1,7 +1,7 @@
 /**
  * macOS WindowProvider — .icns icon + hiddenInset 标题栏 + dock.setIcon.
  */
-import { app } from 'electron';
+import { app, nativeImage } from 'electron';
 import type { WindowProvider, TitleBarStyle } from './types';
 
 export class MacosWindowProvider implements WindowProvider {
@@ -20,14 +20,20 @@ export class MacosWindowProvider implements WindowProvider {
 
   setDockIcon(iconPath: string): void {
     // app.dock 仅 macOS 有
-    if (app.dock) {
-      try {
-        app.dock.setIcon(iconPath);
-      } catch (err) {
-        // icon 路径无效时不让启动失败, 仅 warn
+    if (!app.dock) return;
+    try {
+      // app.dock.setIcon 在 macOS 上对 .icns 路径有兼容问题, 用 nativeImage.createFromPath
+      // 先把 .icns 解析成 NativeImage, 再 setIcon(NativeImage). 这种方式跨版本稳定.
+      const image = nativeImage.createFromPath(iconPath);
+      if (image.isEmpty()) {
         // eslint-disable-next-line no-console
-        console.warn('[window-provider] dock.setIcon failed:', err);
+        console.warn('[window-provider] dock.setIcon: image is empty, path=', iconPath);
+        return;
       }
+      app.dock.setIcon(image);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[window-provider] dock.setIcon failed:', err);
     }
   }
 }

@@ -169,10 +169,10 @@ async function bootstrap() {
     console.error('[main] did-stop-loading');
   });
 
-  // 开发环境: 打开 devtools
-  if (isDev) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
+  // 开发环境: 默认不自动开 devtools (避免 DevTools 内部噪音刷屏
+  // Autofill/VE context 等 warning 跟我们的代码无关). 手动按 Cmd+Shift+I 打开.
+  // 如需临时自动开, 改成:
+  //   if (isDev) { mainWindow.webContents.openDevTools({ mode: 'detach' }); }
 
   // P7: 主窗口显示后,异步触发一次更新检查(不阻塞 UI)
   // 用 setImmediate 把"窗口显示"和"网络请求"解耦
