@@ -49,6 +49,7 @@ const ARCHIVE_EXTS = new Set(['.zip', '.tar', '.tgz', '.gz', '.bz2', '.7z', '.ra
 const DOCX_EXTS = new Set(['.docx', '.dotx']);
 const XLSX_EXTS = new Set(['.xlsx', '.xls', '.xlsm', '.xlsb', '.ods', '.csv']);
 const PPTX_EXTS = new Set(['.pptx', '.ppt', '.odp']);
+const RTF_EXTS = new Set(['.rtf']);
 const VIDEO_EXTS = new Set([
   '.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.wmv', '.flv', '.ogv',
 ]);
@@ -132,7 +133,7 @@ function sniffKindFromText(head: string): PreviewKind {
   return 'text';
 }
 
-type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'font' | 'archive' | 'docx' | 'xlsx' | 'pptx' | 'markdown' | 'code' | 'text' | 'unsupported';
+type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'font' | 'archive' | 'docx' | 'xlsx' | 'pptx' | 'rtf' | 'markdown' | 'code' | 'text' | 'unsupported';
 
 /**
  * @param name 文件名 (含扩展名), 例如 "README.md" / "Makefile" / "foo.PDF"
@@ -149,6 +150,7 @@ function detectKind(name: string, head?: string): PreviewKind {
   if (DOCX_EXTS.has(ext)) return 'docx';
   if (XLSX_EXTS.has(ext)) return 'xlsx';
   if (PPTX_EXTS.has(ext)) return 'pptx';
+  if (RTF_EXTS.has(ext)) return 'rtf';
   if (MARKDOWN_EXTS.has(ext)) return 'markdown';
   if (CODE_EXTS.has(ext)) return 'code';
   if (TEXT_EXTS.has(ext)) return 'text';
@@ -259,7 +261,8 @@ export function PreviewPanel() {
           initialKind === 'archive' ||
           initialKind === 'docx' ||
           initialKind === 'xlsx' ||
-          initialKind === 'pptx'
+          initialKind === 'pptx' ||
+          initialKind === 'rtf'
         ) {
           const maxBytes =
             initialKind === 'image' ? IMAGE_MAX_BYTES
@@ -269,6 +272,7 @@ export function PreviewPanel() {
             : initialKind === 'docx' ? DOCX_MAX_BYTES
             : initialKind === 'xlsx' ? XLSX_MAX_BYTES
             : initialKind === 'pptx' ? PPTX_MAX_BYTES
+            : initialKind === 'rtf' ? DOCX_MAX_BYTES
             : MEDIA_MAX_BYTES;
           if (entry.size > maxBytes) {
             const label =
@@ -280,6 +284,7 @@ export function PreviewPanel() {
               : initialKind === 'docx' ? 'Word 文档'
               : initialKind === 'xlsx' ? 'Excel 表格'
               : initialKind === 'pptx' ? 'PowerPoint 演示'
+              : initialKind === 'rtf' ? 'RTF 文档'
               : 'PDF';
             setPreviewError(
               `${label}过大 (${formatSize(entry.size)}),无法预览(>${formatSize(maxBytes)} 拒绝加载)。`,
@@ -407,6 +412,7 @@ export function PreviewPanel() {
               : kind === 'docx' ? '📄'
               : kind === 'xlsx' ? '📊'
               : kind === 'pptx' ? '🎞'
+              : kind === 'rtf' ? '📰'
               : kind === 'markdown' ? '📝'
               : kind === 'code' ? '📜'
               : '📄'
@@ -525,26 +531,14 @@ export function PreviewPanel() {
               {kind === 'pptx' && preview.blobUrl && (
                 <PptxView url={preview.blobUrl} />
               )}
+              {kind === 'rtf' && preview.blobUrl && (
+                <RtfView url={preview.blobUrl} />
+              )}
               {kind === 'video' && preview.blobUrl && (
-                <div className="preview-media-wrap">
-                  <video
-                    className="preview-video"
-                    src={preview.blobUrl}
-                    controls
-                    autoPlay={false}
-                    preload="metadata"
-                  />
-                </div>
+                <MediaView url={preview.blobUrl} kind="video" />
               )}
               {kind === 'audio' && preview.blobUrl && (
-                <div className="preview-media-wrap">
-                  <audio
-                    className="preview-audio"
-                    src={preview.blobUrl}
-                    controls
-                    preload="metadata"
-                  />
-                </div>
+                <MediaView url={preview.blobUrl} kind="audio" />
               )}
               {kind === 'markdown' && preview.text !== null && (
                 <MarkdownView text={preview.text} />
@@ -576,6 +570,146 @@ export function PreviewPanel() {
         </div>
       </div>
     </div>
+  );
+}
+
+// =================== 视频/音频 (MediaView) ===================
+
+/**
+ * 视频/音频统一组件. 监听 loadedmetadata 拿时长 + 视频分辨率 + 编码信息,
+ * 显示在播放器上方 toolbar. 0 依赖 (用 HTMLVideoElement / HTMLAudioElement API).
+ */
+function MediaView({ url, kind }: { url: string; kind: 'video' | 'audio' }) {
+  const ref = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+  const [meta, setMeta] = useState<{
+    duration?: number;
+    width?: number;
+    height?: number;
+  }>({});
+
+  useEffect(() => {
+    setMeta({});
+  }, [url]);
+
+  const onLoaded = () => {
+    const el = ref.current;
+    if (!el) return;
+    const next: typeof meta = { duration: Number.isFinite(el.duration) ? el.duration : undefined };
+    if (kind === 'video' && el instanceof HTMLVideoElement) {
+      next.width = el.videoWidth;
+      next.height = el.videoHeight;
+    }
+    setMeta(next);
+  };
+
+  const onError = () => {
+    setMeta({}); // 元信息拿不到, 隐藏
+  };
+
+  return (
+    <div className="preview-media-wrap">
+      <div className="preview-media-meta">
+        {meta.duration !== undefined && (
+          <span className="preview-media-stat">
+            ⏱ {formatDuration(meta.duration)}
+          </span>
+        )}
+        {kind === 'video' && meta.width && meta.height && (
+          <span className="preview-media-stat">
+            📐 {meta.width}×{meta.height}
+          </span>
+        )}
+        {kind === 'video' && meta.width && meta.height && meta.duration && (
+          <span className="preview-media-stat preview-media-stat-dim">
+            ≈ {(meta.width * meta.height / 1_000_000 * meta.duration * 0.3 / 8).toFixed(1)} MB (估)
+          </span>
+        )}
+      </div>
+      {kind === 'video' ? (
+        <video
+          ref={ref as React.RefObject<HTMLVideoElement>}
+          className="preview-video"
+          src={url}
+          controls
+          autoPlay={false}
+          preload="metadata"
+          onLoadedMetadata={onLoaded}
+          onError={onError}
+        />
+      ) : (
+        <audio
+          ref={ref as React.RefObject<HTMLAudioElement>}
+          className="preview-audio"
+          src={url}
+          controls
+          preload="metadata"
+          onLoadedMetadata={onLoaded}
+          onError={onError}
+        />
+      )}
+    </div>
+  );
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds)) return '—';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// =================== RTF 文档 ===================
+
+/**
+ * 用 @iarna/rtf-to-html 把 RTF 转 HTML 渲染. dynamic import (~30KB).
+ * 限制: 嵌入图/复杂表格/页眉页脚 不可见 (rtf-to-html 局限).
+ */
+function RtfView({ url }: { url: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setHtml(null);
+    setError(null);
+    void (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`fetch ${res.status}`);
+        const ab = await res.arrayBuffer();
+        if (cancelled) return;
+        // rtf-to-html 期望 string/Buffer, 用 TextDecoder 把 ArrayBuffer 转 str
+        const str = new TextDecoder('utf-8').decode(new Uint8Array(ab));
+        const { default: rtfToHtml } = await import('@iarna/rtf-to-html');
+        const result = await rtfToHtml.fromString(str, (err: Error) => { /* 收集 warn */ });
+        if (cancelled) return;
+        setHtml(result);
+      } catch (err) {
+        if (!cancelled) setError(String((err as Error).message ?? err));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [url]);
+
+  if (error) {
+    return (
+      <div className="preview-error">
+        <div className="error-icon">⚠</div>
+        <div className="error-message">RTF 解析失败: {error}</div>
+      </div>
+    );
+  }
+  if (html === null) {
+    return <div className="preview-loading"><div className="loading-spinner" /><div>解析中…</div></div>;
+  }
+  return (
+    <div
+      className="preview-rtf-wrap"
+      // eslint-disable-next-line react/no-danger
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
@@ -1377,6 +1511,8 @@ function mimeFromExt(ext: string): string {
     case '.ppt':
     case '.odp':
       return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    case '.rtf':
+      return 'application/rtf';
     // Video
     case '.mp4':
     case '.m4v':

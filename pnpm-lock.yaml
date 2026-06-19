@@ -83,6 +83,9 @@ importers:
 
   apps/renderer:
     dependencies:
+      '@iarna/rtf-to-html':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@tanstack/react-virtual':
         specifier: ^3.14.2
         version: 3.14.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -468,6 +471,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@iarna/rtf-to-html@1.1.0':
+    resolution: {integrity: sha512-2bmUxotlWMfDMkjMidIMyoQfuK+QitW0Ys2T098WrgBvPZUV5NN5EvD1vuONrmAtweCDwagmQf6NxRtSbq+siQ==}
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -1511,6 +1517,10 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
+  iconv-lite@0.4.15:
+    resolution: {integrity: sha512-RGR+c9Lm+tLsvU57FTJJtdbv2hQw42Yl2n26tVIBaYmZzLN+EGfroUugN/z9nJf9kOXd49hBmpoGr4FEm+A4pw==}
+    engines: {node: '>=0.10.0'}
+
   immediate@3.0.6:
     resolution: {integrity: sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ==}
 
@@ -2076,6 +2086,9 @@ packages:
     resolution: {integrity: sha512-T9mWdbWfQtp0B5lv/HX+wrhYsmXRlcWnXXmJbXqKJhlRaoS6KMhq0gpyzW4UJfclcxrEdLnTgjT2NjruLONu0g==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
+
+  rtf-parser@1.3.3:
+    resolution: {integrity: sha512-sz2eb4tcCFtwVfs5Ei/l3JnSQGqpDv+drFuNz/zwn2tA24cL2WTuk2VMo2bA4IcRgkn38juAOri2hB9nv85u2Q==}
 
   safe-buffer@5.1.2:
     resolution: {integrity: sha512-Gd2UZBJDkXlY7GbJxfsE8/nvKkUEU1G38c1siN6QP6a9PT9MmHB8GnpscSmMJSoF8LOIrt8ud/wPtojys4G6+g==}
@@ -2890,6 +2903,10 @@ snapshots:
   '@exodus/bytes@1.15.1(@noble/hashes@2.2.0)':
     optionalDependencies:
       '@noble/hashes': 2.2.0
+
+  '@iarna/rtf-to-html@1.1.0':
+    dependencies:
+      rtf-parser: 1.3.3
 
   '@isaacs/cliui@8.0.2':
     dependencies:
@@ -4102,6 +4119,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  iconv-lite@0.4.15: {}
+
   immediate@3.0.6: {}
 
   inflight@1.0.6:
@@ -4679,6 +4698,11 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.61.0
       '@rollup/rollup-win32-x64-msvc': 4.61.0
       fsevents: 2.3.3
+
+  rtf-parser@1.3.3:
+    dependencies:
+      iconv-lite: 0.4.15
+      readable-stream: 2.3.8
 
   safe-buffer@5.1.2: {}
 
