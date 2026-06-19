@@ -28,12 +28,21 @@ const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5MB
 const MEDIA_MAX_BYTES = 500 * 1024 * 1024;
 // PDF — 太大直接拒绝, 100MB 够日常文档
 const PDF_MAX_BYTES = 100 * 1024 * 1024;
+// 字体 — 单个字体文件通常 100KB-5MB, 20MB 上限足够
+const FONT_MAX_BYTES = 20 * 1024 * 1024;
+// 压缩包 — 大型 zip(如带 node_modules) 几百 MB, 上限 1GB
+const ARCHIVE_MAX_BYTES = 1024 * 1024 * 1024;
+// Office 文档 (docx 等) — 单文件通常 <50MB
+const DOCX_MAX_BYTES = 50 * 1024 * 1024;
 
 const IMAGE_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp',
   '.ico', '.heic', '.avif', '.tiff', '.tif', '.psd', '.raw',
 ]);
 const PDF_EXTS = new Set(['.pdf']);
+const FONT_EXTS = new Set(['.ttf', '.otf', '.woff', '.woff2']);
+const ARCHIVE_EXTS = new Set(['.zip', '.tar', '.tgz', '.gz', '.bz2', '.7z', '.rar']);
+const DOCX_EXTS = new Set(['.docx', '.dotx']);
 const VIDEO_EXTS = new Set([
   '.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.wmv', '.flv', '.ogv',
 ]);
@@ -117,7 +126,7 @@ function sniffKindFromText(head: string): PreviewKind {
   return 'text';
 }
 
-type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'markdown' | 'code' | 'text' | 'unsupported';
+type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'font' | 'archive' | 'docx' | 'markdown' | 'code' | 'text' | 'unsupported';
 
 /**
  * @param name 文件名 (含扩展名), 例如 "README.md" / "Makefile" / "foo.PDF"
@@ -129,6 +138,9 @@ function detectKind(name: string, head?: string): PreviewKind {
   if (VIDEO_EXTS.has(ext)) return 'video';
   if (AUDIO_EXTS.has(ext)) return 'audio';
   if (PDF_EXTS.has(ext)) return 'pdf';
+  if (FONT_EXTS.has(ext)) return 'font';
+  if (ARCHIVE_EXTS.has(ext)) return 'archive';
+  if (DOCX_EXTS.has(ext)) return 'docx';
   if (MARKDOWN_EXTS.has(ext)) return 'markdown';
   if (CODE_EXTS.has(ext)) return 'code';
   if (TEXT_EXTS.has(ext)) return 'text';
@@ -229,22 +241,31 @@ export function PreviewPanel() {
 
     const run = async () => {
       try {
-        // 图片 / 视频 / 音频 / PDF → 走 binary 路径(blob URL)
+        // 图片 / 视频 / 音频 / PDF / 字体 / 压缩包 → 走 binary 路径(blob URL)
         if (
           initialKind === 'image' ||
           initialKind === 'video' ||
           initialKind === 'audio' ||
-          initialKind === 'pdf'
+          initialKind === 'pdf' ||
+          initialKind === 'font' ||
+          initialKind === 'archive' ||
+          initialKind === 'docx'
         ) {
           const maxBytes =
             initialKind === 'image' ? IMAGE_MAX_BYTES
             : initialKind === 'pdf' ? PDF_MAX_BYTES
+            : initialKind === 'font' ? FONT_MAX_BYTES
+            : initialKind === 'archive' ? ARCHIVE_MAX_BYTES
+            : initialKind === 'docx' ? DOCX_MAX_BYTES
             : MEDIA_MAX_BYTES;
           if (entry.size > maxBytes) {
             const label =
               initialKind === 'image' ? '图片'
               : initialKind === 'video' ? '视频'
               : initialKind === 'audio' ? '音频'
+              : initialKind === 'font' ? '字体'
+              : initialKind === 'archive' ? '压缩包'
+              : initialKind === 'docx' ? 'Word 文档'
               : 'PDF';
             setPreviewError(
               `${label}过大 (${formatSize(entry.size)}),无法预览(>${formatSize(maxBytes)} 拒绝加载)。`,
@@ -367,6 +388,9 @@ export function PreviewPanel() {
               : kind === 'video' ? '🎬'
               : kind === 'audio' ? '🎵'
               : kind === 'pdf' ? '📕'
+              : kind === 'font' ? '🅰'
+              : kind === 'archive' ? '🗜'
+              : kind === 'docx' ? '📄'
               : kind === 'markdown' ? '📝'
               : kind === 'code' ? '📜'
               : '📄'
@@ -470,6 +494,15 @@ export function PreviewPanel() {
               {kind === 'pdf' && preview.blobUrl && (
                 <PdfView url={preview.blobUrl} />
               )}
+              {kind === 'font' && preview.blobUrl && (
+                <FontView url={preview.blobUrl} name={entry.name} />
+              )}
+              {kind === 'archive' && preview.blobUrl && (
+                <ArchiveView url={preview.blobUrl} name={entry.name} ext={entry.ext} />
+              )}
+              {kind === 'docx' && preview.blobUrl && (
+                <DocxView url={preview.blobUrl} />
+              )}
               {kind === 'video' && preview.blobUrl && (
                 <div className="preview-media-wrap">
                   <video
@@ -518,6 +551,274 @@ export function PreviewPanel() {
               ⚠ 文件过大,仅显示前 {TEXT_TRUNCATE_LINES} 行(共 {preview.totalLines} 行)
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =================== Office 文档 (docx) ===================
+
+/**
+ * docx 走 mammoth.js 转 HTML 渲染. dynamic import 仅在打开 docx 时下载 chunk.
+ * mammoth 转换结果含基础 inline 样式, 配 preview-docx-wrap 容器样式覆盖.
+ * 注意: 嵌入图片/复杂表格/页眉页脚 不可见 (mammoth 局限).
+ */
+function DocxView({ url }: { url: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setHtml(null);
+    setError(null);
+    void (async () => {
+      try {
+        const res = await fetch(url);
+        const ab = await res.arrayBuffer();
+        if (cancelled) return;
+        const mammoth = (await import('mammoth')).default;
+        const result = await mammoth.convertToHtml({ arrayBuffer: ab });
+        if (cancelled) return;
+        setHtml(result.value);
+        if (result.messages.length > 0) {
+          console.warn('[DocxView] mammoth warnings:', result.messages);
+        }
+      } catch (err) {
+        if (!cancelled) setError(String((err as Error).message ?? err));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [url]);
+
+  if (error) {
+    return (
+      <div className="preview-error">
+        <div className="error-icon">⚠</div>
+        <div className="error-message">docx 解析失败: {error}</div>
+      </div>
+    );
+  }
+  if (html === null) {
+    return <div className="preview-loading"><div className="loading-spinner" /><div>解析中…</div></div>;
+  }
+  return (
+    <div
+      className="preview-docx-wrap"
+      // eslint-disable-next-line react/no-danger
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+// =================== 压缩包列表 ===================
+
+/** fflate 解析后的统一 entry 形态 */
+interface ArchiveEntry {
+  name: string;
+  size: number;
+  isDir: boolean;
+  /** 文本文件前 8KB (仅 zip 内嵌纯文本时填充, 二进制/null) */
+  preview?: string | null;
+}
+
+function formatArchiveSize(n: number): string {
+  if (n === 0) return '0';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+const TEXT_PREVIEW_EXTS = new Set([
+  '.txt', '.md', '.json', '.xml', '.html', '.htm', '.css', '.js', '.ts', '.tsx', '.jsx',
+  '.yml', '.yaml', '.toml', '.ini', '.conf', '.env', '.csv', '.tsv', '.log', '.sh', '.bash',
+  '.py', '.rb', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.hpp', '.lua', '.sql',
+  '.gitignore', '.dockerignore', '.editorconfig', '.properties',
+]);
+
+/**
+ * 解析 zip: fflate 的 unzipSync 返回 { [name]: Unzipped }
+ * 解析 tar: fflate 的 unzipTarSync 接受 Uint8Array 返回 { [name]: Unzipped }
+ *   (fflate 把 tar 当 zip-without-compression 处理, 复用同一 API)
+ * 解析 gz: fflate 自身不直接解压, 但 .tar.gz = .tgz 可走 tar 路径 (流式).
+ *   单 .gz 文件 (非 tar 容器) 仅显示 "file size + extracted" 占位.
+ */
+async function parseArchive(ab: ArrayBuffer, ext: string): Promise<ArchiveEntry[]> {
+  const { unzipSync, strFromU8 } = await import('fflate');
+  // tar/tgz 复用 unzip 接口 (fflate 设计)
+  const raw = new Uint8Array(ab);
+  let unzipped: Record<string, { name: string; data?: Uint8Array }> = {};
+  try {
+    if (ext === '.gz' && !ext.includes('tar')) {
+      // 单 .gz 不是容器, 只显示 1 个 entry
+      return [{ name: nameFromGz(ab), size: ab.byteLength, isDir: false, preview: null }];
+    }
+    // zip / tar / tgz 都走 unzipSync
+    if (ext === '.7z' || ext === '.rar') {
+      unzipped = {}; // fflate 不支持 7z/rar
+    } else {
+      unzipped = unzipSync(raw) as unknown as Record<string, { name: string; data?: Uint8Array }>;
+    }
+  } catch (err) {
+    throw new Error(`压缩包解析失败: ${(err as Error).message}`);
+  }
+
+  const entries: ArchiveEntry[] = [];
+  for (const [name, val] of Object.entries(unzipped)) {
+    const isDir = name.endsWith('/') || val.name.endsWith('/');
+    const data = val.data;
+    const size = data ? data.byteLength : 0;
+    let preview: string | null = null;
+    if (data && !isDir && size < 8 * 1024) {
+      // 文本类: 8KB 内解码作预览
+      const ext2 = name.toLowerCase().includes('.') ? `.${name.split('.').pop()!.toLowerCase()}` : '';
+      if (TEXT_PREVIEW_EXTS.has(ext2) || (data.byteLength < 2048 && /^[\x09\x0a\x0d\x20-\x7e]*$/.test(strFromU8(data.slice(0, 256))))) {
+        try {
+          preview = strFromU8(data.slice(0, 8 * 1024));
+        } catch { /* keep null */ }
+      }
+    }
+    entries.push({ name, size, isDir, preview });
+  }
+  // 排序: 目录在前 (按字母), 文件在后
+  entries.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  return entries;
+}
+
+function nameFromGz(ab: ArrayBuffer): string {
+  // 从 .gz 头取原文件名 (RFC 1952 FNAME 字段)
+  const bytes = new Uint8Array(ab);
+  let i = 10; // 跳过 GZ magic(2) + method(1) + flags(1) + mtime(4) + xfl(1) + os(1)
+  if (bytes.length > i + 2 && (bytes[3] & 0x04)) { // FNAME flag
+    const start = i;
+    while (i < bytes.length && bytes[i] !== 0) i++;
+    return new TextDecoder().decode(bytes.slice(start, i)) || 'decompressed.bin';
+  }
+  return 'decompressed.bin';
+}
+
+function ArchiveView({ url, name, ext }: { url: string; name: string; ext: string }) {
+  const [entries, setEntries] = useState<ArchiveEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEntries(null);
+    setError(null);
+    void (async () => {
+      try {
+        const res = await fetch(url);
+        const ab = await res.arrayBuffer();
+        if (cancelled) return;
+        const result = await parseArchive(ab, ext);
+        if (cancelled) return;
+        setEntries(result);
+      } catch (err) {
+        if (!cancelled) setError(String((err as Error).message ?? err));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [url, ext]);
+
+  if (error) {
+    return (
+      <div className="preview-error">
+        <div className="error-icon">⚠</div>
+        <div className="error-message">压缩包解析失败: {error}</div>
+        <div className="preview-error-meta">
+          {ext === '.7z' || ext === '.rar'
+            ? <span>当前不支持 7z / rar 格式 (fflate 不支持)</span>
+            : null}
+        </div>
+      </div>
+    );
+  }
+  if (entries === null) {
+    return <div className="preview-loading"><div className="loading-spinner" /><div>解压中…</div></div>;
+  }
+
+  const dirCount = entries.filter((e) => e.isDir).length;
+  const fileCount = entries.length - dirCount;
+
+  return (
+    <div className="preview-archive-wrap">
+      <div className="preview-archive-summary">
+        <strong>{name}</strong>
+        <span> · {entries.length} 项 ({dirCount} 目录 / {fileCount} 文件)</span>
+      </div>
+      <div className="preview-archive-list">
+        {entries.map((e, i) => (
+          <div key={i} className={`preview-archive-row ${e.isDir ? 'is-dir' : ''}`}>
+            <span className="preview-archive-icon">{e.isDir ? '📁' : '📄'}</span>
+            <span className="preview-archive-name" title={e.name}>{e.name}</span>
+            <span className="preview-archive-size">{e.isDir ? '—' : formatArchiveSize(e.size)}</span>
+            {e.preview !== undefined && e.preview !== null && (
+              <pre className="preview-archive-preview">{e.preview}{e.preview.length >= 8 * 1024 ? '\n…' : ''}</pre>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =================== 字体预览 ===================
+
+/**
+ * 用 @font-face 加载字体 + 渲染 3 个 size × 3 段 sample (含 ASCII/中文/pangram).
+ * 0 依赖, 直接 ObjectURL + document.fonts API.
+ */
+function FontView({ url, name }: { url: string; name: string }) {
+  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  // 字体用 base name 作 fontFamily 后缀 (避免同名冲突)
+  const family = `preview-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    const font = new FontFace(family, `url(${url})`);
+    font
+      .load()
+      .then((loaded) => {
+        if (cancelled) return;
+        document.fonts.add(loaded);
+        setLoadState('loaded');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoadState('error');
+      });
+    return () => {
+      cancelled = true;
+      // 不删除 document.fonts 中的字体 — 重新打开时 add 同一个会忽略
+    };
+  }, [url, family]);
+
+  return (
+    <div className="preview-font-wrap">
+      <div className="preview-font-meta">
+        {name}
+        {loadState === 'loading' && <span className="preview-font-status"> 加载中…</span>}
+        {loadState === 'error' && <span className="preview-font-status preview-font-status-err"> 加载失败 (格式不受支持?)</span>}
+      </div>
+      <div
+        className="preview-font-samples"
+        style={{ fontFamily: loadState === 'loaded' ? `"${family}", sans-serif` : 'sans-serif' }}
+      >
+        <div className="preview-font-row">
+          <span className="preview-font-size">48px</span>
+          <span className="preview-font-text">AaBbCc 0123</span>
+        </div>
+        <div className="preview-font-row">
+          <span className="preview-font-size">24px</span>
+          <span className="preview-font-text">The quick brown fox jumps over the lazy dog.</span>
+        </div>
+        <div className="preview-font-row">
+          <span className="preview-font-size">16px</span>
+          <span className="preview-font-text">中文字体预览 — Tabula 文件管理器</span>
         </div>
       </div>
     </div>
@@ -781,6 +1082,31 @@ function mimeFromExt(ext: string): string {
       return 'image/raw';
     case '.pdf':
       return 'application/pdf';
+    case '.ttf':
+      return 'font/ttf';
+    case '.otf':
+      return 'font/otf';
+    case '.woff':
+      return 'font/woff';
+    case '.woff2':
+      return 'font/woff2';
+    // Archives (binary; previewed via ArchiveView, not <video>/<img>)
+    case '.zip':
+      return 'application/zip';
+    case '.tar':
+      return 'application/x-tar';
+    case '.tgz':
+    case '.gz':
+      return 'application/gzip';
+    case '.bz2':
+      return 'application/x-bzip2';
+    case '.7z':
+      return 'application/x-7z-compressed';
+    case '.rar':
+      return 'application/vnd.rar';
+    case '.docx':
+    case '.dotx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     // Video
     case '.mp4':
     case '.m4v':
