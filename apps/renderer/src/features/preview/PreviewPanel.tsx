@@ -11,7 +11,7 @@
  * 数据流:从 window.tabula.fs.readFile 取一次,数据缓存在 file-store.previewState。
  * 大文件(>1MB 文本)截断到 100 行;图片 >5MB 拒绝加载。
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
@@ -24,10 +24,21 @@ const TEXT_TRUNCATE_BYTES = 1024 * 1024; // 1MB
 const TEXT_TRUNCATE_LINES = 100;
 // 图片超过此大小直接拒绝(避免一次性载入大图片卡死)
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+// 视频/音频 — 浏览器原生播放器对大文件支持较好, 上限放宽到 500MB
+const MEDIA_MAX_BYTES = 500 * 1024 * 1024;
+// PDF — 太大直接拒绝, 100MB 够日常文档
+const PDF_MAX_BYTES = 100 * 1024 * 1024;
 
 const IMAGE_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp',
   '.ico', '.heic', '.avif', '.tiff', '.tif', '.psd', '.raw',
+]);
+const PDF_EXTS = new Set(['.pdf']);
+const VIDEO_EXTS = new Set([
+  '.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.wmv', '.flv', '.ogv',
+]);
+const AUDIO_EXTS = new Set([
+  '.mp3', '.m4a', '.wav', '.flac', '.ogg', '.oga', '.opus', '.aac', '.wma',
 ]);
 const MARKDOWN_EXTS = new Set(['.md', '.markdown', '.mdx']);
 const CODE_EXTS = new Set([
@@ -106,7 +117,7 @@ function sniffKindFromText(head: string): PreviewKind {
   return 'text';
 }
 
-type PreviewKind = 'image' | 'markdown' | 'code' | 'text' | 'unsupported';
+type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'markdown' | 'code' | 'text' | 'unsupported';
 
 /**
  * @param name 文件名 (含扩展名), 例如 "README.md" / "Makefile" / "foo.PDF"
@@ -115,6 +126,9 @@ type PreviewKind = 'image' | 'markdown' | 'code' | 'text' | 'unsupported';
 function detectKind(name: string, head?: string): PreviewKind {
   const ext = extOf(name);
   if (IMAGE_EXTS.has(ext)) return 'image';
+  if (VIDEO_EXTS.has(ext)) return 'video';
+  if (AUDIO_EXTS.has(ext)) return 'audio';
+  if (PDF_EXTS.has(ext)) return 'pdf';
   if (MARKDOWN_EXTS.has(ext)) return 'markdown';
   if (CODE_EXTS.has(ext)) return 'code';
   if (TEXT_EXTS.has(ext)) return 'text';
@@ -215,11 +229,25 @@ export function PreviewPanel() {
 
     const run = async () => {
       try {
-        // 显式图片扩展名 → 走 binary 路径(blob URL)
-        if (initialKind === 'image') {
-          if (entry.size > IMAGE_MAX_BYTES) {
+        // 图片 / 视频 / 音频 / PDF → 走 binary 路径(blob URL)
+        if (
+          initialKind === 'image' ||
+          initialKind === 'video' ||
+          initialKind === 'audio' ||
+          initialKind === 'pdf'
+        ) {
+          const maxBytes =
+            initialKind === 'image' ? IMAGE_MAX_BYTES
+            : initialKind === 'pdf' ? PDF_MAX_BYTES
+            : MEDIA_MAX_BYTES;
+          if (entry.size > maxBytes) {
+            const label =
+              initialKind === 'image' ? '图片'
+              : initialKind === 'video' ? '视频'
+              : initialKind === 'audio' ? '音频'
+              : 'PDF';
             setPreviewError(
-              `图片过大 (${formatSize(entry.size)}),无法预览(>${formatSize(IMAGE_MAX_BYTES)} 拒绝加载)。`,
+              `${label}过大 (${formatSize(entry.size)}),无法预览(>${formatSize(maxBytes)} 拒绝加载)。`,
             );
             return;
           }
@@ -334,7 +362,15 @@ export function PreviewPanel() {
       <div className="preview-panel" ref={containerRef} tabIndex={-1}>
         <div className="preview-header">
           <div className="preview-title">
-            <span className="preview-icon">{kind === 'image' ? '🖼' : kind === 'markdown' ? '📝' : kind === 'code' ? '📜' : '📄'}</span>
+            <span className="preview-icon">{
+              kind === 'image' ? '🖼'
+              : kind === 'video' ? '🎬'
+              : kind === 'audio' ? '🎵'
+              : kind === 'pdf' ? '📕'
+              : kind === 'markdown' ? '📝'
+              : kind === 'code' ? '📜'
+              : '📄'
+            }</span>
             <span className="preview-filename" title={entry.path}>{entry.name}</span>
             <span className="preview-meta">
               {formatSize(entry.size)} · {formatDate(entry.mtime)} · {entry.ext || '文件'}
@@ -431,6 +467,30 @@ export function PreviewPanel() {
                   />
                 </div>
               )}
+              {kind === 'pdf' && preview.blobUrl && (
+                <PdfView url={preview.blobUrl} />
+              )}
+              {kind === 'video' && preview.blobUrl && (
+                <div className="preview-media-wrap">
+                  <video
+                    className="preview-video"
+                    src={preview.blobUrl}
+                    controls
+                    autoPlay={false}
+                    preload="metadata"
+                  />
+                </div>
+              )}
+              {kind === 'audio' && preview.blobUrl && (
+                <div className="preview-media-wrap">
+                  <audio
+                    className="preview-audio"
+                    src={preview.blobUrl}
+                    controls
+                    preload="metadata"
+                  />
+                </div>
+              )}
               {kind === 'markdown' && preview.text !== null && (
                 <MarkdownView text={preview.text} />
               )}
@@ -459,6 +519,156 @@ export function PreviewPanel() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// =================== PDF 渲染 (PDF.js) ===================
+
+/**
+ * 用 PDF.js 渲染 PDF 当前页到 canvas. 支持翻页 (← →) + 滚轮缩放.
+ * PDF.js 包大 (~1.5MB), 通过 dynamic import 仅在打开 PDF 时下载 chunk.
+ */
+function PdfView({ url }: { url: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<unknown | null>(null); // PDFDocumentProxy 类型绕开 import 链
+  const [pageNum, setPageNum] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [scale, setScale] = useState(1.0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+
+  // 加载 PDF (只跑一次, 换 url 时重置)
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
+    setPdfDoc(null);
+    setPageNum(1);
+    setTotalPages(0);
+    void (async () => {
+      try {
+        const pdfjs = await import('pdfjs-dist');
+        // worker URL: Vite 5+ 静态资源处理
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.mjs',
+          import.meta.url,
+        ).toString();
+        const loadingTask = pdfjs.getDocument(url);
+        const doc = await loadingTask.promise;
+        if (cancelled) return;
+        setPdfDoc(doc);
+        setTotalPages(doc.numPages);
+      } catch (err) {
+        if (!cancelled) setLoadError(String(err));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [url]);
+
+  // 渲染当前页
+  useEffect(() => {
+    if (!pdfDoc || !canvasRef.current) return;
+    let cancelled = false;
+    setRendering(true);
+    void (async () => {
+      try {
+        // pdfjs-dist v4 API
+        const pdfjs = await import('pdfjs-dist');
+        const page = await (pdfDoc as { getPage: (n: number) => Promise<unknown> }).getPage(pageNum);
+        const viewport = (page as { getViewport: (s: { scale: number }) => { width: number; height: number } }).getViewport({ scale });
+        const canvas = canvasRef.current!;
+        const ctx = canvas.getContext('2d');
+        if (!ctx || cancelled) return;
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await (page as { render: (p: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> } }).render({
+          canvasContext: ctx,
+          viewport,
+        }).promise;
+      } catch (err) {
+        if (!cancelled) setLoadError(String(err));
+      } finally {
+        if (!cancelled) setRendering(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pdfDoc, pageNum, scale]);
+
+  // 键盘翻页 (preview 已 capture, 这里额外绑一份保险)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!pdfDoc) return;
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        setPageNum((p) => Math.max(1, p - 1));
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        // Space 在 preview 全局已被 closePreview 拦截, 这里不阻止
+        e.preventDefault();
+        setPageNum((p) => Math.min(totalPages, p + 1));
+      } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        setScale((s) => Math.min(3, s + 0.25));
+      } else if (e.key === '-') {
+        e.preventDefault();
+        setScale((s) => Math.max(0.5, s - 0.25));
+      } else if (e.key === '0') {
+        e.preventDefault();
+        setScale(1.0);
+      }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [pdfDoc, totalPages]);
+
+  return (
+    <div className="preview-pdf-wrap">
+      <div className="preview-pdf-toolbar">
+        <button
+          className="preview-pdf-btn"
+          onClick={() => setPageNum((p) => Math.max(1, p - 1))}
+          disabled={pageNum <= 1}
+          title="上一页 (←)"
+        >‹</button>
+        <span className="preview-pdf-pageinfo">
+          {pageNum} / {totalPages}
+        </span>
+        <button
+          className="preview-pdf-btn"
+          onClick={() => setPageNum((p) => Math.min(totalPages, p + 1))}
+          disabled={pageNum >= totalPages}
+          title="下一页 (→)"
+        >›</button>
+        <span className="preview-pdf-sep" />
+        <button
+          className="preview-pdf-btn"
+          onClick={() => setScale((s) => Math.max(0.5, s - 0.25))}
+          title="缩小 (-)"
+        >−</button>
+        <span className="preview-pdf-pageinfo">{Math.round(scale * 100)}%</span>
+        <button
+          className="preview-pdf-btn"
+          onClick={() => setScale((s) => Math.min(3, s + 0.25))}
+          title="放大 (+)"
+        >+</button>
+        <button
+          className="preview-pdf-btn"
+          onClick={() => setScale(1.0)}
+          title="重置缩放 (0)"
+        >100%</button>
+      </div>
+      <div className="preview-pdf-canvas-wrap">
+        {loadError ? (
+          <div className="preview-error">
+            <div className="error-icon">⚠</div>
+            <div className="error-message">PDF 加载失败: {loadError}</div>
+          </div>
+        ) : (
+          <canvas
+            ref={canvasRef}
+            className={`preview-pdf-canvas ${rendering ? 'is-rendering' : ''}`}
+          />
+        )}
       </div>
     </div>
   );
@@ -569,6 +779,39 @@ function mimeFromExt(ext: string): string {
       return 'image/vnd.adobe.photoshop';
     case '.raw':
       return 'image/raw';
+    case '.pdf':
+      return 'application/pdf';
+    // Video
+    case '.mp4':
+    case '.m4v':
+      return 'video/mp4';
+    case '.mov':
+      return 'video/quicktime';
+    case '.webm':
+      return 'video/webm';
+    case '.mkv':
+    case '.avi':
+    case '.wmv':
+    case '.flv':
+      return 'video/x-matroska';
+    case '.ogv':
+      return 'video/ogg';
+    // Audio
+    case '.mp3':
+      return 'audio/mpeg';
+    case '.m4a':
+    case '.aac':
+      return 'audio/aac';
+    case '.wav':
+      return 'audio/wav';
+    case '.flac':
+      return 'audio/flac';
+    case '.ogg':
+    case '.oga':
+    case '.opus':
+      return 'audio/ogg';
+    case '.wma':
+      return 'audio/x-ms-wma';
     default:
       return 'application/octet-stream';
   }
