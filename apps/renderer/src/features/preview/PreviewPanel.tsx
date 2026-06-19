@@ -29,23 +29,110 @@ const IMAGE_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp',
   '.ico', '.heic', '.avif', '.tiff', '.tif', '.psd', '.raw',
 ]);
-const MARKDOWN_EXTS = new Set(['.md', '.markdown']);
+const MARKDOWN_EXTS = new Set(['.md', '.markdown', '.mdx']);
 const CODE_EXTS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json',
+  // 已有主流
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.json5', '.jsonc',
   '.py', '.rs', '.go', '.java', '.c', '.cpp', '.h', '.hpp',
-  '.css', '.html', '.htm', '.xml', '.yaml', '.yml', '.toml',
-  '.sh', '.bash', '.zsh', '.ps1', '.sql', '.lua', '.rb', '.php',
+  '.css', '.html', '.htm', '.xml', '.yaml', '.yml', '.toml', '.ini', '.conf',
+  '.sh', '.bash', '.zsh', '.ps1', '.sql', '.lua', '.rb', '.php', '.pl',
+  // 前端框架
+  '.vue', '.svelte', '.astro', '.scss', '.sass', '.less', '.styl',
+  // 现代语言
+  '.swift', '.kt', '.kts', '.dart', '.scala', '.sc', '.mjs',
+  // 函数式
+  '.hs', '.elm', '.clj', '.cljs', '.cljc', '.edn', '.ex', '.exs', '.erl', '.hrl',
+  // 数据科学
+  '.r', '.R', '.jl', '.m', '.mm',
+  // 数据/协议
+  '.proto', '.graphql', '.gql', '.thrift', '.avro',
+  // 系统/构建
+  '.zig', '.nim', '.cr', '.v', '.sv', '.vhd', '.vhdl',
+  // 文本格式 (会被当代码高亮)
+  '.diff', '.patch', '.tex',
+  // 配置/工具
+  '.dockerignore', '.editorconfig', '.gitattributes', '.gitignore',
+  // 编译产物 (字节码 / 字节码文本)
+  '.class', '.wasm',
 ]);
-const TEXT_EXTS = new Set(['.txt', '.log', '.csv', '.ini', '.conf', '.env']);
+const TEXT_EXTS = new Set(['.txt', '.log', '.csv', '.tsv', '.env', '.properties']);
+
+/** 无扩展名文件 — 按常见文件名识别为文本/code (Dockerfile / Makefile / LICENSE / README 等) */
+const FILENAME_OVERRIDES: ReadonlyMap<string, PreviewKind> = new Map([
+  // dotfiles
+  ['.gitignore', 'text'], ['.gitattributes', 'text'], ['.editorconfig', 'text'],
+  ['.dockerignore', 'text'], ['.npmrc', 'text'], ['.yarnrc', 'text'],
+  ['.npmignore', 'text'], ['.prettierrc', 'text'], ['.eslintrc', 'text'],
+  ['.babelrc', 'text'], ['.browserslistrc', 'text'],
+  // 项目元数据
+  ['README', 'markdown'], ['README.md', 'markdown'], ['README.txt', 'text'],
+  ['LICENSE', 'text'], ['LICENSE.md', 'markdown'], ['LICENCE', 'text'],
+  ['CHANGELOG', 'text'], ['CHANGELOG.md', 'markdown'],
+  ['CONTRIBUTING', 'markdown'], ['AUTHORS', 'text'], ['NOTICE', 'text'],
+  // 构建/CI
+  ['Makefile', 'code'], ['GNUmakefile', 'code'], ['Rakefile', 'code'],
+  ['CMakeLists.txt', 'code'], ['Vagrantfile', 'code'],
+  ['Brewfile', 'text'], ['Podfile', 'code'],
+  // 容器/shell
+  ['Dockerfile', 'code'], ['Containerfile', 'code'],
+  ['docker-compose.yml', 'code'], ['docker-compose.yaml', 'code'],
+  // shell
+  ['gradlew', 'code'], ['mvnw', 'code'],
+  // gem
+  ['Gemfile', 'code'], ['Rakefile', 'code'],
+  // 其他
+  ['justfile', 'code'], ['Procfile', 'code'],
+]);
+
+/** 嗅探无扩展名文件的前 4KB 判定 kind (仅在 filename 匹配失败时) */
+function sniffKindFromText(head: string): PreviewKind {
+  const s = head.trimStart();
+  if (!s) return 'text';
+  // Shebang #! — 各种脚本
+  if (s.startsWith('#!')) {
+    // #!/usr/bin/env python / bash / node / ruby / perl / php
+    // #!/bin/sh / bash / zsh / python3
+    if (/python|node|deno|bun|ruby|perl|php|tcl|lua|bash|sh|zsh|fish|awk|sed|make/i.test(s)) return 'code';
+    return 'text';
+  }
+  // YAML
+  if (/^---\s*$/m.test(head)) return 'code';
+  // JSON
+  if (/^[\s]*[{\[]/.test(s)) return 'code';
+  // XML
+  if (/^<\?xml|^\s*<[a-zA-Z]/.test(s)) return 'code';
+  // Markdown (起始行 # / ## 或 > )
+  if (/^#{1,6}\s+\S|^>\s+\S/m.test(head)) return 'markdown';
+  return 'text';
+}
 
 type PreviewKind = 'image' | 'markdown' | 'code' | 'text' | 'unsupported';
 
-function detectKind(ext: string): PreviewKind {
+/**
+ * @param name 文件名 (含扩展名), 例如 "README.md" / "Makefile" / "foo.PDF"
+ * @param head  可选 — 文件前 4KB (utf-8 字符串), 用于无扩展名嗅探
+ */
+function detectKind(name: string, head?: string): PreviewKind {
+  const ext = extOf(name);
   if (IMAGE_EXTS.has(ext)) return 'image';
   if (MARKDOWN_EXTS.has(ext)) return 'markdown';
   if (CODE_EXTS.has(ext)) return 'code';
   if (TEXT_EXTS.has(ext)) return 'text';
+  // 无扩展名: filename override
+  if (!ext) {
+    const base = name.split('/').pop() ?? name;
+    const override = FILENAME_OVERRIDES.get(base);
+    if (override) return override;
+    if (head !== undefined) return sniffKindFromText(head);
+  }
   return 'unsupported';
+}
+
+function extOf(name: string): string {
+  const base = name.split('/').pop() ?? name;
+  const dot = base.lastIndexOf('.');
+  if (dot <= 0) return '';   // 无扩展名 / 隐藏文件 (.gitignore 走 override)
+  return base.slice(dot).toLowerCase();
 }
 
 function formatSize(bytes: number): string {
@@ -77,7 +164,17 @@ export function PreviewPanel() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const entry = preview?.entry ?? null;
-  const kind = entry ? detectKind(entry.ext) : 'unsupported';
+  // kind: 文件名/扩展名直接嗅探; 无扩展名时若已加载到 text 则按 head 二次嗅探
+  const kind: PreviewKind = (() => {
+    if (!entry) return 'unsupported';
+    const ext = entry.ext;
+    const initial = detectKind(entry.name);
+    if (initial !== 'unsupported' || ext) return initial;
+    if (preview?.text !== null && preview?.text !== undefined) {
+      return sniffKindFromText(preview.text.slice(0, 4096));
+    }
+    return 'unsupported';
+  })();
 
   // 计算当前在同目录 entry 列表里的位置(用于位置指示 + 左右按钮的可见性)
   // getFilteredSortedEntries 是按当前 sort 顺序返回(就是 FileList 里看到的顺序)
@@ -112,18 +209,14 @@ export function PreviewPanel() {
     }
 
     const ext = entry.ext;
-    const localKind = detectKind(ext);
+    // 首轮 kind 基于 filename 嗅探 — 用来决定 image / text 走哪个 fast-path
+    const initialKind = detectKind(entry.name);
     let cancelled = false;
 
     const run = async () => {
       try {
-        if (localKind === 'unsupported') {
-          // 文本类型才尝试当 utf-8 显示,其他直接 unsupported
-          setPreviewLoading(false);
-          return;
-        }
-
-        if (localKind === 'image') {
+        // 显式图片扩展名 → 走 binary 路径(blob URL)
+        if (initialKind === 'image') {
           if (entry.size > IMAGE_MAX_BYTES) {
             setPreviewError(
               `图片过大 (${formatSize(entry.size)}),无法预览(>${formatSize(IMAGE_MAX_BYTES)} 拒绝加载)。`,
@@ -145,9 +238,8 @@ export function PreviewPanel() {
           return;
         }
 
-        // 文本 / 代码 / Markdown:读 utf-8
+        // 文本 / 代码 / Markdown / 无扩展名嗅探:读 utf-8
         if (entry.size > TEXT_TRUNCATE_BYTES * 5) {
-          // 5MB 以上的文本/代码直接拒绝(避免 OOM)
           setPreviewError(
             `文件过大 (${formatSize(entry.size)}),无法预览。`,
           );
@@ -162,6 +254,16 @@ export function PreviewPanel() {
           return;
         }
         const text = res.data as string;
+
+        // 无扩展名 (initialKind='unsupported' 且 ext 为空) → 读 head 嗅探
+        const finalKind = initialKind === 'unsupported' && !ext
+          ? sniffKindFromText(text.slice(0, 4096))
+          : initialKind;
+        if (finalKind === 'unsupported') {
+          setPreviewLoading(false);
+          return;
+        }
+
         const allLines = text.split(/\r?\n/);
         const truncated = entry.size > TEXT_TRUNCATE_BYTES;
         const showLines = truncated ? allLines.slice(0, TEXT_TRUNCATE_LINES) : allLines;
