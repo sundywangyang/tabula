@@ -42,8 +42,11 @@ export class WindowManager {
 
     // 平台最优 icon: macOS .icns / Windows .ico / 其他 512.png
     // dev 模式从仓库 build-assets/icon/ 取, 打包后从 process.resourcesPath/resources/ 取
+    // 用 app.getAppPath() (dev 指向仓库根, prod 指向 asar 根) 替代手算 __dirname/../..
+    // (dev 模式 import.meta.url 指向源码而非编译产物, 手算层级容易错)
+    const appRoot = app.getAppPath();
     const iconDir = this.isDev
-      ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon')
+      ? join(appRoot, 'build-assets', 'icon')
       : join(process.resourcesPath, 'resources');
     const winProvider = getWindowProvider();
     const platformIcon = winProvider.getIconPath(iconDir, process.resourcesPath);

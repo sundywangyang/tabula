@@ -10,7 +10,6 @@
  */
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { WindowManager } from './window/window-manager';
 import { registerIpcHandlers } from './ipc';
 import { getWindowProvider } from './providers/window';
@@ -69,9 +68,11 @@ async function bootstrap() {
   // macOS: BrowserWindow 的 icon option 在 macOS 上无效 (dock 用 Info.plist CFBundleIconFile)
   // 必须在 dev 模式手动 setIcon, 否则 dock 显示旧/默认 icon
   // macOS 下由 WindowProvider 内部处理 (Windows/Linux no-op)
-  const __dirname = fileURLToPath(new URL('.', import.meta.url));
+  // 路径用 app.getAppPath() 而非手算 __dirname/../.. (dev 模式下 import.meta.url 指向
+  // 源码位置而非编译产物, 手算层级容易错)
+  const appRoot = app.getAppPath();
   const dockIcon = isDev
-    ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon', 'Tabula.icns')
+    ? join(appRoot, 'build-assets', 'icon', 'Tabula.icns')
     : join(process.resourcesPath, 'resources', 'Tabula.icns');
   getWindowProvider().setDockIcon(dockIcon);
 
