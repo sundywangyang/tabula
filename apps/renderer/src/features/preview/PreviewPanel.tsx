@@ -171,6 +171,31 @@ function extOf(name: string): string {
   return base.slice(dot).toLowerCase();
 }
 
+/** unsupported 状态下给用户友好的"如何转存"建议 */
+const CONVERSION_HINTS: ReadonlyMap<string, string> = new Map([
+  ['.doc', '旧 Word 二进制格式, 请在 Word 里"另存为 .docx" 或用 LibreOffice 转 .docx'],
+  ['.raw', 'RAW 相机格式需要 libraw 解码, 请用相机自带软件或 darktable 导出 .jpg/.png'],
+  ['.cr2', 'Canon RAW 格式, 请用 Canon DPP / darktable / Adobe Lightroom 导出 .jpg'],
+  ['.cr3', 'Canon CR3 RAW 格式, 同 .cr2 处理方式'],
+  ['.nef', 'Nikon RAW 格式, 请用 Nikon NX Studio / darktable 导出 .jpg'],
+  ['.arw', 'Sony RAW 格式, 请用 Sony IDC / darktable 导出 .jpg'],
+  ['.dng', 'Adobe DNG 格式, 请用 darktable / Adobe Lightroom 导出 .jpg'],
+  ['.rw2', 'Panasonic RAW 格式, 请用 Silkypix / darktable 导出 .jpg'],
+  ['.orf', 'Olympus RAW 格式, 请用 darktable 导出 .jpg'],
+  ['.psd', 'Photoshop 格式, 建议在 Photoshop 里"另存为 .png" 或用 GIMP 打开再导出'],
+  ['.ai', 'Adobe Illustrator 格式, 建议在 AI 里"另存为 .svg" 或导出 .pdf'],
+  ['.sketch', 'Sketch 设计稿, 建议导出 .pdf 或用 Lunacy 等工具转 .svg'],
+  ['.heic', 'HEIF/HEIC 格式, Safari 与 macOS 原生支持, 其他平台可用 heif-convert 转 .jpg'],
+  ['.heif', 'HEIF 格式, 同 .heic 处理方式'],
+  ['.flac', 'FLAC 音频浏览器已支持播放 (顶部 toolbar 可见时长), 但不显示波形 (浏览器 codec 限制)'],
+  ['.ape', 'APE 音频 Monkey\'s Audio 格式, 浏览器不支持, 请转 .flac / .mp3'],
+  ['.midi', 'MIDI 文件需要专用渲染器, 浏览器不支持播放, 请转 .mp3 / .wav'],
+]);
+
+function suggestConversionFor(ext: string): string | null {
+  return CONVERSION_HINTS.get(ext.toLowerCase()) ?? null;
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -556,6 +581,11 @@ export function PreviewPanel() {
                     大小: {formatSize(entry.size)} · 修改时间: {formatDate(entry.mtime)}
                     <br />
                     路径: <code>{entry.path}</code>
+                    {suggestConversionFor(entry.ext) && (
+                      <div className="preview-error-hint">
+                        💡 提示: {suggestConversionFor(entry.ext)}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -289,6 +289,17 @@
   font-family: var(--font-mono);
 }
 
+.preview-error-hint {
+  color: #ffcb47;
+  margin-top: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 203, 71, 0.08);
+  border-left: 2px solid #ffcb47;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+}
+
 .preview-error-meta code {
   background: var(--bg-overlay);
   padding: 1px 6px;
