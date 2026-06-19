@@ -395,6 +395,166 @@
   transition: opacity 0.15s;
 }
 
+/* ===== Excel ===== */
+.preview-xlsx-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-base);
+}
+.preview-xlsx-tabs {
+  display: flex;
+  overflow-x: auto;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.preview-xlsx-tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+  color: var(--fg-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+.preview-xlsx-tab:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+.preview-xlsx-tab.is-active {
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-weight: 500;
+}
+.preview-xlsx-meta {
+  padding: 6px 16px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  font-family: var(--font-mono);
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.preview-xlsx-trunc {
+  color: #ff9f0a;
+}
+.preview-xlsx-table-wrap {
+  flex: 1;
+  overflow: auto;
+}
+.preview-xlsx-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+.preview-xlsx-table td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  white-space: nowrap;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.preview-xlsx-table td.is-num {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.preview-xlsx-table tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ===== PowerPoint ===== */
+.preview-pptx-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-base);
+}
+.preview-pptx-thumbs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 12px;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.preview-pptx-thumb {
+  flex-shrink: 0;
+  width: 100px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.1s;
+}
+.preview-pptx-thumb:hover {
+  border-color: var(--accent);
+}
+.preview-pptx-thumb.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.preview-pptx-thumb-num {
+  font-size: 10px;
+  color: var(--fg-tertiary);
+  font-family: var(--font-mono);
+}
+.preview-pptx-thumb-title {
+  font-size: 11px;
+  color: var(--fg-primary);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-pptx-meta {
+  padding: 6px 16px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  font-family: var(--font-mono);
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.preview-pptx-slide {
+  flex: 1;
+  overflow: auto;
+  padding: 48px 64px;
+  background: #fff;
+  color: #1a1a1f;
+  margin: 24px;
+  max-width: 960px;
+  width: calc(100% - 48px);
+  align-self: center;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.preview-pptx-slide p {
+  margin: 0 0 14px;
+}
+.preview-pptx-slide p.is-title {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #1a1a1f;
+  padding-bottom: 12px;
+}
+.preview-pptx-slide p.is-body {
+  color: #1a1a1f;
+}
+
 /* ===== Office 文档 (docx) ===== */
 .preview-docx-wrap {
   flex: 1;
