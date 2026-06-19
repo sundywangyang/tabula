@@ -71,3 +71,6 @@ test-plugin/
 .playwright-mcp/
 electron-builder-custom.json
 electron-builder.json
+
+# CodeGraph local index (per-machine SQLite + daemon state)
+.codegraph/
