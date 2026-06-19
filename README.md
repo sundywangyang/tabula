@@ -83,9 +83,6 @@
 - 生命周期:`onStartup` / `onCommand:xxx` / `onFileSystem:xxx`
 - 贡献点:命令 / 配置 / 视图
 
-### 🔐 许可证
-- 启动 / 续期激活
-- 状态在启动屏显示
 
 ### 🚀 启动体验
 - **Splash 屏**:显示启动进度,不会卡死
@@ -157,11 +154,7 @@ export function deactivate() {}
 | P8 | 打包(macOS / Windows / Linux) | ✅ |
 | P9 | 文档站 + 社区扩展市场 | 🚧 |
 
----
 
-## 📄 详细设计
-
-见 [docs/PLAN.md](./docs/PLAN.md)。
 
 ---
 
