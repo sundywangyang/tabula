@@ -74,3 +74,20 @@ electron-builder.json
 
 # CodeGraph local index (per-machine SQLite + daemon state)
 .codegraph/
+docs/SHORTCUTS.md
+docs/PLAN.md
+docs/ICON.md
+docs/icon-preview.html
+CLAUDE.md
+AGENTS.md
+.harness/reins/tester/agent.md
+.harness/reins/extension-architect/agent.md
+.harness/reins/electron-expert/agent.md
+.harness/reins/developer/agent.md
+.harness/reins/code-reviewer/agent.md
+.harness/docs/monorepo.md
+.harness/docs/ipc-contract.md
+.harness/docs/code-standards.md
+.harness/agent.md
+.harness/plan_p6_v2.yaml
+.harness/plan_p7_v1.yaml
