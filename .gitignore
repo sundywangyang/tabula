@@ -80,6 +80,9 @@ docs/ICON.md
 docs/icon-preview.html
 CLAUDE.md
 AGENTS.md
+# Harness private workspace (agent plans, reins, docs).
+# Catch-all rule for anything new added under .harness/ in the future.
+.harness/
 .harness/reins/tester/agent.md
 .harness/reins/extension-architect/agent.md
 .harness/reins/electron-expert/agent.md
