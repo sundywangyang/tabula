@@ -1,5 +1,5 @@
 /**
- * 快捷键命令注册表 + 键组合序列化工具 (P7 v1)
+ * 快捷键命令注册表 (P7 v1)
  *
  * 这里集中定义所有 Tabula 内置可自定义命令 + 默认绑定。
  * 每个命令一个唯一 id(如 `file.open`),通过 `category` 在设置页分组。
@@ -12,181 +12,31 @@
  * 系统保留组合(不可被任何命令占用):
  *   Cmd+Q (退出) / Alt+F4 (关闭) / Ctrl+Alt+Delete / Cmd+Tab / Alt+Tab
  *   以及修饰键自身(只按 Ctrl / Alt / Shift 不构成组合)
+ *
+ * 平台相关:
+ *   字符串 <-> KeyCombo 互转工具 → ./keymap-parser(避免 platform 互相依赖)
+ *   平台保留键列表                → ../platform(getPlatform().shortcut.getReservedKeyCombos)
  */
 import type { CommandSpec, KeyCombo } from '@tabula/bridge';
+import { parseKeyCombo, formatKeyCombo, isSameCombo } from './keymap-parser';
+import { getPlatform } from '../platform';
 
-// =================== 字符串 <-> KeyCombo 互转 ===================
-
-const MODIFIER_ALIASES: Record<string, 'ctrl' | 'alt' | 'shift' | 'meta'> = {
-  ctrl: 'ctrl',
-  control: 'ctrl',
-  ctl: 'ctrl',
-  strg: 'ctrl',
-  // Cmd / Meta / Super 都映射到 meta(Windows 上 meta 多被 OS 占用,作为补充信息)
-  cmd: 'meta',
-  command: 'meta',
-  meta: 'meta',
-  super: 'meta',
-  win: 'meta',
-  windows: 'meta',
-  alt: 'alt',
-  option: 'alt',
-  opt: 'alt',
-  shift: 'shift',
-  shft: 'shift',
-};
-
-/** 把主键 key 名规范化为内部字符串(小写 + 常见别名) */
-function normalizeMainKey(raw: string): string | null {
-  if (!raw) return null;
-  const k = raw.toLowerCase().trim();
-  if (!k) return null;
-  // 常见命名规范化
-  const aliases: Record<string, string> = {
-    esc: 'escape',
-    return: 'enter',
-    ' ': 'space',
-    spacebar: 'space',
-    arrowup: 'arrowup',
-    arrowdown: 'arrowdown',
-    arrowleft: 'arrowleft',
-    arrowright: 'arrowright',
-    up: 'arrowup',
-    down: 'arrowdown',
-    left: 'arrowleft',
-    right: 'arrowright',
-    del: 'delete',
-    ins: 'insert',
-    pgup: 'pageup',
-    pgdn: 'pagedown',
-    pageup: 'pageup',
-    pagedown: 'pagedown',
-    'page-up': 'pageup',
-    'page-down': 'pagedown',
-    '`': '`',
-    '~': '~',
-  };
-  return aliases[k] ?? k;
-}
-
-/**
- * 解析 "Ctrl+Shift+P" / "F5" / "Alt+, " 这类字符串为 KeyCombo。
- * 失败返回 null(空字符串 / 纯修饰键 / 多主键都视为无效)。
- */
-export function parseKeyCombo(input: string): KeyCombo | null {
-  if (!input || typeof input !== 'string') return null;
-  const parts = input
-    .split('+')
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-  if (parts.length === 0) return null;
-
-  const out: KeyCombo = { key: '', ctrl: false, alt: false, shift: false, meta: false };
-  for (const part of parts) {
-    const lower = part.toLowerCase();
-    const mod = MODIFIER_ALIASES[lower];
-    if (mod) {
-      out[mod] = true;
-      continue;
-    }
-    // 不是修饰键 → 主键
-    if (out.key) {
-      // 多个主键:无效
-      return null;
-    }
-    const normalized = normalizeMainKey(part);
-    if (!normalized) return null;
-    out.key = normalized;
-  }
-
-  // 没有主键 / 只有修饰键 → 无效
-  if (!out.key) return null;
-  // 单字符主键 + shift 时,自动大写避免歧义(让序列化可逆)
-  if (out.key.length === 1) {
-    out.key = out.shift ? out.key.toUpperCase() : out.key.toLowerCase();
-  }
-  return out;
-}
-
-/** 把 KeyCombo 序列化为可读字符串("Ctrl+Shift+P") */
-export function formatKeyCombo(c: KeyCombo | null): string {
-  if (!c) return '未绑定';
-  const parts: string[] = [];
-  if (c.ctrl) parts.push('Ctrl');
-  if (c.alt) parts.push('Alt');
-  if (c.shift) parts.push('Shift');
-  if (c.meta) parts.push('Meta');
-  // 主键:Shift+字母 展示大写,否则小写
-  let main = c.key;
-  if (main.length === 1) {
-    main = c.shift ? main.toUpperCase() : main.toLowerCase();
-  } else {
-    // F1~F24 / Enter / Escape / ArrowUp 等保持原样(已规范化为小写)
-    main = main.charAt(0).toUpperCase() + main.slice(1);
-  }
-  parts.push(main);
-  return parts.join('+');
-}
-
-/** 比较两个 KeyCombo 是否等价 */
-export function isSameCombo(a: KeyCombo | null, b: KeyCombo | null): boolean {
-  if (a === null && b === null) return true;
-  if (a === null || b === null) return false;
-  return (
-    a.key === b.key &&
-    a.ctrl === b.ctrl &&
-    a.alt === b.alt &&
-    a.shift === b.shift &&
-    a.meta === b.meta
-  );
-}
+// 重新导出 keymap-parser 里的工具,保持外部 import 路径不变(command-dispatcher 等老调用)
+export { parseKeyCombo, formatKeyCombo, isSameCombo };
 
 // =================== 系统保留组合 ===================
 
 /**
  * 判定某个组合是否被系统保留(任何用户命令都不能占用)。
- * 不同平台的保留键不同(见 getPlatformReserved):
- *  - Windows/Linux: Alt+F4, Alt+Tab, Ctrl+Alt+Delete
+ * 不同平台的保留键不同,实际数据由 platform/<os>.ts 提供:
+ *  - Windows: Alt+F4, Alt+Tab, Ctrl+Alt+Delete
  *  - macOS: 上面 + Cmd+Q/Tab/Escape/L/M/H/Space
- *  - Linux: 上面 + Meta+L, Ctrl+Alt+L
+ *  - Linux: 上面 + Meta+L, Ctrl+Alt+L, Meta+Tab
  * 重新绑定这些键会破坏用户预期(例如 Cmd+Q 退出应用)。
  */
 export function isReservedCombo(combo: KeyCombo | null): boolean {
   if (!combo) return false;
-  return getPlatformReserved().some((c) => isSameCombo(c, combo));
-}
-
-/** 按平台返回系统保留键列表 */
-function getPlatformReserved(): KeyCombo[] {
-  const base: KeyCombo[] = [
-    parseKeyCombo('Alt+F4')!,         // Win/Linux 关闭
-    parseKeyCombo('Alt+Tab')!,        // Win/Linux 切应用
-    parseKeyCombo('Ctrl+Alt+Delete')!, // Win 强制任务管理器
-  ];
-
-  if (process.platform === 'darwin') {
-    return [
-      ...base,
-      parseKeyCombo('Meta+Q')!,        // macOS 退出
-      parseKeyCombo('Meta+Tab')!,      // macOS 切应用
-      parseKeyCombo('Meta+Escape')!,   // macOS Mission Control
-      parseKeyCombo('Meta+L')!,        // macOS 锁屏
-      parseKeyCombo('Meta+M')!,        // macOS 最小化窗口
-      parseKeyCombo('Meta+H')!,        // macOS 隐藏窗口
-      parseKeyCombo('Meta+Space')!,    // macOS Spotlight
-    ];
-  }
-
-  if (process.platform === 'linux') {
-    return [
-      ...base,
-      parseKeyCombo('Meta+L')!,        // Linux 锁屏
-      parseKeyCombo('Ctrl+Alt+L')!,   // Linux 一些桌面锁屏
-      parseKeyCombo('Meta+Tab')!,      // Linux 切应用
-    ];
-  }
-
-  return base;
+  return getPlatform().shortcut.getReservedKeyCombos().some((c) => isSameCombo(c, combo));
 }
 
 // =================== 内置命令清单 ===================

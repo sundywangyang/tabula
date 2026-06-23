@@ -28,6 +28,7 @@ import {
   registerPerfIpcHandlers,
 } from '../perf/perf-service';
 import { dispatchRunCommand } from '../keymap/command-dispatcher';
+import { getPlatform, getPlatformName } from '../platform';
 
 export interface IpcContext {
   windowManager: WindowManager;
@@ -45,15 +46,8 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
 
   // =================== Platform ===================
-  ipcMain.handle(IpcChannels.PLATFORM_GET, () => {
-    if (process.platform === 'win32') return 'windows';
-    if (process.platform === 'darwin') return 'macos';
-    return 'linux';
-  });
-  ipcMain.handle(IpcChannels.PLATFORM_DEFAULT_ROOT, () => {
-    if (process.platform === 'darwin' || process.platform === 'linux') return '/';
-    return 'C:\\Users';
-  });
+  ipcMain.handle(IpcChannels.PLATFORM_GET, () => getPlatformName());
+  ipcMain.handle(IpcChannels.PLATFORM_DEFAULT_ROOT, () => getPlatform().defaultRootPath);
 
   // =================== FS ===================
   ipcMain.handle(IpcChannels.FS_LIST_DIR, (_e, p: string) => {
@@ -160,14 +154,8 @@ export function registerIpcHandlers(ctx: IpcContext) {
     if (result.canceled || !result.filePaths[0]) return;
     const program = result.filePaths[0];
 
-    if (process.platform === 'win32') {
-      const { spawn } = await import('node:child_process');
-      spawn(program, [p], { detached: true, windowsHide: true });
-    } else {
-      // macOS/Linux: open -a <program> <file>
-      const { spawn } = await import('node:child_process');
-      spawn('open', ['-a', program, p], { detached: true });
-    }
+    // 平台特定 spawn 走 platform adapter
+    return getPlatform().shell.openWith(p, program);
   });
 
   // =================== Thumbnail (P7 v1) ===================
@@ -349,4 +337,9 @@ export function registerIpcHandlers(ctx: IpcContext) {
     return licenseManager.clear();
   });
   // 注: LICENSE_STATUS_CHANGED 由 licenseManager.broadcastStatus() 直接 send,无需 handler
+
+  // =================== Shell:打开系统终端 ===================
+  ipcMain.handle(IpcChannels.SHELL_OPEN_TERMINAL, async (_e, path: string) => {
+    return getPlatform().shell.openTerminal(path);
+  });
 }

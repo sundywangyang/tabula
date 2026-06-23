@@ -26,6 +26,7 @@ import {
 import { initUpdater, checkForUpdates } from './infra/updater'; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { initKeymap } from './keymap/keymap-manager';
 import { markWhenReady, markWindowReady, markExtHostReady, startMemorySampling } from './perf/perf-service';
+import { getPlatform } from './platform';
 
 const isDev = !app.isPackaged;
 
@@ -67,11 +68,14 @@ async function bootstrap() {
 
   // macOS: BrowserWindow 的 icon option 在 macOS 上无效 (dock 用 Info.plist CFBundleIconFile)
   // 必须在 dev 模式手动 setIcon, 否则 dock 显示旧/默认 icon
-  if (process.platform === 'darwin' && app.dock) {
+  const platform = getPlatform();
+  if (platform.window.getDockIconPath && app.dock) {
     const __dirname = fileURLToPath(new URL('.', import.meta.url));
-    const dockIcon = isDev
-      ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon', 'Tabula.icns')
-      : join(process.resourcesPath, 'resources', 'Tabula.icns');
+    const dockIcon = platform.window.getDockIconPath({
+      isDev,
+      resourcesPath: process.resourcesPath,
+      appRoot: __dirname,
+    });
     try {
       app.dock.setIcon(dockIcon);
     } catch (err) {
@@ -200,7 +204,7 @@ async function bootstrap() {
 }
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (getPlatform().quitOnAllWindowsClosed) {
     app.quit();
   }
 });

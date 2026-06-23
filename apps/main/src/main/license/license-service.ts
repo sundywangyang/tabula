@@ -15,6 +15,7 @@ import https from 'node:https';
 import Store from 'electron-store';
 import { hostname, userInfo } from 'node:os';
 import { createHash } from 'node:crypto';
+import { getPlatformId } from '../platform';
 import type {
   LicenseError,
   LicenseInfo,
@@ -45,11 +46,11 @@ function makeEmptyInfo(): LicenseInfo {
 }
 
 /**
- * 本机指纹 — 当前用 hostname + username + userData 路径 hash 出一个稳定字符串。
+ * 本机指纹 — 当前用 hostname + username + platform id hash 出一个稳定字符串。
  * 注意:这不是安全边界(用户能改 hostname),只是 dev 期间观察"同一台机器"用。
  */
 export function computeFingerprint(): string {
-  const raw = `${hostname()}|${userInfo().username}|${process.platform}`;
+  const raw = `${hostname()}|${userInfo().username}|${getPlatformId()}`;
   return createHash('sha256').update(raw).digest('hex').slice(0, 16);
 }
 

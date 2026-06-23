@@ -5,11 +5,14 @@
  * - 主窗口的创建/恢复
  * - 多窗口支持(预留)
  * - 窗口状态持久化
+ *
+ * 平台差异(icon / titleBarStyle / autoHideMenuBar)统一从 platform adapter 取。
  */
 import { BrowserWindow, shell, app, screen } from 'electron';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { WindowBounds } from '@tabula/bridge';
+import { getPlatform } from '../platform';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -39,16 +42,13 @@ export class WindowManager {
     };
     const bounds = { ...defaultBounds, ...opts.bounds };
 
-    // 平台最优 icon: macOS .icns / Windows .ico / 其他 512.png
-    // dev 模式从仓库 build-assets/icon/ 取, 打包后从 process.resourcesPath/resources/ 取
-    const iconDir = this.isDev
-      ? join(__dirname, '..', '..', '..', '..', 'build-assets', 'icon')
-      : join(process.resourcesPath, 'resources');
-    const platformIcon = process.platform === 'darwin'
-      ? join(iconDir, this.isDev ? 'Tabula.icns' : 'Tabula.icns')
-      : process.platform === 'win32'
-        ? join(iconDir, this.isDev ? 'Tabula.ico' : 'Tabula.ico')
-        : join(iconDir, 'png', '512.png');
+    // 平台 chrome(icon / titleBarStyle / autoHideMenuBar)统一从 platform adapter 取
+    const platform = getPlatform();
+    const iconPath = platform.window.getIconPath({
+      isDev: this.isDev,
+      resourcesPath: process.resourcesPath,
+      appRoot: __dirname,
+    });
 
     const win = new BrowserWindow({
       ...bounds,
@@ -56,10 +56,10 @@ export class WindowManager {
       minHeight: 500,
       show: false,            // 先隐藏,准备好再显示(避免白闪)
       frame: false,           // 自定义标题栏(现代化)
-      titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+      titleBarStyle: platform.window.titleBarStyle,
       backgroundColor: '#1a1a1f',
-      autoHideMenuBar: process.platform !== 'darwin', // macOS 菜单栏在顶部,不隐藏
-      icon: platformIcon,
+      autoHideMenuBar: platform.window.autoHideMenuBar,
+      icon: iconPath,
       webPreferences: {
         preload: this.resolvePreload(),
         contextIsolation: true,
