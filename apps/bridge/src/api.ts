@@ -241,6 +241,17 @@ export interface TabulaAPI {
     off(channel: string, listener: (...args: any[]) => void): void;
   };
 
+  // Shell:在指定路径打开系统终端
+  shell: {
+    /**
+     * 在指定目录打开一个系统终端。
+     * - Windows: PowerShell
+     * - macOS: Terminal.app
+     * - Linux: 尝试常见终端(x-terminal-emulator / gnome-terminal / konsole / xterm)
+     */
+    openTerminal(path: string): Promise<Result<void>>;
+  };
+
   // 许可证 (P-License v1 骨架)
   license: {
     /** 用户输入 key 后, 主进程发 https 到 mock 端点, 返回验证结果 */

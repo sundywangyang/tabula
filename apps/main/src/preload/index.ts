@@ -234,6 +234,11 @@ const api: TabulaAPI = {
   },
 
   events: makeEvents(),
+
+  // 在指定目录打开系统终端(Windows = PowerShell;macOS = Terminal;Linux = 常见终端之一)
+  shell: {
+    openTerminal: (path) => ipcRenderer.invoke(IpcChannels.SHELL_OPEN_TERMINAL, path),
+  },
 };
 
 contextBridge.exposeInMainWorld('tabula', api);

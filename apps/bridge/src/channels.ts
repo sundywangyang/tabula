@@ -98,6 +98,9 @@ export const IpcChannels = {
   APP_OPEN_DEVTOOLS: 'app:open-devtools',
   APP_RELOAD: 'app:reload',
 
+  // Shell:打开系统终端(在指定目录)
+  SHELL_OPEN_TERMINAL: 'shell:open-terminal',
+
   // 平台检测
   PLATFORM_GET: 'platform:get',
   PLATFORM_DEFAULT_ROOT: 'platform:default-root',

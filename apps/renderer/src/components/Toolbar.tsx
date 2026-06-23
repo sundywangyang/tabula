@@ -33,6 +33,7 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
+  Terminal,
 } from 'lucide-react';
 import { useFileStore, type ViewMode } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
@@ -177,6 +178,18 @@ export function Toolbar({ paneId }: { paneId: string }) {
     window.dispatchEvent(
       new CustomEvent('tabula:new-file', { detail: { paneId } }),
     );
+  };
+
+  // 在当前目录打开 PowerShell 终端
+  const handleOpenShell = async () => {
+    if (!currentPath) {
+      showToast('当前未选择目录,无法打开终端', 'warn', 1800);
+      return;
+    }
+    const result = await window.tabula.shell.openTerminal(currentPath);
+    if (!result.ok) {
+      showToast(`打开终端失败: ${result.error.message}`, 'error', 2500);
+    }
   };
 
   // P3: 文件操作按钮
@@ -332,6 +345,16 @@ export function Toolbar({ paneId }: { paneId: string }) {
           >
             <Plus size={16} />
             <span className="toolbar-label">新建</span>
+          </button>
+        </Tooltip>
+        <Tooltip label="在当前目录打开终端">
+          <button
+            className="toolbar-btn"
+            onClick={() => { void handleOpenShell(); }}
+            disabled={!currentPath}
+          >
+            <Terminal size={16} />
+            <span className="toolbar-label">终端</span>
           </button>
         </Tooltip>
       </div>
