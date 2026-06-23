@@ -14,7 +14,6 @@ import * as trashService from '../fs/trash';
 import { getThumbnail } from '../fs/thumbnail';
 import { getConfig, setConfig, getAllConfig } from '../store/config';
 import { extensionHost } from '../ext-host/extension-host';
-import { licenseManager } from '../license/license-manager';
 import { getLogPaths, readTail, installLogSink } from '../infra/logger';
 import { closeSplash, markRendererReady } from '../infra/splash';
 import {
@@ -28,7 +27,8 @@ import {
   registerPerfIpcHandlers,
 } from '../perf/perf-service';
 import { dispatchRunCommand } from '../keymap/command-dispatcher';
-import { getPlatform, getPlatformName } from '../platform';
+import { getWindowProvider } from '../providers/window';
+import { getShellProvider } from '../providers/shell';
 
 export interface IpcContext {
   windowManager: WindowManager;
@@ -46,8 +46,13 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
 
   // =================== Platform ===================
-  ipcMain.handle(IpcChannels.PLATFORM_GET, () => getPlatformName());
-  ipcMain.handle(IpcChannels.PLATFORM_DEFAULT_ROOT, () => getPlatform().defaultRootPath);
+  ipcMain.handle(IpcChannels.PLATFORM_GET, () => {
+    const id = process.platform;
+    if (id === 'win32') return 'windows';
+    if (id === 'darwin') return 'macos';
+    return 'linux';
+  });
+  ipcMain.handle(IpcChannels.PLATFORM_DEFAULT_ROOT, () => getWindowProvider().getDefaultRootPath());
 
   // =================== FS ===================
   ipcMain.handle(IpcChannels.FS_LIST_DIR, (_e, p: string) => {
@@ -155,7 +160,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
     const program = result.filePaths[0];
 
     // 平台特定 spawn 走 platform adapter
-    return getPlatform().shell.openWith(p, program);
+    return getShellProvider().openWith(p, program);
   });
 
   // =================== Thumbnail (P7 v1) ===================
@@ -230,12 +235,8 @@ export function registerIpcHandlers(ctx: IpcContext) {
 
   // =================== Extensions (P6) ===================
   ipcMain.handle(IpcChannels.EXT_LIST, () => extensionHost.list());
-  ipcMain.handle(IpcChannels.EXT_ENABLE, async (_e, id: string) => {
-    await extensionHost.enable(id);
-  });
-  ipcMain.handle(IpcChannels.EXT_DISABLE, async (_e, id: string) => {
-    await extensionHost.disable(id);
-  });
+  ipcMain.handle(IpcChannels.EXT_ENABLE, (_e, id: string) => extensionHost.enable(id));
+  ipcMain.handle(IpcChannels.EXT_DISABLE, (_e, id: string) => extensionHost.disable(id));
   ipcMain.handle(IpcChannels.EXT_INSTALL, async (_e, sourcePath: string) => {
     try {
       const userExtensionsDir = getConfig('extensionsDir');
@@ -323,23 +324,8 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // (避免 IPC 注册被混入定时器副作用,也便于 perf 模块职责单一)
   registerPerfIpcHandlers(ctx);
 
-  // =================== P-License v1: 许可证 ===================
-  // 启动时 init 一次(从 electron-store 加载缓存)
-  licenseManager.init();
-
-  ipcMain.handle(IpcChannels.LICENSE_VERIFY, async (_e, key: string) => {
-    return licenseManager.verify(key);
-  });
-  ipcMain.handle(IpcChannels.LICENSE_GET_STATUS, () => {
-    return licenseManager.getStatus();
-  });
-  ipcMain.handle(IpcChannels.LICENSE_CLEAR, async () => {
-    return licenseManager.clear();
-  });
-  // 注: LICENSE_STATUS_CHANGED 由 licenseManager.broadcastStatus() 直接 send,无需 handler
-
   // =================== Shell:打开系统终端 ===================
   ipcMain.handle(IpcChannels.SHELL_OPEN_TERMINAL, async (_e, path: string) => {
-    return getPlatform().shell.openTerminal(path);
+    return getShellProvider().openTerminal(path);
   });
 }

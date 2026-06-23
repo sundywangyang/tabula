@@ -134,13 +134,6 @@ export const IpcChannels = {
   LOG_GET_LINES: 'log:get-lines',            // 读最近 N 行(渲染端做"近期错误"展示)
   // 事件: 主进程 → 渲染端
   LOG_ENTRY: 'log:entry',                    // 推: { level, message, source: 'main'|'renderer', timestamp }
-
-  // 许可证 (P-License v1 骨架)
-  LICENSE_VERIFY: 'license:verify',              // 用户输入 key, 主进程验证
-  LICENSE_GET_STATUS: 'license:get-status',      // 取当前缓存的 LicenseInfo
-  LICENSE_CLEAR: 'license:clear',                // 注销本地许可证
-  // 事件: 主进程 → 渲染端
-  LICENSE_STATUS_CHANGED: 'license:status-changed', // 推: LicenseInfo(状态变化时)
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

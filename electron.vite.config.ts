@@ -43,6 +43,17 @@ export default defineConfig({
         '@tabula/ext-api': resolve(workspaceRoot, 'packages/ext-api/src'),
       },
     },
+    // PDF.js (pdfjs-dist) 用了顶层 await, electron-vite 当前的 target
+    // (chrome87/es2020) 不支持顶层 await, 报错 "Top-level await is not available".
+    // 排除 PDF.js 不进 main bundle (main 进程不直接 require 它, 只有 renderer
+    // 用 dynamic import). 同时 optimizeDeps.exclude 避免 vite 预构建.
+    ssr: {
+      noExternal: [],
+      external: ['pdfjs-dist'],
+    },
+    optimizeDeps: {
+      exclude: ['pdfjs-dist'],
+    },
     build: {
       outDir: 'out/main',
       lib: {
@@ -84,6 +95,12 @@ export default defineConfig({
       },
     },
     plugins: [react()],
+    // PDF.js (pdfjs-dist) 用了顶层 await, electron-vite 当前的 target
+    // (chrome87/es2020) 不支持顶层 await, 报错 "Top-level await is not available".
+    // exclude PDF.js 不进 renderer 预构建, dynamic import 时浏览器原生 ESM 直接加载.
+    optimizeDeps: {
+      exclude: ['pdfjs-dist'],
+    },
     build: {
       outDir: resolve(workspaceRoot, 'out/renderer'),
       rollupOptions: {

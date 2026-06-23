@@ -14,12 +14,11 @@
  *   以及修饰键自身(只按 Ctrl / Alt / Shift 不构成组合)
  *
  * 平台相关:
- *   字符串 <-> KeyCombo 互转工具 → ./keymap-parser(避免 platform 互相依赖)
- *   平台保留键列表                → ../platform(getPlatform().shortcut.getReservedKeyCombos)
+ *   字符串 <-> KeyCombo 互转工具 → ./keymap-parser(模块级常量,跨调用复用)
+ *   平台保留键列表                → PLATFORM_RESERVED(模块级一次性计算,按 process.platform 选)
  */
 import type { CommandSpec, KeyCombo } from '@tabula/bridge';
 import { parseKeyCombo, formatKeyCombo, isSameCombo } from './keymap-parser';
-import { getPlatform } from '../platform';
 
 // 重新导出 keymap-parser 里的工具,保持外部 import 路径不变(command-dispatcher 等老调用)
 export { parseKeyCombo, formatKeyCombo, isSameCombo };
@@ -27,16 +26,50 @@ export { parseKeyCombo, formatKeyCombo, isSameCombo };
 // =================== 系统保留组合 ===================
 
 /**
- * 判定某个组合是否被系统保留(任何用户命令都不能占用)。
- * 不同平台的保留键不同,实际数据由 platform/<os>.ts 提供:
+ * 按平台返回系统保留键列表 — module-level 一次性计算, isReservedCombo 不重新解析
  *  - Windows: Alt+F4, Alt+Tab, Ctrl+Alt+Delete
- *  - macOS: 上面 + Cmd+Q/Tab/Escape/L/M/H/Space
- *  - Linux: 上面 + Meta+L, Ctrl+Alt+L, Meta+Tab
+ *  - macOS:   上面 + Cmd+Q/Tab/Escape/L/M/H/Space
+ *  - Linux:   上面 + Meta+L, Ctrl+Alt+L, Meta+Tab
+ */
+const PLATFORM_RESERVED: KeyCombo[] = (() => {
+  const base: KeyCombo[] = [
+    parseKeyCombo('Alt+F4')!,         // Win/Linux 关闭
+    parseKeyCombo('Alt+Tab')!,        // Win/Linux 切应用
+    parseKeyCombo('Ctrl+Alt+Delete')!, // Win 强制任务管理器
+  ];
+
+  if (process.platform === 'darwin') {
+    return [
+      ...base,
+      parseKeyCombo('Meta+Q')!,        // macOS 退出
+      parseKeyCombo('Meta+Tab')!,      // macOS 切应用
+      parseKeyCombo('Meta+Escape')!,   // macOS Mission Control
+      parseKeyCombo('Meta+L')!,        // macOS 锁屏
+      parseKeyCombo('Meta+M')!,        // macOS 最小化窗口
+      parseKeyCombo('Meta+H')!,        // macOS 隐藏窗口
+      parseKeyCombo('Meta+Space')!,    // macOS Spotlight
+    ];
+  }
+
+  if (process.platform === 'linux') {
+    return [
+      ...base,
+      parseKeyCombo('Meta+L')!,        // Linux 锁屏
+      parseKeyCombo('Ctrl+Alt+L')!,   // Linux 一些桌面锁屏
+      parseKeyCombo('Meta+Tab')!,      // Linux 切应用
+    ];
+  }
+
+  return base;
+})();
+
+/**
+ * 判定某个组合是否被系统保留(任何用户命令都不能占用)。
  * 重新绑定这些键会破坏用户预期(例如 Cmd+Q 退出应用)。
  */
 export function isReservedCombo(combo: KeyCombo | null): boolean {
   if (!combo) return false;
-  return getPlatform().shortcut.getReservedKeyCombos().some((c) => isSameCombo(c, combo));
+  return PLATFORM_RESERVED.some((c) => isSameCombo(c, combo));
 }
 
 // =================== 内置命令清单 ===================

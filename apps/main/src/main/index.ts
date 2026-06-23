@@ -10,9 +10,9 @@
  */
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { WindowManager } from './window/window-manager';
 import { registerIpcHandlers } from './ipc';
+import { getWindowProvider } from './providers/window';
 import { loadConfig } from './store/config';
 import { initExtensionHost } from './ext-host/extension-host';
 import { initLogger } from './infra/logger';
@@ -26,7 +26,7 @@ import {
 import { initUpdater, checkForUpdates } from './infra/updater'; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { initKeymap } from './keymap/keymap-manager';
 import { markWhenReady, markWindowReady, markExtHostReady, startMemorySampling } from './perf/perf-service';
-import { getPlatform } from './platform';
+
 
 const isDev = !app.isPackaged;
 
@@ -66,24 +66,14 @@ async function bootstrap() {
   await app.whenReady();
   markWhenReady();
 
-  // macOS: BrowserWindow 的 icon option 在 macOS 上无效 (dock 用 Info.plist CFBundleIconFile)
-  // 必须在 dev 模式手动 setIcon, 否则 dock 显示旧/默认 icon
-  const platform = getPlatform();
-  if (platform.window.getDockIconPath && app.dock) {
-    const __dirname = fileURLToPath(new URL('.', import.meta.url));
-    const dockIcon = platform.window.getDockIconPath({
-      isDev,
-      resourcesPath: process.resourcesPath,
-      appRoot: __dirname,
-    });
-    try {
-      app.dock.setIcon(dockIcon);
-    } catch (err) {
-      // 加载失败不致命, 继续启动
-      // eslint-disable-next-line no-console
-      console.warn('[main] dock.setIcon failed:', err);
-    }
-  }
+  // macOS 下由 WindowProvider 内部处理 (Windows/Linux no-op)
+  // 路径用 app.getAppPath() 而非手算 __dirname/../.. (dev 模式下 import.meta.url 指向
+  // 源码位置而非编译产物, 手算层级容易错)
+  const appRoot = app.getAppPath();
+  const dockIcon = isDev
+    ? join(appRoot, 'build-assets', 'icon', 'Tabula.icns')
+    : join(process.resourcesPath, 'resources', 'Tabula.icns');
+  getWindowProvider().setDockIcon(dockIcon);
 
   // P7: 启动屏(splash)
   // 必须在主窗口创建之前,这样用户不会看到空白
@@ -178,10 +168,10 @@ async function bootstrap() {
     console.error('[main] did-stop-loading');
   });
 
-  // 开发环境: 打开 devtools
-  if (isDev) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
+  // 开发环境: 默认不自动开 devtools (避免 DevTools 内部噪音刷屏
+  // Autofill/VE context 等 warning 跟我们的代码无关). 手动按 Cmd+Shift+I 打开.
+  // 如需临时自动开, 改成:
+  //   if (isDev) { mainWindow.webContents.openDevTools({ mode: 'detach' }); }
 
   // P7: 主窗口显示后,异步触发一次更新检查(不阻塞 UI)
   // 用 setImmediate 把"窗口显示"和"网络请求"解耦
@@ -204,7 +194,7 @@ async function bootstrap() {
 }
 
 app.on('window-all-closed', () => {
-  if (getPlatform().quitOnAllWindowsClosed) {
+  if (getWindowProvider().getQuitOnAllWindowsClosed()) {
     app.quit();
   }
 });

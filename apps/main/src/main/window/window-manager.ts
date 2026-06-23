@@ -6,15 +6,12 @@
  * - 多窗口支持(预留)
  * - 窗口状态持久化
  *
- * 平台差异(icon / titleBarStyle / autoHideMenuBar)统一从 platform adapter 取。
+ * 平台差异(icon / titleBarStyle / autoHideMenuBar)统一从 WindowProvider 取。
  */
 import { BrowserWindow, shell, app, screen } from 'electron';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { WindowBounds } from '@tabula/bridge';
-import { getPlatform } from '../platform';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+import { getWindowProvider } from '../providers/window';
 
 export interface CreateWindowOptions {
   initialPath?: string;
@@ -42,13 +39,16 @@ export class WindowManager {
     };
     const bounds = { ...defaultBounds, ...opts.bounds };
 
-    // 平台 chrome(icon / titleBarStyle / autoHideMenuBar)统一从 platform adapter 取
-    const platform = getPlatform();
-    const iconPath = platform.window.getIconPath({
-      isDev: this.isDev,
-      resourcesPath: process.resourcesPath,
-      appRoot: __dirname,
-    });
+    // 平台最优 icon: macOS .icns / Windows .ico / 其他 512.png
+    // dev 模式从仓库 build-assets/icon/ 取, 打包后从 process.resourcesPath/resources/ 取
+    // 用 app.getAppPath() (dev 指向仓库根, prod 指向 asar 根) 替代手算 __dirname/../..
+    // (dev 模式 import.meta.url 指向源码而非编译产物, 手算层级容易错)
+    const appRoot = app.getAppPath();
+    const iconDir = this.isDev
+      ? join(appRoot, 'build-assets', 'icon')
+      : join(process.resourcesPath, 'resources');
+    const winProvider = getWindowProvider();
+    const platformIcon = winProvider.getIconPath(iconDir, process.resourcesPath);
 
     const win = new BrowserWindow({
       ...bounds,
@@ -56,10 +56,10 @@ export class WindowManager {
       minHeight: 500,
       show: false,            // 先隐藏,准备好再显示(避免白闪)
       frame: false,           // 自定义标题栏(现代化)
-      titleBarStyle: platform.window.titleBarStyle,
+      titleBarStyle: winProvider.getTitleBarStyle(),
       backgroundColor: '#1a1a1f',
-      autoHideMenuBar: platform.window.autoHideMenuBar,
-      icon: iconPath,
+      autoHideMenuBar: winProvider.getAutoHideMenuBar(),
+      icon: platformIcon,
       webPreferences: {
         preload: this.resolvePreload(),
         contextIsolation: true,

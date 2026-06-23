@@ -39,7 +39,6 @@ import { useLayoutStore } from './stores/layout-store';
 import { useFavoritesStore } from './stores/favorites-store';
 import { useThemeStore, type ThemeMode } from './stores/theme-store';
 import { useSettingsStore } from './stores/settings-store';
-import { useLicenseStore } from './stores/license-store';
 import { useKeymapStore } from './stores/keymap-store';
 import { useUiDialogsStore } from './stores/ui-dialogs-store';
 import { makeFolderTab } from './stores/file-store';
@@ -136,9 +135,6 @@ export function App() {
   // P7 v1: 快捷键(从主进程拉命令 + 绑定)
   const hydrateKeymap = useKeymapStore((s) => s.hydrate);
 
-  // P-License v1 骨架
-  const hydrateLicense = useLicenseStore((s) => s.hydrate);
-
   // layout-store
   const rootLayout = useLayoutStore((s) => s.rootLayout);
   const activePaneId = useLayoutStore((s) => s.activePaneId);
@@ -184,9 +180,6 @@ export function App() {
       await hydrateLayout();
       // P7 v1: 拉快捷键配置(electron-store 持久化的用户覆盖)
       await hydrateKeymap();
-
-      // P-License v1: 拉许可证缓存(NOT_ACTIVATED 是合法初始态)
-      await hydrateLicense();
 
       // P2 v2: 检查 boot 路径(由 win:open-with-tab 注入的开窗初始路径)
       // 如果有,说明这个窗口是被「拖出 tab」开的,把 boot 路径记下来
@@ -245,12 +238,6 @@ export function App() {
       offMem();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // P-License v1 骨架:订阅主进程推送的许可证状态变化
-  useEffect(() => {
-    const off = useLicenseStore.getState().subscribe();
-    return off;
   }, []);
 
   // P5: 跟随系统主题(mode === 'system' 时,监听 OS 主题变化)

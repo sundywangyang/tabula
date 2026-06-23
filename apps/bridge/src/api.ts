@@ -14,9 +14,6 @@ import type {
   FsEntry,
   KeyCombo,
   LayoutNode,
-  LicenseInfo,
-  LicenseResult,
-  LicenseVerifyResult,
   ListDirResult,
   LogEntry,
   LogLevel,
@@ -250,18 +247,6 @@ export interface TabulaAPI {
      * - Linux: 尝试常见终端(x-terminal-emulator / gnome-terminal / konsole / xterm)
      */
     openTerminal(path: string): Promise<Result<void>>;
-  };
-
-  // 许可证 (P-License v1 骨架)
-  license: {
-    /** 用户输入 key 后, 主进程发 https 到 mock 端点, 返回验证结果 */
-    verify(key: string): Promise<LicenseVerifyResult>;
-    /** 取当前缓存的 LicenseInfo(可能 NOT_ACTIVATED) */
-    getStatus(): Promise<LicenseResult<LicenseInfo>>;
-    /** 清除本地许可证(注销) */
-    clear(): Promise<LicenseResult<void>>;
-    /** 订阅主进程推送的状态变更(过期 / 验证结果回写) */
-    onStatusChanged(listener: (info: LicenseInfo) => void): () => void;
   };
 }
 

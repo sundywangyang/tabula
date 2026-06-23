@@ -5,13 +5,13 @@
  * 后续可加缓存、权限校验、跨盘移动优化等。
  *
  * 跨平台差异:
- *  - listDrives:走 platform adapter(Win PowerShell / macOS df+mount / Linux df+findmnt)
+ *  - listDrives:走 DriveProvider(Win PowerShell / macOS df+mount / Linux df+findmnt)
  *  - 其他:全平台一致(Node fs API)
  */
-import { promises as fs } from 'node:fs';
+import { promises as fs, statfsSync } from 'node:fs';
 import { join, basename, extname } from 'node:path';
 import type { DriveInfo, FsEntry, ListDirResult, MoveOrCopyRequest, Result, SearchRequest, SearchResult, SearchHit, FileTypeFilter } from '@tabula/bridge';
-import { getPlatform } from '../platform';
+import { getDriveProvider } from '../providers/drive';
 
 function mapError(err: unknown, path?: string): { ok: false; error: { code: any; message: string; path?: string } } {
   const e = err as NodeJS.ErrnoException;
@@ -228,14 +228,11 @@ export async function stat(path: string): Promise<Result<FsEntry>> {
   }
 }
 
-// =================== P5: 驱动器列表 ===================
+// =================== P5: 驱动器列表 (P7: 委托给 DriveProvider) ===================
 
-/**
- * 列出所有挂载的卷/驱动器(跨平台 facade)
- * 实际平台实现(Win PowerShell / macOS df+mount / Linux df+findmnt)已搬到 platform/{win,mac,linux}.ts
- */
+/** 列出所有挂载的卷/驱动器 — 实现见 providers/drive/{windows,macos,linux}.ts */
 export async function listDrives(): Promise<DriveInfo[]> {
-  return getPlatform().drive.list();
+  return getDriveProvider().listDrives();
 }
 
 // =================== P4 v1: 递归搜索 ===================
