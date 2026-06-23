@@ -4,12 +4,17 @@
 import type {
   AppConfig,
   AppWindowState,
+  ArchiveError,
+  ArchiveInfo,
+  ArchiveProgress,
   CommandSpec,
+  CompressRequest,
   DirSizeResult,
   DownloadProgress,
   DriveInfo,
   ExtensionManifest,
   ExtensionPanel,
+  ExtractRequest,
   FileTypeFilter,
   FsEntry,
   KeyCombo,
@@ -148,6 +153,15 @@ export interface TabulaAPI {
     writeClipboard(text: string): Promise<void>;
     /** 显示 Windows「打开方式」对话框并用用户选择的程序打开文件 */
     openWithDialog(path: string): Promise<void>;
+    /**
+     * 弹系统「另存为」对话框,用户选路径后返回;取消返回 null。
+     * 用于压缩时让用户指定输出文件名和位置。
+     */
+    saveDialog(opts?: {
+      title?: string;
+      defaultPath?: string;
+      filters?: Electron.FileFilter[];
+    }): Promise<string | null>;
   };
 
   // 标签
@@ -247,6 +261,31 @@ export interface TabulaAPI {
      * - Linux: 尝试常见终端(x-terminal-emulator / gnome-terminal / konsole / xterm)
      */
     openTerminal(path: string): Promise<Result<void>>;
+  };
+
+  // 归档 (压缩 / 解压)
+  archive: {
+    /**
+     * 列出归档内全部 entry(同步,无副作用)。
+     * 当前仅支持 zip 格式;zip 损坏 / 加密 / 不存在 → ok=false。
+     */
+    list(archivePath: string): Promise<Result<ArchiveInfo, ArchiveError>>;
+    /**
+     * 启动一个压缩任务。立即返回 jobId,实际工作在后台执行,
+     * 通过 `onJobUpdate` 推送 `ArchiveProgress`,最终 phase = done。
+     */
+    compress(req: CompressRequest): Promise<Result<{ jobId: string }, ArchiveError>>;
+    /**
+     * 启动一个解压任务。立即返回 jobId,实际工作在后台执行,
+     * 通过 `onJobUpdate` 推送 `ArchiveProgress`,最终 phase = done。
+     */
+    extract(req: ExtractRequest): Promise<Result<{ jobId: string }, ArchiveError>>;
+    /** 拉取任务当前状态(用于 UI 主动查询 / 刷新) */
+    getJob(jobId: string): Promise<Result<ArchiveProgress, ArchiveError>>;
+    /** 取消正在执行的任务;终态 phase = cancelled */
+    cancelJob(jobId: string): Promise<Result<void, ArchiveError>>;
+    /** 订阅主进程推送的进度事件;返回取消订阅函数 */
+    onJobUpdate(listener: (progress: ArchiveProgress) => void): () => void;
   };
 }
 

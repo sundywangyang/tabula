@@ -12,7 +12,13 @@
  * 走 panes[paneId] 分片。
  */
 import { create } from 'zustand';
-import type { FsEntry, TrashEntry } from '@tabula/bridge';
+import type {
+  ArchiveProgress,
+  CompressRequest,
+  ExtractRequest,
+  FsEntry,
+  TrashEntry,
+} from '@tabula/bridge';
 import { useLayoutStore } from './layout-store';
 import { getCachedRootPath } from '../platform-cache';
 
@@ -255,6 +261,14 @@ interface FileStore {
   /** 正在加载的 path 集合(去重 + UI 状态) */
   thumbnailLoading: Set<string>;
 
+  // ===== Archive (压缩 / 解压) =====
+  /** 活跃的归档任务(jobId → 最新进度),包含已完成/失败(用于查询历史) */
+  archiveJobs: Map<string, ArchiveProgress & { sourcePaneId?: string }>;
+  /** jobId → 显示该进度的 toast id(取消/完成后 dismiss) */
+  archiveToasts: Map<string, string>;
+  /** jobId → 触发该任务的 paneId(用于完成后刷新) */
+  archivePaneIds: Map<string, string>;
+
   // ===== 每 pane 数据分片 =====
   panes: Record<string, PaneFileData>;
 
@@ -328,6 +342,23 @@ interface FileStore {
   showToast: (message: string, kind?: ToastItem['kind'], durationMs?: number) => string;
   dismissToast: (id: string) => void;
   setProgress: (p: ProgressInfo | null) => void;
+
+  // ============ Archive (压缩 / 解压) ============
+  /**
+   * 启动压缩任务。先弹目录选择框让用户选目标位置,
+   * 然后调主进程压缩,订阅进度通过 toast 显示。
+   * 失败返回错误信息(已通过 toast 提示)。
+   */
+  startCompress: (sources: string[], sourcePaneId?: string) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * 启动解压任务。弹目录选择框让用户选解压目标,
+   * 然后调主进程解压,订阅进度通过 toast 显示。
+   */
+  startExtract: (archive: string, destination?: string, sourcePaneId?: string) => Promise<{ ok: boolean; error?: string }>;
+  /** 取消正在执行的归档任务 */
+  cancelArchive: (jobId: string) => Promise<void>;
+  /** 由 ARCHIVE_JOB_UPDATE 事件触发,更新 archiveJobs + 关联 toast 文案 */
+  updateArchiveJob: (progress: ArchiveProgress) => void;
 
   // ============ P3: 冲突解决 ============
   resolveConflict: (resolution: ConflictResolution, newName?: string) => Promise<void>;
@@ -625,6 +656,11 @@ export const useFileStore = create<FileStore>((set, get) => {
     // P7: 缩略图缓存
     thumbnails: new Map(),
     thumbnailLoading: new Set(),
+
+    // Archive (压缩 / 解压)
+    archiveJobs: new Map(),
+    archiveToasts: new Map(),
+    archivePaneIds: new Map(),
 
     // panes
     panes: {},
@@ -1889,6 +1925,178 @@ export const useFileStore = create<FileStore>((set, get) => {
 
     clearThumbnails: () => {
       set({ thumbnails: new Map(), thumbnailLoading: new Set() });
+    },
+
+    // ============ Archive (压缩 / 解压) ============
+    startCompress: async (sources: string[], sourcePaneId?: string) => {
+      if (!sources || sources.length === 0) {
+        get().showToast('未选中任何项', 'warn');
+        return { ok: false, error: '未选中任何项' };
+      }
+      // 自动在源所在目录生成 zip 文件名,不弹任何对话框
+      // 单选 → 源文件名.zip; 多选 → "N 项.zip"
+      const defaultName =
+        sources.length === 1
+          ? (sources[0].split(/[\\/]/).filter(Boolean).pop() ?? 'archive') + '.zip'
+          : `${sources.length} 项.zip`;
+      // 取第一个源文件的目录作为输出目录
+      const firstDir = sources[0].split(/[\\/]/).slice(0, -1).join('/');
+      const destination = firstDir + '/' + defaultName;
+
+      const req: CompressRequest = { sources, destination, sourcePaneId };
+      const result = await window.tabula.archive.compress(req);
+      if (!result.ok) {
+        get().showToast(`压缩失败: ${result.error.message}`, 'error', 4000);
+        return { ok: false, error: result.error.message };
+      }
+      const jobId = result.data.jobId;
+      const toastId = get().showToast(`正在压缩 ${defaultName}…`, 'info', 0);
+      set((s) => {
+        const jobs = new Map(s.archiveJobs);
+        jobs.set(jobId, { jobId, phase: 'pending', processed: 0, total: -1 });
+        const toasts = new Map(s.archiveToasts);
+        toasts.set(jobId, toastId);
+        const paneIds = new Map(s.archivePaneIds);
+        if (sourcePaneId) paneIds.set(jobId, sourcePaneId);
+        return { archiveJobs: jobs, archiveToasts: toasts, archivePaneIds: paneIds };
+      });
+      return { ok: true };
+    },
+
+    startExtract: async (archive, destination, sourcePaneId?: string) => {
+      if (!archive) {
+        return { ok: false, error: 'archive 不能为空' };
+      }
+      // 默认解压目标: 同目录 / 文件名(去后缀)
+      let dest: string | null = destination ?? null;
+      if (!dest) {
+        dest = await window.tabula.fs.pickDirectory();
+        if (!dest) return { ok: false, error: '已取消' };
+      }
+      // 计算默认输出 zip 文件名(用作 toast)
+      const archiveName = archive.split(/[\\/]/).filter(Boolean).pop() ?? archive;
+
+      const req: ExtractRequest = { archive, destination: dest, overwrite: false };
+      const result = await window.tabula.archive.extract(req);
+      if (!result.ok) {
+        // DESTINATION_EXISTS 用更友好的提示
+        if (result.error.code === 'DESTINATION_EXISTS') {
+          get().showToast(`目标已存在,解压取消:${result.error.message}`, 'warn', 4000);
+        } else {
+          get().showToast(`解压失败: ${result.error.message}`, 'error', 4000);
+        }
+        return { ok: false, error: result.error.message };
+      }
+      const jobId = result.data.jobId;
+      const toastId = get().showToast(`正在解压 ${archiveName}…`, 'info', 0);
+      set((s) => {
+        const jobs = new Map(s.archiveJobs);
+        jobs.set(jobId, { jobId, phase: 'pending', processed: 0, total: -1 });
+        const toasts = new Map(s.archiveToasts);
+        toasts.set(jobId, toastId);
+        const paneIds = new Map(s.archivePaneIds);
+        if (sourcePaneId) paneIds.set(jobId, sourcePaneId);
+        return { archiveJobs: jobs, archiveToasts: toasts, archivePaneIds: paneIds };
+      });
+      return { ok: true };
+    },
+
+    cancelArchive: async (jobId) => {
+      await window.tabula.archive.cancelJob(jobId);
+    },
+
+    updateArchiveJob: (progress) => {
+      const { jobId, phase, currentEntry, percent, error } = progress;
+      // 1. 写 store
+      set((s) => {
+        const jobs = new Map(s.archiveJobs);
+        jobs.set(jobId, progress);
+        return { archiveJobs: jobs };
+      });
+      // 2. 更新对应 toast
+      const toastId = get().archiveToasts.get(jobId);
+      if (!toastId) return;
+      if (phase === 'done') {
+        get().dismissToast(toastId);
+        // 完成后自动刷新触发该操作的 pane
+        const paneId = get().archivePaneIds.get(jobId);
+        if (paneId && get().panes[paneId]) {
+          const path = get().panes[paneId]?.currentPath;
+          if (path) void get().loadDir(paneId, path);
+        }
+        get().showToast(
+          currentEntry ? `${currentEntry.split(/[\\/]/).pop()} 完成` : '归档完成',
+          'success',
+          2500,
+        );
+        // 清理 map 项(终态后)
+        setTimeout(() => {
+          set((s) => {
+            const jobs = new Map(s.archiveJobs);
+            jobs.delete(jobId);
+            const toasts = new Map(s.archiveToasts);
+            toasts.delete(jobId);
+            const paneIds = new Map(s.archivePaneIds);
+            paneIds.delete(jobId);
+            return { archiveJobs: jobs, archiveToasts: toasts, archivePaneIds: paneIds };
+          });
+        }, 500);
+      } else if (phase === 'error') {
+        get().dismissToast(toastId);
+        get().showToast(`归档失败: ${error?.message ?? '未知错误'}`, 'error', 4000);
+        setTimeout(() => {
+          set((s) => {
+            const jobs = new Map(s.archiveJobs);
+            jobs.delete(jobId);
+            const toasts = new Map(s.archiveToasts);
+            toasts.delete(jobId);
+            const paneIds = new Map(s.archivePaneIds);
+            paneIds.delete(jobId);
+            return { archiveJobs: jobs, archiveToasts: toasts, archivePaneIds: paneIds };
+          });
+        }, 500);
+      } else if (phase === 'cancelled') {
+        get().dismissToast(toastId);
+        get().showToast('已取消', 'info', 2000);
+        setTimeout(() => {
+          set((s) => {
+            const jobs = new Map(s.archiveJobs);
+            jobs.delete(jobId);
+            const toasts = new Map(s.archiveToasts);
+            toasts.delete(jobId);
+            const paneIds = new Map(s.archivePaneIds);
+            paneIds.delete(jobId);
+            return { archiveJobs: jobs, archiveToasts: toasts, archivePaneIds: paneIds };
+          });
+        }, 500);
+      } else {
+        // 进行中:更新文案
+        const phaseLabel =
+          phase === 'reading' ? '读取'
+            : phase === 'compressing' ? '压缩'
+            : phase === 'writing' ? '写入'
+            : phase === 'extracting' ? '解压'
+            : phase === 'pending' ? '准备' : '处理';
+        const entryLabel = currentEntry
+          ? ` ${currentEntry.split(/[\\/]/).pop() ?? currentEntry}`
+          : '';
+        const percentLabel = percent !== undefined ? ` (${percent}%)` : '';
+        // 用一个新 toast 替换(dismiss 旧的,show 新的同 id 是不可能的 — 直接 push 新 toast)
+        // 简化:用 showToast 创建一个新 toast,旧的 dismiss
+        // 但 dismiss + show 会闪,改为只 push 一条新的 progress toast,
+        // 用 archiveToasts map 跟踪最新的 toast id
+        get().dismissToast(toastId);
+        const newToastId = get().showToast(
+          `${phaseLabel}${entryLabel}${percentLabel}`,
+          'info',
+          0,
+        );
+        set((s) => {
+          const toasts = new Map(s.archiveToasts);
+          toasts.set(jobId, newToastId);
+          return { archiveToasts: toasts };
+        });
+      }
     },
   };
 });

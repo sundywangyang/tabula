@@ -324,6 +324,11 @@ export function App() {
     };
     window.addEventListener('tabula:batch-rename', onBatchRename);
 
+    // Archive (压缩 / 解压) 进度推送
+    const offArchiveUpdate = window.tabula.archive.onJobUpdate((progress) => {
+      useFileStore.getState().updateArchiveJob(progress);
+    });
+
     return () => {
       window.removeEventListener('tabula:new-folder', onNewFolder);
       window.removeEventListener('tabula:new-file', onNewFile);
@@ -331,6 +336,7 @@ export function App() {
       window.removeEventListener('tabula:show-properties', onShowProperties);
       window.removeEventListener('tabula:batch-rename', onBatchRename);
       offRunCommand();
+      offArchiveUpdate();
     };
   }, []);
 

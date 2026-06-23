@@ -80,6 +80,9 @@ importers:
       electron-updater:
         specifier: ^6.8.3
         version: 6.8.3
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
 
   apps/renderer:
     dependencies:
@@ -4011,6 +4014,7 @@ snapshots:
       minimatch: 3.1.5
       once: 1.4.0
       path-is-absolute: 1.0.1
+    optional: true
 
   glob@7.2.3:
     dependencies:
@@ -4651,7 +4655,7 @@ snapshots:
 
   rimraf@2.6.3:
     dependencies:
-      glob: 7.2.0
+      glob: 7.2.3
 
   rimraf@3.0.2:
     dependencies:

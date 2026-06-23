@@ -29,6 +29,8 @@ import {
 import { dispatchRunCommand } from '../keymap/command-dispatcher';
 import { getWindowProvider } from '../providers/window';
 import { getShellProvider } from '../providers/shell';
+import { archiveManager } from '../archive/archive-manager';
+import type { CompressRequest, ExtractRequest } from '@tabula/bridge';
 
 export interface IpcContext {
   windowManager: WindowManager;
@@ -161,6 +163,21 @@ export function registerIpcHandlers(ctx: IpcContext) {
 
     // 平台特定 spawn 走 platform adapter
     return getShellProvider().openWith(p, program);
+  });
+
+  // 「另存为」对话框(用于压缩时用户指定 zip 路径和文件名)
+  ipcMain.handle(IpcChannels.FS_SAVE_DIALOG, async (e, opts?: {
+    title?: string;
+    defaultPath?: string;
+    filters?: Electron.FileFilter[];
+  }) => {
+    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    const result = await dialog.showSaveDialog(win!, {
+      title: opts?.title ?? '保存文件',
+      defaultPath: opts?.defaultPath,
+      filters: opts?.filters ?? [{ name: 'ZIP 压缩文件', extensions: ['zip'] }],
+    });
+    return result.canceled ? null : result.filePath;
   });
 
   // =================== Thumbnail (P7 v1) ===================
@@ -328,4 +345,23 @@ export function registerIpcHandlers(ctx: IpcContext) {
   ipcMain.handle(IpcChannels.SHELL_OPEN_TERMINAL, async (_e, path: string) => {
     return getShellProvider().openTerminal(path);
   });
+
+  // =================== Archive (压缩 / 解压) ===================
+  ipcMain.handle(IpcChannels.ARCHIVE_LIST, async (_e, archivePath: string) => {
+    return archiveManager.list(archivePath);
+  });
+  ipcMain.handle(IpcChannels.ARCHIVE_COMPRESS, async (_e, req: CompressRequest) => {
+    return archiveManager.compress(req);
+  });
+  ipcMain.handle(IpcChannels.ARCHIVE_EXTRACT, async (_e, req: ExtractRequest) => {
+    return archiveManager.extract(req);
+  });
+  ipcMain.handle(IpcChannels.ARCHIVE_GET_JOB, async (_e, jobId: string) => {
+    return archiveManager.getJob(jobId);
+  });
+  ipcMain.handle(IpcChannels.ARCHIVE_CANCEL_JOB, async (_e, jobId: string) => {
+    return archiveManager.cancelJob(jobId);
+  });
+  // 注: ARCHIVE_JOB_UPDATE 推送由 archive-manager 在订阅 provider 时自动发到所有窗口,
+  // 不在这里 register handler(那是渲染端 subscribe 的 channel)
 }

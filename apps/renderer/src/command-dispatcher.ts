@@ -236,6 +236,33 @@ export function runCommandById(commandId: string): boolean {
       return true;
     }
 
+    // ============ Archive (压缩 / 解压) ============
+    case 'archive.compress': {
+      const data = file.panes[activePaneId];
+      const selected = Array.from(data?.selectedPaths ?? []);
+      if (selected.length === 0) {
+        showToast('未选中任何项', 'warn');
+        return true;
+      }
+      void file.startCompress(selected, activePaneId);
+      return true;
+    }
+    case 'archive.extract': {
+      const data = file.panes[activePaneId];
+      const selected = Array.from(data?.selectedPaths ?? []);
+      if (selected.length === 0) {
+        showToast('请先选中一个 .zip 文件', 'warn');
+        return true;
+      }
+      const archive = selected[0];
+      if (!/\.zip(x)?$/i.test(archive)) {
+        showToast('请选中一个 .zip 文件', 'warn');
+        return true;
+      }
+      void file.startExtract(archive, undefined, activePaneId);
+      return true;
+    }
+
     // ============ 标签 ============
     case 'tab.new': {
       const tab = makeFolderTab(defaultPath(), '新标签');

@@ -6,7 +6,12 @@
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { IpcChannels } from '@tabula/bridge';
-import type { TabulaAPI } from '@tabula/bridge';
+import type {
+  ArchiveProgress,
+  CompressRequest,
+  ExtractRequest,
+  TabulaAPI,
+} from '@tabula/bridge';
 
 // 事件订阅封装
 function makeEvents() {
@@ -154,6 +159,7 @@ const api: TabulaAPI = {
     getDirSize: (p) => ipcRenderer.invoke(IpcChannels.FS_GET_DIR_SIZE, p),
     writeClipboard: (text) => ipcRenderer.invoke(IpcChannels.FS_WRITE_CLIPBOARD, text),
     openWithDialog: (p) => ipcRenderer.invoke(IpcChannels.FS_OPEN_WITH_DIALOG, p),
+    saveDialog: (opts) => ipcRenderer.invoke(IpcChannels.FS_SAVE_DIALOG, opts ?? {}),
   },
 
   tabs: {
@@ -226,6 +232,24 @@ const api: TabulaAPI = {
   // 在指定目录打开系统终端(Windows = PowerShell;macOS = Terminal;Linux = 常见终端之一)
   shell: {
     openTerminal: (path) => ipcRenderer.invoke(IpcChannels.SHELL_OPEN_TERMINAL, path),
+  },
+
+  // 归档 (压缩 / 解压)
+  archive: {
+    list: (archivePath: string) =>
+      ipcRenderer.invoke(IpcChannels.ARCHIVE_LIST, archivePath),
+    compress: (req: CompressRequest) =>
+      ipcRenderer.invoke(IpcChannels.ARCHIVE_COMPRESS, req),
+    extract: (req: ExtractRequest) =>
+      ipcRenderer.invoke(IpcChannels.ARCHIVE_EXTRACT, req),
+    getJob: (jobId: string) => ipcRenderer.invoke(IpcChannels.ARCHIVE_GET_JOB, jobId),
+    cancelJob: (jobId: string) =>
+      ipcRenderer.invoke(IpcChannels.ARCHIVE_CANCEL_JOB, jobId),
+    onJobUpdate: (listener: (progress: ArchiveProgress) => void) => {
+      const wrapped = (_e: IpcRendererEvent, payload: ArchiveProgress) => listener(payload);
+      ipcRenderer.on(IpcChannels.ARCHIVE_JOB_UPDATE, wrapped);
+      return () => ipcRenderer.removeListener(IpcChannels.ARCHIVE_JOB_UPDATE, wrapped);
+    },
   },
 };
 

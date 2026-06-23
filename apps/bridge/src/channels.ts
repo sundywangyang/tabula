@@ -38,6 +38,7 @@ export const IpcChannels = {
   FS_GET_DIR_SIZE: 'fs:get-dir-size',
   FS_WRITE_CLIPBOARD: 'fs:write-clipboard',
   FS_OPEN_WITH_DIALOG: 'fs:open-with-dialog',
+  FS_SAVE_DIALOG: 'fs:save-dialog',
 
   // 标签
   TABS_OPEN: 'tabs:open',
@@ -134,6 +135,15 @@ export const IpcChannels = {
   LOG_GET_LINES: 'log:get-lines',            // 读最近 N 行(渲染端做"近期错误"展示)
   // 事件: 主进程 → 渲染端
   LOG_ENTRY: 'log:entry',                    // 推: { level, message, source: 'main'|'renderer', timestamp }
+
+  // 归档 (压缩 / 解压)
+  ARCHIVE_LIST: 'archive:list',              // 列归档内 entry → ArchiveInfo
+  ARCHIVE_COMPRESS: 'archive:compress',      // 启动压缩任务 → { jobId }
+  ARCHIVE_EXTRACT: 'archive:extract',        // 启动解压任务 → { jobId }
+  ARCHIVE_GET_JOB: 'archive:get-job',        // 拉取任务当前状态
+  ARCHIVE_CANCEL_JOB: 'archive:cancel-job',  // 取消任务
+  // 事件: 主进程 → 渲染端
+  ARCHIVE_JOB_UPDATE: 'archive:job-update',  // 推: ArchiveProgress
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

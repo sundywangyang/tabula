@@ -1,14 +1,14 @@
 /**
  * Vitest 全局配置。
  *
- * 只匹配 renderer store 单测与未来 packages 子包的纯逻辑单测。
- *走 jsdom 环境,因为 keymap-store / favorites-store / settings-store /
- * theme-store 的 hydrate路径都会触碰 window.tabula IPC mock
- * 以及 document.documentElement 的 data-theme / --accent CSS变量。
+ * 覆盖:
+ * - apps/renderer 测试 (jsdom 环境,涉及 window.tabula IPC mock)
+ * - packages 子包纯逻辑单测
+ * - apps/main/archive + providers/archive 测试 (Node 环境,纯逻辑 + fs)
  *
  * 不覆盖:
- * - apps/main/**(主进程 Node 代码,有专门 unit/integration 测试策略)
- * - apps/renderer 中需要 React DOM 的组件测试(此轮不装 RTL)
+ * - apps/main 中需要 electron 主进程 runtime 的代码 (browserWindow / ipc 等)
+ * - apps/renderer 中需要 React DOM 的组件测试 (此轮不装 RTL)
  */
 import { defineConfig } from 'vitest/config';
 
@@ -21,6 +21,8 @@ export default defineConfig({
  'apps/renderer/src/**/*.test.tsx',
  'packages/*/src/**/*.test.ts',
  'packages/*/src/**/*.test.tsx',
+ 'apps/main/src/main/archive/**/*.test.ts',
+ 'apps/main/src/main/providers/**/*.test.ts',
  ],
  //排除 build artifacts、release目录、out/ 与 electron-vite 中间产物
  exclude: [

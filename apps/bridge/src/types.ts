@@ -550,3 +550,102 @@ export interface LogEntry {
   /** ms since epoch */
   timestamp: number;
 }
+
+// =================== Archive (压缩 / 解压) ===================
+
+/** 当前支持的归档格式 (v1: 仅 zip) */
+export type ArchiveFormat = 'zip';
+
+/** 归档中的一个 entry */
+export interface ArchiveEntry {
+  /** entry 在归档内的路径(用 / 分隔) */
+  path: string;
+  /** 原始字节数(目录为 0) */
+  size: number;
+  /** 压缩后字节数 */
+  compressedSize: number;
+  /** 是否为目录 */
+  isDirectory: boolean;
+  /** 可选 CRC32(部分 entry 没有,例如目录) */
+  crc32?: number;
+}
+
+/** `archive:list` 的返回 */
+export interface ArchiveInfo {
+  format: ArchiveFormat;
+  totalEntries: number;
+  /** 所有 entry 解压后总字节数 */
+  totalSize: number;
+  /** 归档自身字节数(可与 totalSize 对比压缩率) */
+  totalCompressedSize: number;
+  entries: ArchiveEntry[];
+}
+
+/** `archive:compress` 的入参 */
+export interface CompressRequest {
+  /** 要压缩的文件 / 文件夹路径列表(支持混传) */
+  sources: string[];
+  /** 输出的 .zip 绝对路径 */
+  destination: string;
+  /** 0-9;默认 6;0 = 不压缩 (store) */
+  level?: number;
+  /** 触发压缩的 paneId(用于完成后自动刷新该 pane);可选 */
+  sourcePaneId?: string;
+}
+
+/** `archive:extract` 的入参 */
+export interface ExtractRequest {
+  /** 归档文件绝对路径 */
+  archive: string;
+  /** 解压目标目录(必须已存在或可创建) */
+  destination: string;
+  /** 仅解压这些 entry 的路径;空 = 全部 */
+  selectedEntries?: string[];
+  /** 目标文件已存在时是否覆盖;默认 false */
+  overwrite?: boolean;
+}
+
+/** 归档任务状态机阶段 */
+export type ArchiveJobPhase =
+  | 'pending'      // 已入队,等待开始
+  | 'reading'      // 正在读取源文件
+  | 'compressing'  // 正在 fflate.zip
+  | 'writing'      // 正在写入目标 .zip
+  | 'extracting'   // 正在解压 + 写盘
+  | 'done'         // 成功完成
+  | 'error'        // 失败
+  | 'cancelled';   // 用户取消
+
+/** 归档任务进度事件(主进程推送) */
+export interface ArchiveProgress {
+  jobId: string;
+  phase: ArchiveJobPhase;
+  /** 已处理 entry 数 */
+  processed: number;
+  /** 总 entry 数(扫描完成后才能确定;扫描中 = -1) */
+  total: number;
+  /** 当前正在处理的 entry 路径 */
+  currentEntry?: string;
+  /** 0-100;phase = done/error/cancelled 时未填 */
+  percent?: number;
+  /** phase = error 时 */
+  error?: ArchiveError;
+}
+
+/** 归档操作错误码 */
+export type ArchiveErrorCode =
+  | 'ARCHIVE_NOT_FOUND'   // 归档文件不存在
+  | 'ARCHIVE_INVALID'     // 损坏 / 不是 ZIP 格式
+  | 'ARCHIVE_UNSUPPORTED' // 不支持的格式 / 版本
+  | 'ARCHIVE_ENCRYPTED'   // 加密归档(暂不支持)
+  | 'JOB_NOT_FOUND'       // jobId 不存在
+  | 'JOB_ALREADY_RUNNING' // 同 destination 正在被处理
+  | 'DESTINATION_EXISTS'  // 解压目标已存在且未设置 overwrite
+  | 'IO_ERROR'            // 读写失败
+  | 'UNKNOWN';
+
+export interface ArchiveError {
+  code: ArchiveErrorCode;
+  message: string;
+  path?: string;
+}

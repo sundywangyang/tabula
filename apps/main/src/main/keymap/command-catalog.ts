@@ -388,6 +388,24 @@ export const COMMAND_CATALOG: CommandSpec[] = [
     description: '在 浅色 / 深色 / 跟随系统 之间循环',
     reserved: false,
   },
+  // Archive (压缩 / 解压)
+  {
+    id: 'archive.compress',
+    title: '压缩为 ZIP…',
+    category: '文件',
+    defaultCombo: null,
+    description: '把当前 pane 选中的文件 / 文件夹压缩为 .zip(v1:弹目录选择)',
+    reserved: false,
+  },
+  {
+    id: 'archive.extract',
+    title: '解压到…',
+    category: '文件',
+    defaultCombo: null,
+    description: '解压当前 pane 选中的 .zip 到目标目录(v1:弹目录选择)',
+    reserved: false,
+  },
+
   // 设置
   {
     id: 'settings.open',
