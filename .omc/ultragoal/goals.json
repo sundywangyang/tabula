@@ -111,10 +111,10 @@
       "title": "Make Alias / 符号链接",
       "objective": "创建符号链接",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "fs:create-symlink IPC (junction mode) + bridge channel + preload + api.ts + ContextMenu '创建快捷方式'. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "FS_CREATE_SYMLINK IPC + symlink with junction/file type + ContextMenu 创建快捷方式. TC:0 err, tests:153/153 (8 new create-symlink tests cover dir/file/stat-throw/symlink-throw/empty-input).",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:36:00.000Z"
+      "updatedAt": "2026-06-24T13:38:00.000Z"
     },
     {
       "id": "G012-undo-redo",
