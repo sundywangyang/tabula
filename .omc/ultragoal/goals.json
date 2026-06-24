@@ -121,10 +121,10 @@
       "title": "Undo / Redo (操作栈)",
       "objective": "撤销重做操作栈",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "main/undo/undo-manager.ts (undo/redo/executeUndo) + IPC handlers + bridge channels + preload + App.tsx Ctrl+Z/Ctrl+Shift+Z. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "UndoManager class (callback-based execute/undo/redo/getStack with maxSize=100 FIFO eviction) + UNDO_UNDO/REDO/GET_STACK IPC + bridge UndoOperationInfo/UndoStackSnapshot types + preload fs.undo/redo/getUndoStack + App.tsx Ctrl+Z / Ctrl+Shift+Z in keydown handler. 10 new vitest tests cover execute/undo/redo LIFO, redo-stack-clear-on-new-execute, getStack shallow copy, empty-stack null, maxSize FIFO eviction, clear(). TC:0 err, tests:163/163 (commit a0f776e).",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:38:00.000Z"
+      "updatedAt": "2026-06-24T13:48:00.000Z"
     },
     {
       "id": "G013-batch-rename",
