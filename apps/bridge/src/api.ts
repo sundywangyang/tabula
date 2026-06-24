@@ -9,7 +9,7 @@ import type {
   ArchiveProgress,
   CommandSpec,
   CompressRequest,
-  DirSizeResult,
+  DirSizeProgress,
   DownloadProgress,
   DriveInfo,
   ExtensionManifest,
@@ -165,8 +165,16 @@ export interface TabulaAPI {
      * dataUrl 可直接 `<img src=...>`,CSP 已放行 `data:`。
      */
     getThumbnail(path: string): Promise<Result<ThumbnailResult>>;
-    /** 计算目录递归大小（异步，后台执行） */
-    getDirSize(path: string): Promise<Result<DirSizeResult>>;
+    /**
+     * G016: 启动一个后台目录大小计算任务,立即返回 jobId。
+     * 实际计算在主进程后台执行,通过 `onDirSizeProgress` 推送进度事件;
+     * 最终事件 `done=true`,可从中读取 `totalBytes` / `processedEntries` / `error`。
+     */
+    getDirSize(path: string): Promise<Result<{ jobId: string }>>;
+    /** G016: 取消正在执行的目录大小计算任务 */
+    cancelDirSize(jobId: string): Promise<Result<void>>;
+    /** G016: 订阅目录大小计算的进度事件;返回取消订阅函数 */
+    onDirSizeProgress(listener: (progress: DirSizeProgress) => void): () => void;
     /** 写文本到系统剪贴板 */
     writeClipboard(text: string): Promise<void>;
     /** 显示 Windows「打开方式」对话框并用用户选择的程序打开文件 */

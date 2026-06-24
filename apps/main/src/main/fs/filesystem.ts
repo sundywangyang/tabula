@@ -398,44 +398,6 @@ export async function search(req: SearchRequest): Promise<Result<SearchResult>> 
   });
 }
 
-// =================== 目录大小计算 (new) ===================
-
-interface DirSizeAccumulator {
-  totalSize: number;
-  fileCount: number;
-  dirCount: number;
-}
-
-async function accumulateDirSize(dirPath: string, accum: DirSizeAccumulator): Promise<void> {
-  try {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = join(dirPath, entry.name);
-      try {
-        if (entry.isDirectory()) {
-          accum.dirCount++;
-          await accumulateDirSize(full, accum);
-        } else {
-          const stat = await fs.stat(full);
-          accum.totalSize += stat.size;
-          accum.fileCount++;
-        }
-      } catch {
-        // 单个文件/目录访问失败，跳过
-      }
-    }
-  } catch {
-    // 目录不可读，跳过
-  }
-}
-
-export async function getDirSize(path: string): Promise<Result<{ size: number; fileCount: number; dirCount: number; elapsedMs: number }>> {
-  const start = Date.now();
-  try {
-    const accum: DirSizeAccumulator = { totalSize: 0, fileCount: 0, dirCount: 0 };
-    await accumulateDirSize(path, accum);
-    return ok({ size: accum.totalSize, fileCount: accum.fileCount, dirCount: accum.dirCount, elapsedMs: Date.now() - start });
-  } catch (err) {
-    return mapError(err, path);
-  }
-}
+// =================== 目录大小计算 ===================
+// G016: 已迁移到 apps/main/src/main/fs/dir-size.ts(后台异步 + 取消支持)
+// 老版本阻塞式 getDirSize 移除,改由 dir-size.ts 的 startDirSize / cancelDirSize 提供。

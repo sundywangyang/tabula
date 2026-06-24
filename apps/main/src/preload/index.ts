@@ -9,6 +9,7 @@ import { IpcChannels } from '@tabula/bridge';
 import type {
   ArchiveProgress,
   CompressRequest,
+  DirSizeProgress,
   ExtractRequest,
   FsChecksumRequest,
   FsCreateSymlinkRequest,
@@ -159,7 +160,15 @@ const api: TabulaAPI = {
     trashEmpty: () => ipcRenderer.invoke(IpcChannels.FS_TRASH_EMPTY),
     search: (req) => ipcRenderer.invoke(IpcChannels.FS_SEARCH, req),
     getThumbnail: (p) => ipcRenderer.invoke(IpcChannels.FS_GET_THUMBNAIL, p),
+    // G016: 后台异步目录大小计算。invoke 立即返回 { jobId },进度走 fs:dir-size-progress 推送
     getDirSize: (p) => ipcRenderer.invoke(IpcChannels.FS_GET_DIR_SIZE, p),
+    cancelDirSize: (jobId: string) =>
+      ipcRenderer.invoke(IpcChannels.FS_CANCEL_DIR_SIZE, jobId),
+    onDirSizeProgress: (listener: (progress: DirSizeProgress) => void) => {
+      const wrapped = (_e: IpcRendererEvent, payload: DirSizeProgress) => listener(payload);
+      ipcRenderer.on(IpcChannels.FS_DIR_SIZE_PROGRESS, wrapped);
+      return () => ipcRenderer.removeListener(IpcChannels.FS_DIR_SIZE_PROGRESS, wrapped);
+    },
     writeClipboard: (text) => ipcRenderer.invoke(IpcChannels.FS_WRITE_CLIPBOARD, text),
     openWithDialog: (p) => ipcRenderer.invoke(IpcChannels.FS_OPEN_WITH_DIALOG, p),
     saveDialog: (opts) => ipcRenderer.invoke(IpcChannels.FS_SAVE_DIALOG, opts ?? {}),

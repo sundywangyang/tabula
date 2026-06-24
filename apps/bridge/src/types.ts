@@ -161,6 +161,24 @@ export interface DirSizeResult {
   elapsedMs: number;
 }
 
+/** G016: 异步目录大小进度事件(主进程 → 渲染端) */
+export interface DirSizeProgress {
+  /** 唯一 jobId(由 startDirSize 返回) */
+  jobId: string;
+  /** 被扫描的根路径 */
+  path: string;
+  /** 已统计的 entry 数(文件 + 目录) */
+  processedEntries: number;
+  /** 已统计的字节数 */
+  totalBytes: number;
+  /** 是否被取消 */
+  cancelled: boolean;
+  /** 是否完成(true = 不再有后续事件) */
+  done: boolean;
+  /** 错误信息(done=true && error != null 时) */
+  error?: string;
+}
+
 /** 驱动器 / 盘符 (P5: 侧边栏「此电脑」section) */
 export interface DriveInfo {
   /** 挂载点,Windows 下形如 `C:\\` / `D:\\`;POSIX 下形如 `/` */

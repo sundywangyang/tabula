@@ -3,6 +3,11 @@
  *
  * 侧边弹出面板，显示文件/文件夹的完整属性。
  * 从右侧滑入，宽度 320px。
+ *
+ * G016: 文件夹大小计算改为后台异步。
+ * - 点击「计算」 → invoke getDirSize, 立即拿到 jobId
+ * - 通过 onDirSizeProgress 订阅该 job 的进度
+ * - done=true 时取消订阅,显示结果;组件卸载时也取消订阅
  */
 import { useEffect, useRef, useState } from 'react';
 import type { FsEntry } from '@tabula/bridge';
@@ -16,8 +21,7 @@ export interface PropertiesPanelProps {
 
 interface DirSizeInfo {
   size: number;
-  fileCount: number;
-  dirCount: number;
+  processedEntries: number;
 }
 
 /** 格式化文件大小 */
@@ -47,6 +51,9 @@ function getTypeLabel(entry: FsEntry): string {
 export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps) {
   const [dirSize, setDirSize] = useState<DirSizeInfo | null>(null);
   const [calculating, setCalculating] = useState(false);
+  const [calcError, setCalcError] = useState<string | null>(null);
+  const jobIdRef = useRef<string | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Esc 关闭
@@ -63,21 +70,58 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
     panelRef.current?.focus();
   }, []);
 
+  // 组件卸载:取消订阅 + 取消未完成 job
+  useEffect(() => {
+    return () => {
+      unsubRef.current?.();
+      unsubRef.current = null;
+      if (jobIdRef.current) {
+        void window.tabula.fs.cancelDirSize(jobIdRef.current);
+        jobIdRef.current = null;
+      }
+    };
+  }, []);
+
   const handleCalcSize = async () => {
     if (!entry.isDirectory || calculating) return;
     setCalculating(true);
-    try {
-      const res = await window.tabula.fs.getDirSize(entry.path);
-      if (res.ok) {
-        setDirSize({
-          size: res.data.size,
-          fileCount: res.data.fileCount,
-          dirCount: res.data.dirCount,
-        });
-      }
-    } finally {
+    setCalcError(null);
+
+    const startRes = await window.tabula.fs.getDirSize(entry.path);
+    if (!startRes.ok) {
       setCalculating(false);
+      setCalcError(startRes.error.message);
+      return;
     }
+    const jobId = startRes.data.jobId;
+    jobIdRef.current = jobId;
+
+    const unsub = window.tabula.fs.onDirSizeProgress((p) => {
+      if (p.jobId !== jobId) return;
+      if (!p.done) {
+        // 中间进度:更新 processedEntries 即可,size 已包含在 totalBytes
+        setDirSize({ size: p.totalBytes, processedEntries: p.processedEntries });
+        return;
+      }
+      // 终态:取消订阅
+      unsub();
+      unsubRef.current = null;
+      jobIdRef.current = null;
+      setCalculating(false);
+      if (p.cancelled) {
+        setCalcError('已取消');
+      } else if (p.error) {
+        setCalcError(p.error);
+      } else {
+        setDirSize({ size: p.totalBytes, processedEntries: p.processedEntries });
+      }
+    });
+    unsubRef.current = unsub;
+  };
+
+  const handleCancel = async () => {
+    if (!jobIdRef.current) return;
+    await window.tabula.fs.cancelDirSize(jobIdRef.current);
   };
 
   const handleOpenInExplorer = () => {
@@ -137,29 +181,41 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
                   )}
                   {' '}
                   {calculating ? (
-                    <span className="properties-calc-loading">计算中…</span>
+                    <>
+                      <span className="properties-calc-loading">
+                        计算中…({dirSize?.processedEntries ?? 0} 个文件)
+                      </span>
+                      <button
+                        className="properties-calc-btn"
+                        onClick={handleCancel}
+                      >
+                        取消
+                      </button>
+                    </>
                   ) : (
                     <button
                       className="properties-calc-btn"
                       onClick={handleCalcSize}
                       disabled={calculating}
                     >
-                      计算
+                      {dirSize ? '重新计算' : '计算'}
                     </button>
                   )}
                 </span>
               </div>
-              {dirSize && (
-                <>
-                  <div className="properties-row properties-row-sub">
-                    <span className="properties-label">子文件数</span>
-                    <span className="properties-value">{dirSize.fileCount} 个文件</span>
-                  </div>
-                  <div className="properties-row properties-row-sub">
-                    <span className="properties-label">子目录数</span>
-                    <span className="properties-value">{dirSize.dirCount} 个文件夹</span>
-                  </div>
-                </>
+              {calcError && (
+                <div className="properties-row properties-row-sub">
+                  <span className="properties-label">错误</span>
+                  <span className="properties-value" style={{ color: 'var(--color-error, #e44)' }}>
+                    {calcError}
+                  </span>
+                </div>
+              )}
+              {dirSize && !calcError && (
+                <div className="properties-row properties-row-sub">
+                  <span className="properties-label">已统计</span>
+                  <span className="properties-value">{dirSize.processedEntries} 个文件</span>
+                </div>
               )}
             </>
           ) : (

@@ -36,6 +36,9 @@ export const IpcChannels = {
   FS_TRASH_EMPTY: 'fs:trash-empty',
   FS_SEARCH: 'fs:search',
   FS_GET_DIR_SIZE: 'fs:get-dir-size',
+  FS_CANCEL_DIR_SIZE: 'fs:cancel-dir-size',
+  // 事件: 主进程 → 渲染端
+  FS_DIR_SIZE_PROGRESS: 'fs:dir-size-progress',
   FS_WRITE_CLIPBOARD: 'fs:write-clipboard',
   FS_OPEN_WITH_DIALOG: 'fs:open-with-dialog',
   FS_SAVE_DIALOG: 'fs:save-dialog',

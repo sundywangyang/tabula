@@ -26,6 +26,7 @@ export default defineConfig({
  'apps/main/src/main/store/**/*.test.ts',
  'apps/main/src/main/ipc/**/*.test.ts',
  'apps/main/src/main/undo/**/*.test.ts',
+ 'apps/main/src/main/fs/**/*.test.ts',
  ],
  //排除 build artifacts、release目录、out/ 与 electron-vite 中间产物
  exclude: [

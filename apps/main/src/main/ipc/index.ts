@@ -20,6 +20,7 @@ import { handleSetPermissions, handleCreateSymlink, handleChecksum } from './han
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
 import * as trashService from '../fs/trash';
+import * as dirSizeService from '../fs/dir-size';
 import { getThumbnail } from '../fs/thumbnail';
 import { getConfig, setConfig, getAllConfig } from '../store/config';
 import { extensionHost } from '../ext-host/extension-host';
@@ -152,8 +153,13 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // =================== Search (P4 v1) ===================
   ipcMain.handle(IpcChannels.FS_SEARCH, (_e, req) => fsService.search(req));
 
-  // =================== Dir size (new) ===================
-  ipcMain.handle(IpcChannels.FS_GET_DIR_SIZE, (_e, p: string) => fsService.getDirSize(p));
+  // =================== Dir size (G016: 后台异步 + 取消) ===================
+  ipcMain.handle(IpcChannels.FS_GET_DIR_SIZE, (_e, p: string) =>
+    dirSizeService.handleGetDirSize(p),
+  );
+  ipcMain.handle(IpcChannels.FS_CANCEL_DIR_SIZE, (_e, id: string) =>
+    dirSizeService.handleCancelDirSize(id),
+  );
 
   // =================== Clipboard (new) ===================
   ipcMain.handle(IpcChannels.FS_WRITE_CLIPBOARD, (_e, text: string) => {

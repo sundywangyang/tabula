@@ -380,22 +380,42 @@ function buildMenuItems(args: {
       },
     });
 
-    // P3: 计算文件夹大小（仅文件夹）
+    // P3 + G016: 计算文件夹大小（仅文件夹）。G016 后改为后台异步,
+    // invoke 立即返回 jobId,后续通过 onDirSizeProgress 收进度。
     if (targetEntry?.isDirectory) {
       items.push({
         label: '计算文件夹大小',
         icon: '📊',
         action: () => {
           if (targetEntry) {
+            const path = targetEntry.path;
             const toastId = actions.showToast('正在计算…', 'info', 0);
-            void window.tabula.fs.getDirSize(targetEntry.path).then((result) => {
-              actions.dismissToast(toastId);
-              if (result.ok) {
-                const { size, fileCount, dirCount } = result.data;
-                actions.showToast(`大小: ${formatSize(size)} · 文件: ${fileCount} · 目录: ${dirCount}`, 'success', 3000);
-              } else {
-                actions.showToast(`计算失败: ${result.error.message}`, 'error', 3000);
+            void window.tabula.fs.getDirSize(path).then((startRes) => {
+              if (!startRes.ok) {
+                actions.dismissToast(toastId);
+                actions.showToast(`启动失败: ${startRes.error.message}`, 'error', 3000);
+                return;
               }
+              const { jobId } = startRes.data;
+              const unsub = window.tabula.fs.onDirSizeProgress((p) => {
+                if (p.jobId !== jobId) return;
+                if (p.done) {
+                  actions.dismissToast(toastId);
+                  unsub();
+                  if (p.cancelled) {
+                    actions.showToast('已取消', 'info', 1500);
+                  } else if (p.error) {
+                    actions.showToast(`计算失败: ${p.error}`, 'error', 3000);
+                  } else {
+                    actions.showToast(
+                      `大小: ${formatSize(p.totalBytes)} · 文件: ${p.processedEntries}`,
+                      'success',
+                      3000,
+                    );
+                  }
+                }
+                // 中间进度点(每 100 个文件一次)不弹 toast,只显示「计算中…」
+              });
             });
           }
           hideGlobalMenu();
