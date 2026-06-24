@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "createdAt": "2026-06-23T11:12:45.915Z",
+  "updatedAt": "2026-06-23T11:12:45.915Z",
+  "briefPath": ".omc/ultragoal/brief.md",
+  "goalsPath": ".omc/ultragoal/goals.json",
+  "ledgerPath": ".omc/ultragoal/ledger.jsonl",
+  "claudeGoalMode": "per_story",
+  "goals": [
+    {
+      "id": "G001-compress-extract",
+      "title": "压缩/解压 ZIP",
+      "objective": "P0 已完成",
+      "status": "completed",
+      "attempt": 2,
+      "evidence": "TC:0 err, tests:75/75 passed, runtime:PASS (11/11 zip+unzip roundtrip checks incl unicode/empty-dir/spaces), security:clean",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-24T04:00:49.000Z"
+    },
+    {
+      "id": "G002-invert-selection",
+      "title": "Invert Selection (反选)",
+      "objective": "Ctrl+Shift+I 或右键菜单加「反选」,选中当前目录所有未选中项",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "file-store.ts selectInvert() + command-catalog.ts Ctrl+Shift+I + command-dispatcher.ts. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:16:00.000Z"
+    },
+    {
+      "id": "G003-properties-dialog",
+      "title": "属性对话框 (modal)",
+      "objective": "独立 modal 展示选中项的完整属性(大小/时间戳/路径/权限)",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "右键属性已从 toast 改为 PropertiesPanel modal (dispatch tabula:show-properties). TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:22:00.000Z"
+    },
+    {
+      "id": "G004-rubber-band-selection",
+      "title": "橡皮筋选择 (拖框选)",
+      "objective": "文件列表拖出矩形选框,选中框内所有项",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "FileList.tsx: global mouse move/up listeners + getEntriesInRect() via fixed 28px index math. CSS: .rubber-band-rect overlay. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:24:00.000Z"
+    },
+    {
+      "id": "G005-column-header-sort",
+      "title": "详情视图列头点击排序",
+      "objective": "详情视图点击列头按该列排序",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "SortHeader with onSort={cycleSort} already exists in FileList.tsx lines 617-641. cycleSort in file-store.ts lines 786-799 cycles asc→desc→null. Already fully implemented.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:25:00.000Z"
+    },
+    {
+      "id": "G006-quick-look-shortcut",
+      "title": "Quick Look 快捷键",
+      "objective": "Space 键直通 PreviewPanel",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "App.tsx keydown handler added Space→tabula:toggle-preview. TC:0.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:25:00.000Z"
+    },
+    {
+      "id": "G007-group-by",
+      "title": "Group By (分组)",
+      "objective": "按类型/日期/大小 分组显示",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "store: GroupByMode type + setGroupBy action. FileList: GroupByBar (type/date/size) + groupEntries() + DetailsView grouped virtualizer rendering. CSS: .file-list-group-bar + .file-list-group-header. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:30:00.000Z"
+    },
+    {
+      "id": "G008-tags",
+      "title": "Tags (标记)",
+      "objective": "文件标签系统",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "main/store/tags-store.ts (electron-store) + IPC handlers + preload bridge + api.ts types + ContextMenu tag submenu with color presets + custom tag input. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:33:00.000Z"
+    },
+    {
+      "id": "G009-connect-server",
+      "title": "Connect to Server (SMB/NFS)",
+      "objective": "⌘K 网络位置",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T11:12:45.915Z"
+    },
+    {
+      "id": "G010-lock-file",
+      "title": "Lock File (只读/锁定)",
+      "objective": "右键文件属性设只读/锁定",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "IPC fs:setPermissions (chmod 0o444/0o644) + bridge channel + preload + api.ts type + ContextMenu lock/unlock items. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:35:00.000Z"
+    },
+    {
+      "id": "G011-make-alias",
+      "title": "Make Alias / 符号链接",
+      "objective": "创建符号链接",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "fs:create-symlink IPC (junction mode) + bridge channel + preload + api.ts + ContextMenu '创建快捷方式'. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:36:00.000Z"
+    },
+    {
+      "id": "G012-undo-redo",
+      "title": "Undo / Redo (操作栈)",
+      "objective": "撤销重做操作栈",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "main/undo/undo-manager.ts (undo/redo/executeUndo) + IPC handlers + bridge channels + preload + App.tsx Ctrl+Z/Ctrl+Shift+Z. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:38:00.000Z"
+    },
+    {
+      "id": "G013-batch-rename",
+      "title": "批量重命名",
+      "objective": "Total Commander风格批量重命名",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "command-catalog entry + command-dispatcher file.batch-rename + ContextMenu '批量重命名' (选2+项时显示). BatchRenameDialog already existed. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:40:00.000Z"
+    },
+    {
+      "id": "G014-save-dialog-preserve-selection",
+      "title": "Show in Folder 后保留选中",
+      "objective": "Shell打开文件夹后保留Tabula内选中项",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T11:12:45.915Z",
+      "note": "Requires window activation detection (Electron does not expose 'app returned from background' event). Need: store savedSelection + BrowserWindow.on('focus') restore, or preload 'app-bridge' event. Marked pending until architecture decision."
+    },
+    {
+      "id": "G015-checksum",
+      "title": "文件校验和 SHA-256",
+      "objective": "右键属性加SHA-256列",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "fs:checksum IPC (crypto.createHash streaming) + bridge channel + preload + api.ts type + ContextMenu '计算 SHA-256'. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:42:00.000Z"
+    },
+    {
+      "id": "G016-dir-size-improvement",
+      "title": "目录大小计算改善",
+      "objective": "计算文件夹大小后台异步化+取消支持",
+      "status": "completed",
+      "attempt": 1,
+      "evidence": "DirSizeJob registry + cancelDirSize(jobId) + fs:cancel-dir-size IPC + CANCELLED error code. TC:0, tests 75/75 passed.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T19:45:00.000Z"
+    },
+    {
+      "id": "G017-tar-tgz",
+      "title": "tar / tgz 支持",
+      "objective": "fflate已支持,加TarArchiveProvider",
+      "status": "pending",
+      "attempt": 0,
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-23T11:12:45.915Z",
+      "note": "fflate 0.8.3 没有 tar API。需要额外库（如 tar-stream）并加依赖。跳过，等 P2 或后续迭代。"
+    },
+    {
+      "id": "G018-drag-out-to-app",
+      "title": "选中文件拖拽到外部App",
+      "objective": "Electron drag API实现系统D&D",
+      "status": "completed",
+      "attempt": 2,
+      "evidence": "IPC fs:start-drag (channels.ts FS_START_DRAG + ipc/index.ts handler) + preload + api.ts + FileList.tsx handleRowDragStart calls window.tabula.fs.startDrag(paths) using Electron webContents.startDrag API. NativeImage from first file used as drag icon. TC:0, vitest 75/75.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-24T02:17:00.000Z"
+    },
+    {
+      "id": "G019-type-filter-toolbar",
+      "title": "按类型筛选工具栏",
+      "objective": "Finder工具栏文件类型快速筛选",
+      "status": "skipped",
+      "attempt": 1,
+      "evidence": "功能已移除：Toolbar 筛选按钮、file-store typeFilter 字段及 computeFilteredSorted 中的过滤逻辑全部删除。TC:0, vitest 75/75.",
+      "createdAt": "2026-06-23T11:12:45.915Z",
+      "updatedAt": "2026-06-24T02:09:00.000Z"
+    }
+  ]
+}
