@@ -101,10 +101,10 @@
       "title": "Lock File (只读/锁定)",
       "objective": "右键文件属性设只读/锁定",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "IPC fs:setPermissions (chmod 0o444/0o644) + bridge channel + preload + api.ts type + ContextMenu lock/unlock items. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "FS_SET_PERMISSIONS IPC + chmod 0o444/0o644 + ContextMenu 锁定/解锁. TC:0 err, tests:137/137 passed.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:35:00.000Z"
+      "updatedAt": "2026-06-24T13:25:00.000Z"
     },
     {
       "id": "G011-make-alias",
