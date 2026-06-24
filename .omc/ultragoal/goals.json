@@ -181,10 +181,10 @@
       "title": "选中文件拖拽到外部App",
       "objective": "Electron drag API实现系统D&D",
       "status": "completed",
-      "attempt": 3,
-      "evidence": "FS_START_DRAG IPC + webContents.startDrag({file,icon}) + Tabula.ico fallback for non-images. Multi-file limited to first file. TC:0 err, tests:198/198 (9 new start-drag tests: first-file / image-icon / fallback-icon / startDrag-throws / non-Error-throw / empty-paths / undefined-paths / resolveDragIconPath empty+non-empty). Commit 58d39d9.",
+      "attempt": 4,
+      "evidence": "FIX: icon path uses app.isPackaged + app.getAppPath() (matches window-manager pattern). TC:0 err, tests:200/200 (2 new regression tests covering dev → /repo/build-assets/icon/Tabula.ico + packaged → process.resourcesPath/resources/Tabula.ico). Commit 595b41e.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-24T14:32:00.000Z"
+      "updatedAt": "2026-06-24T14:45:00.000Z"
     },
     {
       "id": "G019-type-filter-toolbar",
