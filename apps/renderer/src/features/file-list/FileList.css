@@ -439,3 +439,19 @@
 .file-icon-code   { color: #ff9500; } /* system orange */
 .file-icon-text   { color: var(--fg-secondary); }
 .file-icon-default{ color: var(--fg-tertiary); }
+
+/* =================== G004: 橡皮筋拖框 ===================
+ * - 渲染在 file-list-body 的 children(由 inline style 定位),所以
+ *   position: absolute 相对于 body 内部的内容坐标。
+ * - pointer-events: none 保证不阻挡鼠标事件向下穿透(mousemove/up
+ *   仍由 window 监听器接收,row click 仍由 row 自己处理)。
+ * - z-index 抬高到 rows 之上,让用户清楚看到当前框选范围。
+ */
+.rubber-band-rect {
+  position: absolute;
+  border: 1px dashed var(--accent, #007acc);
+  background: rgba(99, 102, 241, 0.12);
+  pointer-events: none;
+  z-index: 10;
+  box-sizing: border-box;
+}

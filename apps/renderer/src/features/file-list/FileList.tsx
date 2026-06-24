@@ -56,6 +56,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   const rangeSelect = useFileStore((s) => s.rangeSelect);
   const clearSelection = useFileStore((s) => s.clearSelection);
   const selectAll = useFileStore((s) => s.selectAll);
+  const selectRect = useFileStore((s) => s.selectRect);
   const setCursor = useFileStore((s) => s.setCursor);
   const cycleSort = useFileStore((s) => s.cycleSort);
   const beginRename = useFileStore((s) => s.beginRename);
@@ -93,7 +94,23 @@ export function FileList({ paneId, onOpenEntry }: Props) {
 
   // === 容器 ref & 虚拟滚动 ===
   const containerRef = useRef<HTMLDivElement>(null);
+  // G004: 橡皮筋拖框 — ref 指向视图 body(滚动容器),用于坐标原点
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   const [gridCols, setGridCols] = useState(4);
+
+  // G004: rubber-band 状态。当前鼠标位置 + 起点的 clientX/Y。
+  // 当不为 null 时,说明正在拖框;UI 会渲染 .rubber-band-rect overlay。
+  interface RubberBand {
+    startX: number;
+    startY: number;
+    curX: number;
+    curY: number;
+  }
+  const [rubberBand, setRubberBand] = useState<RubberBand | null>(null);
+  const rubberBandRef = useRef<RubberBand | null>(null);
+  // 在哪个元素上开始拖框(记录后,在 mousemove/up 阶段保持监听,即使
+  // 鼠标快速移出原始元素也不会丢事件)。用 window 监听兜底。
+  const RUBBER_BAND_DRAG_THRESHOLD = 4; // px,小于这个位移视为点击,不起框
 
   // 监听容器宽度更新 grid 列数
   useLayoutEffect(() => {
@@ -456,6 +473,157 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     [onOpenEntry],
   );
 
+  // === G004: 橡皮筋拖框 — 在 file-list-body 上的 mousedown 启动 ===
+  // 用 useCallback + ref 拿到最新 entries / 函数,避免把 entries 放进依赖导致重启监听。
+  // 关键策略:
+  //  - 仅在 mousedown 目标 = 当前元素(空白处)时启动,避开 row / header / cell。
+  //  - mousemove / mouseup 用 window 监听,避免快速移出元素丢事件。
+  //  - 位移 < 4px 视为普通点击,让现有的"点空白清空 selection"行为保留。
+  //  - 拖框动作命中 row 时,把该 row 加入 selection;释放时一次性 commit selectRect。
+  const computeEntriesInRect = useCallback(
+    (band: RubberBand, list: FsEntry[]): string[] => {
+      // 视图 body 的滚动容器作为坐标原点。
+      const body = bodyRef.current;
+      if (!body || list.length === 0) return [];
+      const bodyRect = body.getBoundingClientRect();
+      // body 内可见区域(滚动后)
+      const bodyLeft = bodyRect.left;
+      const bodyTop = bodyRect.top;
+      const scrollTop = body.scrollTop;
+      const scrollLeft = body.scrollLeft;
+
+      // 归一化 band 坐标(让 start <= cur)。
+      const x1 = Math.min(band.startX, band.curX);
+      const x2 = Math.max(band.startX, band.curX);
+      const y1 = Math.min(band.startY, band.curY);
+      const y2 = Math.max(band.startY, band.curY);
+
+      // 转换到 body 内部坐标(相对 body 内容左上角,已考虑滚动)
+      const bandLeft = x1 - bodyLeft + scrollLeft;
+      const bandTop = y1 - bodyTop + scrollTop;
+      const bandRight = x2 - bodyLeft + scrollLeft;
+      const bandBottom = y2 - bodyTop + scrollTop;
+
+      // 行高:details / list 用 28px,grid 用 96px(对齐 virtualizer estimateSize)
+      const rowH = viewMode === 'grid' ? 96 : 28;
+      const out: string[] = [];
+
+      if (viewMode === 'grid') {
+        const cols = Math.max(1, gridCols);
+        const rowHeight = 96;
+        const cellHeight = rowHeight;
+        const cellGap = 4; // 与 CSS .grid-row gap 一致
+        const colWidth = Math.max(1, (bodyRect.width - 24) / cols);
+        const startRow = Math.max(0, Math.floor(bandTop / cellHeight));
+        const endRow = Math.min(
+          Math.ceil(list.length / cols) - 1,
+          Math.floor(bandBottom / cellHeight),
+        );
+        for (let r = startRow; r <= endRow; r++) {
+          for (let c = 0; c < cols; c++) {
+            const idx = r * cols + c;
+            if (idx >= list.length) break;
+            const cellLeft = c * (colWidth + cellGap);
+            const cellRight = cellLeft + colWidth;
+            const cellTop = r * cellHeight;
+            const cellBottom = cellTop + cellHeight;
+            // 相交判定(AABB 命中即选)
+            if (
+              cellRight >= bandLeft &&
+              cellLeft <= bandRight &&
+              cellBottom >= bandTop &&
+              cellTop <= bandBottom
+            ) {
+              out.push(list[idx]!.path);
+            }
+          }
+        }
+        // suppress unused rowH warning for grid
+        void rowH;
+      } else {
+        // details / list:固定行高 28px
+        const startIdx = Math.max(0, Math.floor(bandTop / rowH));
+        const endIdx = Math.min(list.length - 1, Math.floor(bandBottom / rowH));
+        // details 视图行宽为 body 整个宽度;没有列概念,所以只判定 Y 轴相交。
+        // 但为了和"穿过行即选中"的 Finder 行为一致,仍要求 band 与 row 有真实重叠。
+        for (let i = startIdx; i <= endIdx; i++) {
+          const rowTop = i * rowH;
+          const rowBottom = rowTop + rowH;
+          if (rowBottom >= bandTop && rowTop <= bandBottom) {
+            out.push(list[i]!.path);
+          }
+        }
+      }
+      return out;
+    },
+    [viewMode, gridCols],
+  );
+
+  // mousedown on the body (empty area between rows or below them)
+  const handleBodyMouseDown = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      // 仅在左键 + 命中当前 body 元素(空白区域)时启动拖框。
+      // 若点击命中 row / header / cell,这些元素自己处理,不进入拖框分支。
+      if (e.button !== 0) return;
+      if (e.target !== e.currentTarget) return;
+      // 必须阻止默认文本选择 + 防止后续 click 触发 row 处理
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const initial: RubberBand = { startX, startY, curX: startX, curY: startY };
+      rubberBandRef.current = initial;
+      setRubberBand(initial);
+    },
+    [],
+  );
+
+  // === G004: 拖框过程 — 全局 mousemove / mouseup ===
+  // 用 ref 拿到最新 entries / paneId / 状态,避免反复重启监听。
+  useEffect(() => {
+    if (!rubberBand) return;
+    const onMove = (e: MouseEvent) => {
+      const cur = rubberBandRef.current;
+      if (!cur) return;
+      const next: RubberBand = { ...cur, curX: e.clientX, curY: e.clientY };
+      rubberBandRef.current = next;
+      setRubberBand(next);
+    };
+    const onUp = (e: MouseEvent) => {
+      const cur = rubberBandRef.current;
+      rubberBandRef.current = null;
+      setRubberBand(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (!cur) return;
+      const dx = Math.abs(e.clientX - cur.startX);
+      const dy = Math.abs(e.clientY - cur.startY);
+      // 位移太小 → 当作普通点击(由 mousedown handler 之后会执行 clearSelection)
+      if (dx < RUBBER_BAND_DRAG_THRESHOLD && dy < RUBBER_BAND_DRAG_THRESHOLD) {
+        clearSelection(paneId);
+        return;
+      }
+      const paths = computeEntriesInRect(
+        { startX: cur.startX, startY: cur.startY, curX: e.clientX, curY: e.clientY },
+        sortedEntries,
+      );
+      selectRect(paneId, paths);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rubberBand !== null]);
+
+  // 切换目录 / pane 时清掉残留的拖框状态
+  useEffect(() => {
+    rubberBandRef.current = null;
+    setRubberBand(null);
+  }, [paneId, currentPath]);
+
   // === 错误 / 加载 / 空 ===
   if (error) {
     return (
@@ -578,6 +746,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
           onDrop={handleContainerDrop}
+          bodyRef={bodyRef}
+          onBodyMouseDown={handleBodyMouseDown}
+          rubberBand={rubberBand}
         />
       )}
       {viewMode === 'list' && (
@@ -596,6 +767,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
           onDrop={handleContainerDrop}
+          bodyRef={bodyRef}
+          onBodyMouseDown={handleBodyMouseDown}
+          rubberBand={rubberBand}
         />
       )}
       {viewMode === 'grid' && (
@@ -615,6 +789,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
           onDrop={handleContainerDrop}
+          bodyRef={bodyRef}
+          onBodyMouseDown={handleBodyMouseDown}
+          rubberBand={rubberBand}
         />
       )}
     </div>
@@ -694,6 +871,12 @@ interface DetailsViewProps {
   onDragOver?: (e: ReactDragEvent<HTMLDivElement>) => void;
   onDragLeave?: (e: ReactDragEvent<HTMLDivElement>) => void;
   onDrop?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  /** G004: 用于把 body 元素 ref 上抛到父组件,作为橡皮筋坐标原点 */
+  bodyRef?: React.MutableRefObject<HTMLDivElement | null>;
+  /** G004: 在 body 空白处按下鼠标时启动拖框 */
+  onBodyMouseDown?: (e: ReactMouseEvent<HTMLDivElement>) => void;
+  /** G004: 当前 rubber-band overlay 几何(用于在 body 上画 overlay) */
+  rubberBand?: { startX: number; startY: number; curX: number; curY: number } | null;
 }
 
 function DetailsView({
@@ -711,8 +894,11 @@ function DetailsView({
   onDragOver,
   onDragLeave,
   onDrop,
+  bodyRef,
+  onBodyMouseDown,
+  rubberBand,
 }: Omit<DetailsViewProps, 'sortBy' | 'sortDir' | 'onHeaderSort'>) {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => parentRef.current,
@@ -720,14 +906,24 @@ function DetailsView({
     overscan: 12,
   });
 
+  // rubber-band overlay 几何:与 FileList.tsx 里 computeEntriesInRect 同样的转换逻辑
+  const overlayStyle = rubberBand
+    ? computeOverlayStyle(parentRef.current, rubberBand)
+    : null;
+
   return (
     <div
-      ref={parentRef}
+      ref={(el) => {
+        parentRef.current = el;
+        if (bodyRef) bodyRef.current = el;
+      }}
       className="details-view file-list-body file-list-body-virtual"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      onMouseDown={onBodyMouseDown}
     >
+      {overlayStyle && <div className="rubber-band-rect" style={overlayStyle} />}
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
@@ -878,6 +1074,9 @@ function ListView({
   onDragOver,
   onDragLeave,
   onDrop,
+  bodyRef,
+  onBodyMouseDown,
+  rubberBand,
 }: {
   entries: FsEntry[];
   showExtensions: boolean;
@@ -893,8 +1092,11 @@ function ListView({
   onDragOver?: (e: ReactDragEvent<HTMLDivElement>) => void;
   onDragLeave?: (e: ReactDragEvent<HTMLDivElement>) => void;
   onDrop?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  bodyRef?: React.MutableRefObject<HTMLDivElement | null>;
+  onBodyMouseDown?: (e: ReactMouseEvent<HTMLDivElement>) => void;
+  rubberBand?: { startX: number; startY: number; curX: number; curY: number } | null;
 }) {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => parentRef.current,
@@ -902,14 +1104,23 @@ function ListView({
     overscan: 12,
   });
 
+  const overlayStyle = rubberBand
+    ? computeOverlayStyle(parentRef.current, rubberBand)
+    : null;
+
   return (
     <div
-      ref={parentRef}
+      ref={(el) => {
+        parentRef.current = el;
+        if (bodyRef) bodyRef.current = el;
+      }}
       className="list-view file-list-body file-list-body-virtual"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      onMouseDown={onBodyMouseDown}
     >
+      {overlayStyle && <div className="rubber-band-rect" style={overlayStyle} />}
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
@@ -981,6 +1192,9 @@ function GridView({
   onDragOver,
   onDragLeave,
   onDrop,
+  bodyRef,
+  onBodyMouseDown,
+  rubberBand,
 }: {
   entries: FsEntry[];
   cols: number;
@@ -997,8 +1211,11 @@ function GridView({
   onDragOver?: (e: ReactDragEvent<HTMLDivElement>) => void;
   onDragLeave?: (e: ReactDragEvent<HTMLDivElement>) => void;
   onDrop?: (e: ReactDragEvent<HTMLDivElement>) => void;
+  bodyRef?: React.MutableRefObject<HTMLDivElement | null>;
+  onBodyMouseDown?: (e: ReactMouseEvent<HTMLDivElement>) => void;
+  rubberBand?: { startX: number; startY: number; curX: number; curY: number } | null;
 }) {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement | null>(null);
   const rows = Math.ceil(entries.length / cols);
   const rowVirtualizer = useVirtualizer({
     count: rows,
@@ -1007,15 +1224,24 @@ function GridView({
     overscan: 4,
   });
 
+  const overlayStyle = rubberBand
+    ? computeOverlayStyle(parentRef.current, rubberBand)
+    : null;
+
   return (
     <div
-      ref={parentRef}
+      ref={(el) => {
+        parentRef.current = el;
+        if (bodyRef) bodyRef.current = el;
+      }}
       className="grid-view file-list-body file-list-body-virtual"
       style={{ ['--grid-cols' as string]: String(cols) }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      onMouseDown={onBodyMouseDown}
     >
+      {overlayStyle && <div className="rubber-band-rect" style={overlayStyle} />}
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
@@ -1249,4 +1475,34 @@ function parentOf(p: string): string {
     return parent;
   }
   return '';
+}
+
+/**
+ * G004: 计算橡皮筋 overlay 元素的 inline style(相对于 body 容器)。
+ * body 是滚动容器,overlay 必须是 body 的 child 并用 absolute 定位,
+ * 把 clientX/Y 减去 body 自身位置 + scroll offset,得到 body 内容坐标系。
+ */
+function computeOverlayStyle(
+  body: HTMLDivElement | null,
+  band: { startX: number; startY: number; curX: number; curY: number },
+): React.CSSProperties | null {
+  if (!body) return null;
+  const rect = body.getBoundingClientRect();
+  const scrollTop = body.scrollTop;
+  const scrollLeft = body.scrollLeft;
+  const x1 = Math.min(band.startX, band.curX);
+  const x2 = Math.max(band.startX, band.curX);
+  const y1 = Math.min(band.startY, band.curY);
+  const y2 = Math.max(band.startY, band.curY);
+  const left = x1 - rect.left + scrollLeft;
+  const top = y1 - rect.top + scrollTop;
+  const width = Math.max(1, x2 - x1);
+  const height = Math.max(1, y2 - y1);
+  return {
+    position: 'absolute',
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  };
 }

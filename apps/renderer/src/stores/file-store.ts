@@ -292,6 +292,14 @@ interface FileStore {
   clearSelection: (paneId: string) => void;
   selectAll: (paneId: string) => void;
   selectInvert: (paneId: string) => void;
+  /**
+   * G004: 橡皮筋拖框选择 — 直接把 selection 设为传入的路径集合。
+   * - 行为是「替换」,而不是「合并」:这与原生 Finder / Explorer 的
+   *   rubber-band 体验一致 — 拖框就是一次明确的 selection 重新声明。
+   * - 传空数组等价于 clearSelection。
+   * - 未知 paneId:安全 no-op(不抛错)。
+   */
+  selectRect: (paneId: string, paths: string[]) => void;
   setCursor: (paneId: string, path: string | null) => void;
   moveCursor: (paneId: string, delta: number, viewportSize: number) => void;
   cursorToEdge: (paneId: string, edge: 'start' | 'end') => void;
@@ -917,6 +925,36 @@ export const useFileStore = create<FileStore>((set, get) => {
         panes: {
           ...s.panes,
           [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), selectedPaths: inverted },
+        },
+      }));
+    },
+
+    // G004: 橡皮筋拖框 — 用传入的 paths 替换 selectedPaths。
+    // - 未知 paneId:no-op
+    // - 空数组:等价于 clearSelection(同时清掉 cursor / lastClicked)
+    // - 非空:用新 Set 替换;保留 cursor/lastClicked 不动(用户通常还在框选后做后续操作)
+    selectRect: (paneId, paths) => {
+      const data = get().panes[paneId];
+      if (!data) return;
+      const next = new Set(paths);
+      if (next.size === 0) {
+        set((s) => ({
+          panes: {
+            ...s.panes,
+            [paneId]: {
+              ...(s.panes[paneId] ?? emptyPaneData()),
+              selectedPaths: next,
+              cursorPath: null,
+              lastClickedPath: null,
+            },
+          },
+        }));
+        return;
+      }
+      set((s) => ({
+        panes: {
+          ...s.panes,
+          [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), selectedPaths: next },
         },
       }));
     },

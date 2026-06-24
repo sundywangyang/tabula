@@ -22,30 +22,30 @@
       "title": "Invert Selection (反选)",
       "objective": "Ctrl+Shift+I 或右键菜单加「反选」,选中当前目录所有未选中项",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "file-store.ts selectInvert() + command-catalog.ts Ctrl+Shift+I + command-dispatcher.ts. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "selectInvert() in file-store.ts + Ctrl+Shift+I binding in command-catalog.ts + 反选 in ContextMenu. TC:0 err, tests:82/82 passed (commit 05653f8).",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:16:00.000Z"
+      "updatedAt": "2026-06-24T12:18:00.000Z"
     },
     {
       "id": "G003-properties-dialog",
       "title": "属性对话框 (modal)",
       "objective": "独立 modal 展示选中项的完整属性(大小/时间戳/路径/权限)",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "右键属性已从 toast 改为 PropertiesPanel modal (dispatch tabula:show-properties). TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "ContextMenu '属性' item now dispatches tabula:show-properties (was a toast); App.tsx listener routes to useUiDialogsStore.openPropertiesPanel(paneId, entry); App.tsx renders <PropertiesPanel> when propertiesPanel.open && entry. Panel shows name/path/size(格式化)/birthtime/mtime/atime + dir size button + open-in-explorer + Esc/X/click-outside to close. New test properties-panel.test.ts (6 tests) covers open/close/overwrite. TC:0 err, tests:88/88 passed.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:22:00.000Z"
+      "updatedAt": "2026-06-24T12:25:00.000Z"
     },
     {
       "id": "G004-rubber-band-selection",
       "title": "橡皮筋选择 (拖框选)",
       "objective": "文件列表拖出矩形选框,选中框内所有项",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "FileList.tsx: global mouse move/up listeners + getEntriesInRect() via fixed 28px index math. CSS: .rubber-band-rect overlay. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "selectRect() in file-store.ts + FileList.tsx rubber-band state + .rubber-band-rect CSS overlay. TC:0 err, tests:95/95.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:24:00.000Z"
+      "updatedAt": "2026-06-24T12:38:00.000Z"
     },
     {
       "id": "G005-column-header-sort",
