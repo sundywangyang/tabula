@@ -31,6 +31,17 @@ export type ViewMode = 'list' | 'grid' | 'details';
 export type SortField = 'name' | 'size' | 'mtime' | 'type';
 export type SortDir = 'asc' | 'desc' | null;
 
+// =================== G007: Group By (分组) ===================
+
+/** G007: 分组模式。'none' = 不分组(单段),其余按指定维度分组。 */
+export type GroupByMode = 'none' | 'type' | 'date' | 'size';
+
+/** G007: 分组后的一段(header 是组的可读标签,如 ".js" / "Today" / "Large (>10 MB)") */
+export interface GroupSection {
+  header: string;
+  entries: FsEntry[];
+}
+
 // =================== P3:剪贴板 / 拖放 / 通知 ===================
 
 /** 全局剪贴板状态(copy / cut + 路径列表) */
@@ -118,6 +129,9 @@ export interface PaneFileData {
 
   /** 视图模式(list/grid/details)，每个 pane 独立 */
   viewMode: ViewMode;
+
+  // G007: 当前 pane 的分组模式(per-pane)
+  groupBy: GroupByMode;
 }
 
 function emptyPaneData(): PaneFileData {
@@ -134,6 +148,7 @@ function emptyPaneData(): PaneFileData {
     searchQuery: '',
     searchOpen: false,
     viewMode: 'details',
+    groupBy: 'none',
   };
 }
 
@@ -280,6 +295,8 @@ interface FileStore {
 
   // ============ Per-pane: 视图设置(每个 pane 独立)===========
   setViewMode: (paneId: string, mode: ViewMode) => void;
+  // G007: 设置 pane 的分组模式
+  setGroupBy: (paneId: string, mode: GroupByMode) => void;
   cycleSort: (field: SortField) => void;
   toggleShowHidden: () => void;
   toggleShowExtensions: () => void;
@@ -613,6 +630,89 @@ async function persistConfig(key: string, value: unknown): Promise<void> {
   }
 }
 
+// =================== G007: 分组 helper ===================
+
+/** G007: 大小桶阈值(字节)。包含顺序:逐桶往上,落到第一个命中区间。 */
+const SIZE_BUCKETS: ReadonlyArray<{ header: string; min: number; max: number }> = [
+  { header: 'Tiny (< 1 KB)', min: 0, max: 1024 },
+  { header: 'Small (1 KB – 1 MB)', min: 1024, max: 1024 * 1024 },
+  { header: 'Medium (1 MB – 100 MB)', min: 1024 * 1024, max: 100 * 1024 * 1024 },
+  { header: 'Large (100 MB – 1 GB)', min: 100 * 1024 * 1024, max: 1024 * 1024 * 1024 },
+  { header: 'Huge (> 1 GB)', min: 1024 * 1024 * 1024, max: Number.POSITIVE_INFINITY },
+];
+
+/** G007: 日期桶 — 给一个 mtime 返回可读 bucket header。 */
+function dateBucketLabel(mtime: number, now: number): string {
+  if (!mtime) return 'Unknown';
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  const diffDays = Math.floor((now - mtime) / ONE_DAY);
+  if (diffDays < 1) return 'Today';
+  if (diffDays < 2) return 'Yesterday';
+  if (diffDays < 7) return 'This Week';
+  if (diffDays < 30) return 'This Month';
+  if (diffDays < 365) return 'This Year';
+  return 'Older';
+}
+
+/**
+ * G007: 把 entries 按 mode 分组。
+ *
+ * - 'none'  → 单段(空 header + 全部 entries)
+ * - 'type'  → 目录先一段('Folders'),然后按 ext(.js/.ts/...)分组,无 ext 一段('No Extension')
+ * - 'date'  → 按 mtime 相对今天的 bucket 分组(Today / Yesterday / This Week / ...)
+ * - 'size'  → 按 SIZE_BUCKETS 分组
+ *
+ * 各组内 entries 保持输入顺序(已排好序再传入更佳)。
+ */
+export function groupEntries(entries: FsEntry[], mode: GroupByMode): GroupSection[] {
+  if (mode === 'none') return [{ header: '', entries: [...entries] }];
+
+  // 用 Map 维持首次插入顺序,这样组顺序确定且稳定
+  const groups = new Map<string, FsEntry[]>();
+  const dirs: FsEntry[] = [];
+
+  if (mode === 'type') {
+    for (const e of entries) {
+      if (e.isDirectory) {
+        dirs.push(e);
+      } else {
+        const key = e.ext ? e.ext : '(no extension)';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(e);
+      }
+    }
+  } else if (mode === 'date') {
+    const now = Date.now();
+    for (const e of entries) {
+      if (e.isDirectory) {
+        dirs.push(e);
+        continue;
+      }
+      const key = dateBucketLabel(e.mtime, now);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(e);
+    }
+  } else if (mode === 'size') {
+    for (const e of entries) {
+      if (e.isDirectory) {
+        dirs.push(e);
+        continue;
+      }
+      const bucket = SIZE_BUCKETS.find((b) => e.size >= b.min && e.size < b.max);
+      const key = bucket ? bucket.header : 'Unknown';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(e);
+    }
+  }
+
+  const sections: GroupSection[] = [];
+  if (dirs.length > 0) sections.push({ header: 'Folders', entries: dirs });
+  for (const [header, items] of groups) {
+    sections.push({ header, entries: items });
+  }
+  return sections;
+}
+
 // =================== Store ===================
 
 export const useFileStore = create<FileStore>((set, get) => {
@@ -789,6 +889,16 @@ export const useFileStore = create<FileStore>((set, get) => {
         },
       }));
       void persistConfig(VIEW_KEY, mode); // 持久化最后一个切换的视图模式(新 pane 默认值)
+    },
+
+    // G007: 设置 pane 的分组模式(per-pane;v1 不持久化,UI 渲染延后实现)
+    setGroupBy: (paneId, mode) => {
+      set((s) => ({
+        panes: {
+          ...s.panes,
+          [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), groupBy: mode },
+        },
+      }));
     },
 
     cycleSort: (field) => {

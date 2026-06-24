@@ -60,6 +60,7 @@ function makePaneData(): PaneFileData {
     searchQuery: '',
     searchOpen: false,
     viewMode: 'details',
+    groupBy: 'none',
   };
 }
 

@@ -56,6 +56,7 @@ function makePaneData(overrides: Partial<PaneFileData> = {}): PaneFileData {
     searchQuery: '',
     searchOpen: false,
     viewMode: 'details',
+    groupBy: 'none',
     ...overrides,
   };
 }
