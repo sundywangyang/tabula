@@ -17,12 +17,23 @@ export interface FsEntry {
   ctime: number;
   birthtime: number;
   ext: string;       // 包含点,小写,目录为空字符串
+  /**
+   * POSIX 权限位(只读 owner)。Windows 上 fs.stat 不可用,值为 0。
+   * 锁定判断: `(mode & 0o400) === 0` 表示文件对 owner 只读。
+   */
+  mode: number;
 }
 
 export interface ListDirResult {
   path: string;
   entries: FsEntry[];
   total: number;
+}
+
+/** G010: 设置文件只读/可写 权限(Windows: ReadOnly bit;Unix: 0o444/0o644) */
+export interface FsSetPermissionsRequest {
+  path: string;
+  readonly: boolean;
 }
 
 export type FsErrorCode =

@@ -10,6 +10,7 @@ import type {
   ArchiveProgress,
   CompressRequest,
   ExtractRequest,
+  FsSetPermissionsRequest,
   TabulaAPI,
 } from '@tabula/bridge';
 
@@ -160,6 +161,8 @@ const api: TabulaAPI = {
     writeClipboard: (text) => ipcRenderer.invoke(IpcChannels.FS_WRITE_CLIPBOARD, text),
     openWithDialog: (p) => ipcRenderer.invoke(IpcChannels.FS_OPEN_WITH_DIALOG, p),
     saveDialog: (opts) => ipcRenderer.invoke(IpcChannels.FS_SAVE_DIALOG, opts ?? {}),
+    setPermissions: (req: FsSetPermissionsRequest) =>
+      ipcRenderer.invoke(IpcChannels.FS_SET_PERMISSIONS, req),
   },
 
   tabs: {

@@ -5,9 +5,11 @@
  */
 import { ipcMain, dialog, shell, app, clipboard } from 'electron';
 import { promises as fs } from 'node:fs';
+import { chmod } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
-import type { AppConfig, FsErrorCode, UpdateStatus } from '@tabula/bridge';
+import type { AppConfig, FsErrorCode, FsSetPermissionsRequest, UpdateStatus } from '@tabula/bridge';
+import { handleSetPermissions } from './handlers';
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
 import * as trashService from '../fs/trash';
@@ -180,6 +182,12 @@ export function registerIpcHandlers(ctx: IpcContext) {
     });
     return result.canceled ? null : result.filePath;
   });
+
+  // =================== Set Permissions (G010: 锁定/解锁) ===================
+  // Windows: fs.chmod 0o444/0o644 走 ReadOnly bit;Unix: 标准 POSIX 模式位
+  ipcMain.handle(IpcChannels.FS_SET_PERMISSIONS, (_e, req: FsSetPermissionsRequest) =>
+    handleSetPermissions(req, chmod),
+  );
 
   // =================== Thumbnail (P7 v1) ===================
   ipcMain.handle(IpcChannels.FS_GET_THUMBNAIL, (_e, p: string) => {

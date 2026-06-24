@@ -32,6 +32,7 @@ function makeEntry(
     ctime: 0,
     birthtime: 0,
     ext: opts.ext ?? '',
+    mode: 0o644,
   };
 }
 

@@ -39,6 +39,7 @@ export const IpcChannels = {
   FS_WRITE_CLIPBOARD: 'fs:write-clipboard',
   FS_OPEN_WITH_DIALOG: 'fs:open-with-dialog',
   FS_SAVE_DIALOG: 'fs:save-dialog',
+  FS_SET_PERMISSIONS: 'fs:set-permissions',
 
   // 标签
   TABS_OPEN: 'tabs:open',

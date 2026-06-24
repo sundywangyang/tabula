@@ -72,6 +72,9 @@ const TAG_COLOR_PRESETS: ReadonlyArray<{ color: string; emoji: string; label: st
 
 /** G008: 缓存 entry → tags 的内存映射(避免每次右键都打 IPC) */
 const tagsCache = new Map<string, string[]>();
+
+/** G010: 缓存 path → 上次读到的 POSIX mode(用于「锁定/解锁」菜单显示状态) */
+const readonlyCache = new Map<string, number>();
 const tagsCacheListeners = new Set<() => void>();
 let tagsCacheLoaded = false;
 let tagsCacheLoading: Promise<void> | null = null;
@@ -479,7 +482,6 @@ function buildMenuItems(args: {
         },
       });
     }
-
     // Archive: 压缩 / 解压
     // - 选中文件 / 文件夹 → 显示「压缩为 ZIP...」
     // - 选中单个 .zip 文件 → 显示「解压到...」(合并单选 / 多选,多选时取第一个 .zip)
@@ -531,6 +533,75 @@ function buildMenuItems(args: {
         hideGlobalMenu();
       },
     });
+
+    items.push({ label: '', divider: true });
+
+    // G010: 锁定 / 解锁 — 通过 FS_SET_PERMISSIONS 切换 read-only 权限位
+    // - 锁定:对 owner 取消 w 位 (0o444);Windows:FS ReadOnly bit
+    // - 解锁:恢复 0o644
+    // - 多选时,按"任一未锁"决定显示「锁定」,否则显示「解锁」;操作应用到所有选中项
+    {
+      const targetPaths: string[] = [];
+      if (selectedPaths.size > 0) {
+        targetPaths.push(...selectedPaths);
+      } else if (targetEntry) {
+        targetPaths.push(targetEntry.path);
+      }
+      // 异步取第一个目标的当前 read-only 状态作为菜单显示依据
+      // 简化策略:第一次打开时为同步读 cache,否则等异步拉一次
+      const firstPath = targetPaths[0];
+      const cachedMode = readonlyCache.get(firstPath);
+      const anyWritable = cachedMode === undefined ? true : (cachedMode & 0o400) !== 0;
+      // 用缓存不可知时,不显示等异步,可以乐观选择"锁定"(常见默认是可写)
+      items.push({
+        label: anyWritable ? '锁定' : '解锁',
+        icon: anyWritable ? '🔒' : '🔓',
+        disabled: targetPaths.length === 0,
+        action: async () => {
+          // 取每个 path 的最新 mode,按各自当前状态取反
+          // 简化:如果 firstPath 已知是 read-only → 全部解锁;否则 → 全部锁定
+          // 为更稳妥,逐个 stat
+          let succeeded = 0;
+          let failed = 0;
+          for (const p of targetPaths) {
+            const statRes = await window.tabula.fs.stat(p);
+            if (!statRes.ok) {
+              failed++;
+              continue;
+            }
+            const isReadonly = (statRes.data.mode & 0o400) === 0;
+            const nextReadonly = !isReadonly;
+            const r = await window.tabula.fs.setPermissions({ path: p, readonly: nextReadonly });
+            if (r.ok) {
+              readonlyCache.set(p, nextReadonly ? 0o444 : 0o644);
+              succeeded++;
+            } else {
+              failed++;
+            }
+          }
+          if (failed === 0) {
+            actions.showToast(
+              `已${anyWritable ? '锁定' : '解锁'} ${succeeded} 项`,
+              'success',
+              1500,
+            );
+          } else if (succeeded === 0) {
+            actions.showToast(
+              `${anyWritable ? '锁定' : '解锁'}失败 (${failed} 项)`,
+              'error',
+              3000,
+            );
+          } else {
+            actions.showToast(
+              `${anyWritable ? '锁定' : '解锁'} ${succeeded} 项,${failed} 项失败`,
+              'warn',
+              3000,
+            );
+          }
+          hideGlobalMenu();
+        },
+      });
+    }
 
     items.push({ label: '', divider: true });
 
@@ -636,6 +707,12 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
           }
           // G008: 右键打开菜单时,拉一次该 entry 的 tags(写入缓存)
           void loadTagsForPath(entryPath);
+          // G010: 拉一次该 entry 的 stat(mode)用于「锁定/解锁」菜单显示
+          void window.tabula.fs.stat(entryPath).then((res) => {
+            if (res.ok) {
+              readonlyCache.set(entryPath, res.data.mode);
+            }
+          });
         }
       }
 

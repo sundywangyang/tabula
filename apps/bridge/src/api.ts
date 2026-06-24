@@ -17,6 +17,7 @@ import type {
   ExtractRequest,
   FileTypeFilter,
   FsEntry,
+  FsSetPermissionsRequest,
   KeyCombo,
   LayoutNode,
   ListDirResult,
@@ -174,6 +175,12 @@ export interface TabulaAPI {
       defaultPath?: string;
       filters?: Electron.FileFilter[];
     }): Promise<string | null>;
+    /**
+     * G010: 设置文件只读/可写 权限。
+     * - readonly=true → chmod 0o444 (Windows: FS ReadOnly bit)
+     * - readonly=false → chmod 0o644 (Windows: 清除 ReadOnly bit)
+     */
+    setPermissions(req: FsSetPermissionsRequest): Promise<Result<void>>;
   };
 
   // 标签

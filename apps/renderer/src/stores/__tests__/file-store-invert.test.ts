@@ -34,6 +34,7 @@ function makeEntries(): FsEntry[] {
     ctime: Date.now(),
     birthtime: Date.now(),
     ext: '.txt',
+    mode: 0o644,
   });
   return [
     mk(1, 'alpha.txt'),

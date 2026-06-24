@@ -32,6 +32,7 @@ function mkEntry(i: number): FsEntry {
     ctime: Date.now(),
     birthtime: Date.now(),
     ext: '.txt',
+    mode: 0o644,
   };
 }
 

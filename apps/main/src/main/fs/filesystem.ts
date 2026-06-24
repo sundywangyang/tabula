@@ -50,6 +50,7 @@ export async function listDir(path: string): Promise<Result<ListDirResult>> {
             ctime: 0,
             birthtime: 0,
             ext,
+            mode: 0,
           };
         }
         return {
@@ -64,6 +65,7 @@ export async function listDir(path: string): Promise<Result<ListDirResult>> {
           ctime: stats.ctimeMs,
           birthtime: stats.birthtimeMs,
           ext,
+          mode: stats.mode,
         };
       }),
     );
@@ -222,6 +224,8 @@ export async function stat(path: string): Promise<Result<FsEntry>> {
       ctime: s.ctimeMs,
       birthtime: s.birthtimeMs,
       ext,
+      // POSIX 模式位(Windows 下 fs.stat 不暴露 mode,Node 返回 0;0o400 测试需要时用 unix 平台)
+      mode: s.mode,
     });
   } catch (err) {
     return mapError(err, path);
