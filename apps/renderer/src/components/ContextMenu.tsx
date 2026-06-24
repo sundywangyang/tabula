@@ -18,6 +18,7 @@ import { InputDialog } from './InputDialog';
 import type { FsEntry } from '@tabula/bridge';
 import './ContextMenu.css';
 import { isReadOnly } from '../utils/permissions';
+import { shouldContextMenuReturnNull } from './context-menu-shared';
 
 /** 全局单例:模块级 state,所有 ContextMenu 实例共享 */
 interface GlobalState {
@@ -846,7 +847,18 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
   }, []);
 
   // early return 必须放在所有 hooks 之后,否则 hooks 顺序会被破坏
-  if (!globalState.visible || !globalState.paneId) return null;
+  // G008 fix: 菜单关闭但 dialog 已开,仍要渲染 InputDialog,否则 hideGlobalMenu 后
+  // 与 setTagDialog 一起被批量 setState 抹掉,用户看到「下次右键才弹」的现象。
+  if (
+    shouldContextMenuReturnNull({
+      visible: globalState.visible,
+      paneId: globalState.paneId,
+      hasTagDialog: tagDialog !== null,
+      hasSymlinkDialog: symlinkDialog !== null,
+    })
+  ) {
+    return null;
+  }
 
   const paneId = globalState.paneId;
   const targetEntry = globalState.entry;
@@ -854,7 +866,7 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
   const isEmptySpace = !targetEntry;
 
   // 从 store 取当前 pane 数据(读一次,菜单打开期间用)
-  const paneData = useFileStore.getState().panes[paneId];
+  const paneData = paneId ? useFileStore.getState().panes[paneId] : undefined;
   const selectedPaths = paneData?.selectedPaths ?? new Set<string>();
   const currentPath = paneData?.currentPath ?? '';
   const clipboard = useFileStore.getState().clipboard;
@@ -863,44 +875,26 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
   const actions = useFileStore.getState();
 
   // buildMenuItems 现在是模块级纯函数,直接调用,不依赖 hook 顺序
-  const menuItems = buildMenuItems({
-    paneId,
-    targetEntry,
-    isEmptySpace,
-    selectedPaths,
-    currentPath,
-    clipboard,
-    actions,
-  });
+  // 仅在 paneId 存在时构建菜单项(菜单关闭但 dialog 仍开的情况不应重新构建菜单)
+  const menuItems = paneId
+    ? buildMenuItems({
+        paneId,
+        targetEntry,
+        isEmptySpace,
+        selectedPaths,
+        currentPath,
+        clipboard,
+        actions,
+      })
+    : [];
 
-  return (
-    <div
-      ref={menuRef}
-      className="context-menu"
-      style={{ left: position.x, top: position.y }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {menuItems.map((item, index) => {
-        if (item.divider) {
-          return <div key={index} className="context-menu-divider" />;
-        }
-        return (
-          <button
-            key={index}
-            className={`context-menu-item ${item.disabled ? 'disabled' : ''} ${item.danger ? 'danger' : ''}`}
-            onClick={() => {
-              if (!item.disabled && item.action) {
-                item.action();
-              }
-            }}
-            disabled={item.disabled}
-          >
-            {item.icon && <span className="context-menu-icon">{item.icon}</span>}
-            <span className="context-menu-label">{item.label}</span>
-            {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
-          </button>
-        );
-      })}
+  // G008 fix: 当菜单已隐藏但 dialog 仍开,不显示菜单 div 本身(避免悬空的菜单样式),
+  // 只渲染 dialog fragment,避免 visibility:hidden 级联到 dialog 蒙层。
+  const showMenu = globalState.visible && paneId;
+
+  // dialogs 用一个 fragment 渲染,确保它们不受外层菜单的 visibility 影响
+  const dialogs = (
+    <>
       {tagDialog && (
         <InputDialog
           open={true}
@@ -960,6 +954,42 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
           onCancel={() => setSymlinkDialog(null)}
         />
       )}
+    </>
+  );
+
+  if (!showMenu) {
+    return dialogs;
+  }
+
+  return (
+    <div
+      ref={menuRef}
+      className="context-menu"
+      style={{ left: position.x, top: position.y }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {menuItems.map((item, index) => {
+        if (item.divider) {
+          return <div key={index} className="context-menu-divider" />;
+        }
+        return (
+          <button
+            key={index}
+            className={`context-menu-item ${item.disabled ? 'disabled' : ''} ${item.danger ? 'danger' : ''}`}
+            onClick={() => {
+              if (!item.disabled && item.action) {
+                item.action();
+              }
+            }}
+            disabled={item.disabled}
+          >
+            {item.icon && <span className="context-menu-icon">{item.icon}</span>}
+            <span className="context-menu-label">{item.label}</span>
+            {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
+          </button>
+        );
+      })}
+      {dialogs}
     </div>
   );
 }
