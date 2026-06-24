@@ -62,10 +62,10 @@
       "title": "Quick Look 快捷键",
       "objective": "Space 键直通 PreviewPanel",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "App.tsx keydown handler added Space→tabula:toggle-preview. TC:0.",
+      "attempt": 2,
+      "evidence": "Space key → openPreview()/closePreview() in App.tsx keydown. Esc closes. Skips directories. TC:0 err, tests:110/110.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:25:00.000Z"
+      "updatedAt": "2026-06-24T12:56:00.000Z"
     },
     {
       "id": "G007-group-by",
