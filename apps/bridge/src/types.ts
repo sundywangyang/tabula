@@ -19,7 +19,10 @@ export interface FsEntry {
   ext: string;       // 包含点,小写,目录为空字符串
   /**
    * POSIX 权限位(只读 owner)。Windows 上 fs.stat 不可用,值为 0。
-   * 锁定判断: `(mode & 0o400) === 0` 表示文件对 owner 只读。
+   * 锁定判断: `(mode & 0o200) === 0` 表示文件对 owner 只读。
+   * 注:必须用 owner-write 位(0o200),不能用 read 位(0o400);
+   * 在 Windows 上 fs.chmod 0o444 → 100444,fs.chmod 0o644 → 100666,
+   * 两种 mode 都含 0o400 位,无法区分。
    */
   mode: number;
 }

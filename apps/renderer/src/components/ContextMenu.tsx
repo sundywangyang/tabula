@@ -17,6 +17,7 @@ import { useLayoutStore } from '../stores/layout-store';
 import { InputDialog } from './InputDialog';
 import type { FsEntry } from '@tabula/bridge';
 import './ContextMenu.css';
+import { isReadOnly } from '../utils/permissions';
 
 /** 全局单例:模块级 state,所有 ContextMenu 实例共享 */
 interface GlobalState {
@@ -551,7 +552,7 @@ function buildMenuItems(args: {
       // 简化策略:第一次打开时为同步读 cache,否则等异步拉一次
       const firstPath = targetPaths[0];
       const cachedMode = readonlyCache.get(firstPath);
-      const anyWritable = cachedMode === undefined ? true : (cachedMode & 0o400) !== 0;
+      const anyWritable = cachedMode === undefined ? true : !isReadOnly(cachedMode);
       // 用缓存不可知时,不显示等异步,可以乐观选择"锁定"(常见默认是可写)
       items.push({
         label: anyWritable ? '锁定' : '解锁',
@@ -569,8 +570,8 @@ function buildMenuItems(args: {
               failed++;
               continue;
             }
-            const isReadonly = (statRes.data.mode & 0o400) === 0;
-            const nextReadonly = !isReadonly;
+            const currentIsReadonly = isReadOnly(statRes.data.mode);
+            const nextReadonly = !currentIsReadonly;
             const r = await window.tabula.fs.setPermissions({ path: p, readonly: nextReadonly });
             if (r.ok) {
               readonlyCache.set(p, nextReadonly ? 0o444 : 0o644);
