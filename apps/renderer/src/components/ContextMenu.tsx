@@ -409,10 +409,10 @@ function buildMenuItems(args: {
       icon: 'ℹ',
       action: () => {
         if (targetEntry) {
-          actions.showToast(
-            `${targetEntry.name}\n类型: ${targetEntry.isDirectory ? '文件夹' : '文件'}\n大小: ${formatSize(targetEntry.size)}\n修改: ${formatDate(targetEntry.mtime)}`,
-            'info',
-            4000,
+          window.dispatchEvent(
+            new CustomEvent('tabula:show-properties', {
+              detail: { paneId, entry: targetEntry },
+            }),
           );
         }
         hideGlobalMenu();
