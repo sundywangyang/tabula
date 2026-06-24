@@ -82,10 +82,10 @@
       "title": "Tags (标记)",
       "objective": "文件标签系统",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "main/store/tags-store.ts (electron-store) + IPC handlers + preload bridge + api.ts types + ContextMenu tag submenu with color presets + custom tag input. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "tags-store (electron-store) + IpcChannels.TAGS_* (get/set/add/remove) + IPC handlers + preload tags namespace (using constants) + ContextMenu tag submenu with 5 color presets (🔴🟠🟡🟢🔵) + add/remove custom tag via InputDialog + 9 vitest tests for store (roundtrip / dedup / multi-path / remove / getAllTags). TC:0 err, tests:130/130 passed.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:33:00.000Z"
+      "updatedAt": "2026-06-24T13:16:00.000Z"
     },
     {
       "id": "G009-connect-server",
