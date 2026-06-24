@@ -41,6 +41,8 @@ import type {
   Tab,
   ThumbnailResult,
   TrashListResult,
+  UndoOperationInfo,
+  UndoStackSnapshot,
   UpdateInfo,
   UpdateStatus,
 } from './types';
@@ -189,6 +191,21 @@ export interface TabulaAPI {
      * 成功返回 linkPath(写入的链接绝对路径)。
      */
     createSymlink(req: FsCreateSymlinkRequest): Promise<Result<string>>;
+    /**
+     * G012: 撤销最近一次可逆操作。
+     * - 空栈时返回 `ok=true` + `data=null`,不抛错
+     * - 内部 op.undo() 抛错时返回 `ok=false` + 错误码
+     */
+    undo(): Promise<Result<UndoOperationInfo | null>>;
+    /**
+     * G012: 重做最近一次被撤销的操作。
+     * - 空 redo 栈时返回 `ok=true` + `data=null`
+     */
+    redo(): Promise<Result<UndoOperationInfo | null>>;
+    /**
+     * G012: 拉取 undo/redo 两栈的当前快照(只读,给 UI 展示)。
+     */
+    getUndoStack(): Promise<Result<UndoStackSnapshot>>;
   };
 
   // 标签

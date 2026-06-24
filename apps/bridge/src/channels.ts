@@ -152,6 +152,11 @@ export const IpcChannels = {
   TAGS_SET: 'tags:set',          // 覆盖设置整组标签
   TAGS_ADD: 'tags:add',          // 添加单个标签(去重)
   TAGS_REMOVE: 'tags:remove',    // 移除单个标签
+
+  // 撤销/重做 (G012)
+  UNDO_UNDO: 'undo:undo',             // 弹栈 → undo
+  UNDO_REDO: 'undo:redo',             // 弹 redo 栈 → redo
+  UNDO_GET_STACK: 'undo:get-stack',   // 拉取两栈快照(给 UI 展示)
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

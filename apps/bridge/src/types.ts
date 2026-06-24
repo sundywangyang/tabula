@@ -578,6 +578,24 @@ export interface LogEntry {
 /** 完整 tags 状态(path → string[])。 */
 export type TagsState = Record<string, string[]>;
 
+// =================== Undo / Redo (G012) ===================
+
+/** UndoOperation 的对外展示形态(IPC 跨进程用,不暴露 do/undo 闭包)。 */
+export interface UndoOperationInfo {
+  /** 唯一 id(UUID-like) */
+  id: string;
+  /** 人类可读描述,例如 "Delete 3 files" */
+  label: string;
+  /** 入栈时间(ms since epoch) */
+  timestamp: number;
+}
+
+/** undo/redo 两栈快照(IPC 返回) */
+export interface UndoStackSnapshot {
+  undo: UndoOperationInfo[];
+  redo: UndoOperationInfo[];
+}
+
 // =================== Archive (压缩 / 解压) ===================
 
 /** 当前支持的归档格式 (v1: 仅 zip) */

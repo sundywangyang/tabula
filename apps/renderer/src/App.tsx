@@ -598,6 +598,28 @@ export function App() {
         return;
       }
 
+      // G012: Ctrl+Z 撤销 / Ctrl+Shift+Z 重做
+      if (isMeta && !isAlt && !isShift && (key === 'z' || key === 'Z')) {
+        e.preventDefault();
+        void (async () => {
+          const r = await window.tabula.fs.undo();
+          if (r.ok && r.data) {
+            showToast(`已撤销: ${r.data.label}`, 'info', 2000);
+          }
+        })();
+        return;
+      }
+      if (isMeta && !isAlt && isShift && (key === 'z' || key === 'Z')) {
+        e.preventDefault();
+        void (async () => {
+          const r = await window.tabula.fs.redo();
+          if (r.ok && r.data) {
+            showToast(`已重做: ${r.data.label}`, 'info', 2000);
+          }
+        })();
+        return;
+      }
+
       // G002: Ctrl+Shift+I 反选
       if (isMeta && !isAlt && isShift && (key === 'i' || key === 'I')) {
         e.preventDefault();

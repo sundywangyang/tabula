@@ -166,6 +166,10 @@ const api: TabulaAPI = {
       ipcRenderer.invoke(IpcChannels.FS_SET_PERMISSIONS, req),
     createSymlink: (req: FsCreateSymlinkRequest) =>
       ipcRenderer.invoke(IpcChannels.FS_CREATE_SYMLINK, req),
+    // G012: 撤销 / 重做 / 拉取两栈快照
+    undo: () => ipcRenderer.invoke(IpcChannels.UNDO_UNDO),
+    redo: () => ipcRenderer.invoke(IpcChannels.UNDO_REDO),
+    getUndoStack: () => ipcRenderer.invoke(IpcChannels.UNDO_GET_STACK),
   },
 
   tabs: {

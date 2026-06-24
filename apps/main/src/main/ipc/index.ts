@@ -39,6 +39,7 @@ import { getWindowProvider } from '../providers/window';
 import { getShellProvider } from '../providers/shell';
 import { archiveManager } from '../archive/archive-manager';
 import * as tagsStore from '../store/tags-store';
+import { undoManager } from '../undo/undo-manager';
 import type { CompressRequest, ExtractRequest } from '@tabula/bridge';
 
 export interface IpcContext {
@@ -396,5 +397,37 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
   ipcMain.handle(IpcChannels.TAGS_REMOVE, (_e, path: string, tag: string) => {
     tagsStore.removeTag(path, tag);
+  });
+
+  // =================== Undo / Redo (G012) ===================
+  // 弹栈 → 执行 op.undo() → 推到 redo 栈。
+  // 空栈时返回 { ok: true, data: null }(渲染端 Ctrl+Z 没东西时静默 noop)。
+  // op.undo() 抛错 → 包成 IO_ERROR Result。
+  ipcMain.handle(IpcChannels.UNDO_UNDO, async () => {
+    try {
+      const op = await undoManager.undo();
+      return {
+        ok: true,
+        data: op ? { id: op.id, label: op.label, timestamp: op.timestamp } : null,
+      };
+    } catch (err) {
+      const e = err as Error;
+      return { ok: false, error: { code: 'IO_ERROR', message: e.message } };
+    }
+  });
+  ipcMain.handle(IpcChannels.UNDO_REDO, async () => {
+    try {
+      const op = await undoManager.redo();
+      return {
+        ok: true,
+        data: op ? { id: op.id, label: op.label, timestamp: op.timestamp } : null,
+      };
+    } catch (err) {
+      const e = err as Error;
+      return { ok: false, error: { code: 'IO_ERROR', message: e.message } };
+    }
+  });
+  ipcMain.handle(IpcChannels.UNDO_GET_STACK, async () => {
+    return { ok: true, data: undoManager.getStack() };
   });
 }
