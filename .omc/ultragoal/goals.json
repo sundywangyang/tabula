@@ -131,10 +131,10 @@
       "title": "批量重命名",
       "objective": "Total Commander风格批量重命名",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "command-catalog entry + command-dispatcher file.batch-rename + ContextMenu '批量重命名' (选2+项时显示). BatchRenameDialog already existed. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "file.batch-rename in catalog + dispatcher + ContextMenu 批量重命名 (2+ items). BatchRenameDialog with find/replace + preview. TC:0 err, tests:166/166.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:40:00.000Z"
+      "updatedAt": "2026-06-24T14:00:00.000Z"
     },
     {
       "id": "G014-save-dialog-preserve-selection",
