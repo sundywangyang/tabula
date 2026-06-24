@@ -181,10 +181,10 @@
       "title": "选中文件拖拽到外部App",
       "objective": "Electron drag API实现系统D&D",
       "status": "completed",
-      "attempt": 2,
-      "evidence": "IPC fs:start-drag (channels.ts FS_START_DRAG + ipc/index.ts handler) + preload + api.ts + FileList.tsx handleRowDragStart calls window.tabula.fs.startDrag(paths) using Electron webContents.startDrag API. NativeImage from first file used as drag icon. TC:0, vitest 75/75.",
+      "attempt": 3,
+      "evidence": "FS_START_DRAG IPC + webContents.startDrag({file,icon}) + Tabula.ico fallback for non-images. Multi-file limited to first file. TC:0 err, tests:198/198 (9 new start-drag tests: first-file / image-icon / fallback-icon / startDrag-throws / non-Error-throw / empty-paths / undefined-paths / resolveDragIconPath empty+non-empty). Commit 58d39d9.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-24T02:17:00.000Z"
+      "updatedAt": "2026-06-24T14:32:00.000Z"
     },
     {
       "id": "G019-type-filter-toolbar",
