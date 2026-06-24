@@ -4,13 +4,25 @@
  * 把 handler 主体抽出来(不依赖 electron 的 ipcMain),可由 registerIpcHandlers
  * 包装,也可在 vitest 中直接传 mock chmod 测试。
  */
-import { chmod as realChmod } from 'node:fs/promises';
-import type { FsError, FsErrorCode, FsSetPermissionsRequest, Result } from '@tabula/bridge';
+import { chmod as realChmod, stat as realStat, symlink as realSymlink } from 'node:fs/promises';
+import type { FsCreateSymlinkRequest, FsError, FsErrorCode, FsSetPermissionsRequest, Result } from '@tabula/bridge';
 
 /** 与 `node:fs/promises` 的 chmod 同形,便于注入 mock */
 export type ChmodFn = (
   path: string,
   mode: number,
+) => Promise<void>;
+
+/** 与 `node:fs/promises` 的 stat 同形,便于注入 mock */
+export type StatFn = (
+  path: string,
+) => Promise<{ isDirectory(): boolean; isFile(): boolean }>;
+
+/** 与 `node:fs/promises` 的 symlink 同形,便于注入 mock */
+export type SymlinkFn = (
+  target: string,
+  path: string,
+  type?: 'dir' | 'file' | 'junction',
 ) => Promise<void>;
 
 /**
@@ -39,6 +51,41 @@ export async function handleSetPermissions(
       code: (err.code as FsErrorCode) ?? 'IO_ERROR',
       message: err.message,
       path: req?.path,
+    };
+    return { ok: false, error };
+  }
+}
+
+/**
+ * G011: 创建符号链接 / 快捷方式。
+ * - Windows: 对目录使用 NTFS `junction`(无需管理员/开发者模式),对文件使用 `file` symlink
+ * - Unix: 根据 stat 结果选择 `'dir'` 或 `'file'`
+ *
+ * 注意:不实现真正的 .lnk 文件(需 IShellLink COM),MINIMUM VIABLE 用 fs.symlink 替代。
+ */
+export async function handleCreateSymlink(
+  req: FsCreateSymlinkRequest,
+  statFn: StatFn = realStat,
+  symlinkFn: SymlinkFn = realSymlink,
+): Promise<Result<string>> {
+  try {
+    if (!req || typeof req.target !== 'string' || req.target.length === 0) {
+      return { ok: false, error: { code: 'UNKNOWN' as FsErrorCode, message: 'invalid target' } };
+    }
+    if (typeof req.linkPath !== 'string' || req.linkPath.length === 0) {
+      return { ok: false, error: { code: 'UNKNOWN' as FsErrorCode, message: 'invalid linkPath' } };
+    }
+    const s = await statFn(req.target);
+    // Windows 下 junction 仅对目录有效;'file' 用于文件;Unix 下对应 'dir'/'file'
+    const type = s.isDirectory() ? 'junction' : 'file';
+    await symlinkFn(req.target, req.linkPath, type);
+    return { ok: true, data: req.linkPath };
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    const error: FsError = {
+      code: (err.code as FsErrorCode) ?? 'IO_ERROR',
+      message: err.message,
+      path: req?.linkPath,
     };
     return { ok: false, error };
   }

@@ -8,8 +8,14 @@ import { promises as fs } from 'node:fs';
 import { chmod } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
-import type { AppConfig, FsErrorCode, FsSetPermissionsRequest, UpdateStatus } from '@tabula/bridge';
-import { handleSetPermissions } from './handlers';
+import type {
+  AppConfig,
+  FsCreateSymlinkRequest,
+  FsErrorCode,
+  FsSetPermissionsRequest,
+  UpdateStatus,
+} from '@tabula/bridge';
+import { handleSetPermissions, handleCreateSymlink } from './handlers';
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
 import * as trashService from '../fs/trash';
@@ -187,6 +193,12 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // Windows: fs.chmod 0o444/0o644 走 ReadOnly bit;Unix: 标准 POSIX 模式位
   ipcMain.handle(IpcChannels.FS_SET_PERMISSIONS, (_e, req: FsSetPermissionsRequest) =>
     handleSetPermissions(req, chmod),
+  );
+
+  // =================== Create Symlink (G011: 创建快捷方式) ===================
+  // Windows: junction(目录)/ file symlink(文件);Unix: dir / file
+  ipcMain.handle(IpcChannels.FS_CREATE_SYMLINK, (_e, req: FsCreateSymlinkRequest) =>
+    handleCreateSymlink(req),
   );
 
   // =================== Thumbnail (P7 v1) ===================

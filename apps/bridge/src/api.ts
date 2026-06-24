@@ -17,6 +17,7 @@ import type {
   ExtractRequest,
   FileTypeFilter,
   FsEntry,
+  FsCreateSymlinkRequest,
   FsSetPermissionsRequest,
   KeyCombo,
   LayoutNode,
@@ -181,6 +182,13 @@ export interface TabulaAPI {
      * - readonly=false → chmod 0o644 (Windows: 清除 ReadOnly bit)
      */
     setPermissions(req: FsSetPermissionsRequest): Promise<Result<void>>;
+    /**
+     * G011: 创建符号链接 / 快捷方式。
+     * - Windows: 对目录使用 NTFS junction(无需管理员),对文件使用 file symlink
+     * - Unix: 标准 symlink
+     * 成功返回 linkPath(写入的链接绝对路径)。
+     */
+    createSymlink(req: FsCreateSymlinkRequest): Promise<Result<string>>;
   };
 
   // 标签

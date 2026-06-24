@@ -10,6 +10,7 @@ import type {
   ArchiveProgress,
   CompressRequest,
   ExtractRequest,
+  FsCreateSymlinkRequest,
   FsSetPermissionsRequest,
   TabulaAPI,
 } from '@tabula/bridge';
@@ -163,6 +164,8 @@ const api: TabulaAPI = {
     saveDialog: (opts) => ipcRenderer.invoke(IpcChannels.FS_SAVE_DIALOG, opts ?? {}),
     setPermissions: (req: FsSetPermissionsRequest) =>
       ipcRenderer.invoke(IpcChannels.FS_SET_PERMISSIONS, req),
+    createSymlink: (req: FsCreateSymlinkRequest) =>
+      ipcRenderer.invoke(IpcChannels.FS_CREATE_SYMLINK, req),
   },
 
   tabs: {

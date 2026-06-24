@@ -537,6 +537,26 @@ function buildMenuItems(args: {
 
     items.push({ label: '', divider: true });
 
+    // G011: 创建快捷方式 (symlink / junction) — 仅单选
+    {
+      const singlePath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
+      items.push({
+        label: '创建快捷方式',
+        icon: '🔗',
+        disabled: !singlePath,
+        action: () => {
+          if (singlePath) {
+            window.dispatchEvent(
+              new CustomEvent('tabula:create-symlink', { detail: { paneId, sourcePath: singlePath } }),
+            );
+          }
+          hideGlobalMenu();
+        },
+      });
+    }
+
+    items.push({ label: '', divider: true });
+
     // G010: 锁定 / 解锁 — 通过 FS_SET_PERMISSIONS 切换 read-only 权限位
     // - 锁定:对 owner 取消 w 位 (0o444);Windows:FS ReadOnly bit
     // - 解锁:恢复 0o644
@@ -642,6 +662,12 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
     | null
   >(null);
 
+  // G011: create-symlink dialog 状态
+  const [symlinkDialog, setSymlinkDialog] = useState<
+    | { paneId: string; sourcePath: string; defaultName: string }
+    | null
+  >(null);
+
   // 监听 add/remove tag 全局事件
   useEffect(() => {
     const onAdd = (e: Event) => {
@@ -652,11 +678,20 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
       const detail = (e as CustomEvent<{ path: string; existingTags: string[] }>).detail;
       setTagDialog({ mode: 'remove', path: detail.path, existingTags: detail.existingTags });
     };
+    const onCreateSymlink = (e: Event) => {
+      const detail = (e as CustomEvent<{ paneId: string; sourcePath: string }>).detail;
+      const sep = detail.sourcePath.includes('\\') ? '\\' : '/';
+      const baseName = detail.sourcePath.substring(detail.sourcePath.lastIndexOf(sep) + 1);
+      const defaultName = baseName ? `${baseName} - Shortcut` : 'Shortcut';
+      setSymlinkDialog({ paneId: detail.paneId, sourcePath: detail.sourcePath, defaultName });
+    };
     window.addEventListener('tabula:add-tag', onAdd);
     window.addEventListener('tabula:remove-tag', onRemove);
+    window.addEventListener('tabula:create-symlink', onCreateSymlink);
     return () => {
       window.removeEventListener('tabula:add-tag', onAdd);
       window.removeEventListener('tabula:remove-tag', onRemove);
+      window.removeEventListener('tabula:create-symlink', onCreateSymlink);
     };
   }, []);
 
@@ -828,6 +863,35 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
             setTagDialog(null);
           }}
           onCancel={() => setTagDialog(null)}
+        />
+      )}
+      {symlinkDialog && (
+        <InputDialog
+          open={true}
+          title="创建快捷方式"
+          placeholder="链接名称"
+          defaultValue={symlinkDialog.defaultName}
+          okLabel="创建"
+          onSubmit={async (value) => {
+            const trimmed = value.trim();
+            if (!trimmed) return;
+            const sep = symlinkDialog.sourcePath.includes('\\') ? '\\' : '/';
+            const parent = symlinkDialog.sourcePath.substring(0, symlinkDialog.sourcePath.lastIndexOf(sep));
+            const linkPath = parent + sep + trimmed;
+            const actions = useFileStore.getState();
+            const result = await window.tabula.fs.createSymlink({
+              target: symlinkDialog.sourcePath,
+              linkPath,
+            });
+            if (result.ok) {
+              actions.showToast(`已创建快捷方式: ${trimmed}`, 'success', 1500);
+              void actions.loadDir(symlinkDialog.paneId, parent);
+            } else {
+              actions.showToast(`创建失败: ${result.error.message}`, 'error', 3000);
+            }
+            setSymlinkDialog(null);
+          }}
+          onCancel={() => setSymlinkDialog(null)}
         />
       )}
     </div>

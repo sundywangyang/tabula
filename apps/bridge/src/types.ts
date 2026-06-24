@@ -39,6 +39,14 @@ export interface FsSetPermissionsRequest {
   readonly: boolean;
 }
 
+/** G011: 创建符号链接/快捷方式。Windows 上对目录走 junction,对文件走 file symlink。 */
+export interface FsCreateSymlinkRequest {
+  /** 源(被链接)路径 */
+  target: string;
+  /** 新建链接的目标路径 */
+  linkPath: string;
+}
+
 export type FsErrorCode =
   | 'ENOENT'
   | 'EACCES'
