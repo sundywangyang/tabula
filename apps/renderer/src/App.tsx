@@ -390,9 +390,43 @@ export function App() {
         if (newFolderOpen) { setNewFolder(false, null); return; }
         if (newFileOpen) { setNewFile(false, null); return; }
         if (confirmDeleteOpen) { setConfirmDelete(null); return; }
+        // G006: 预览面板打开时,Esc 优先关闭预览
+        if (useFileStore.getState().previewState) {
+          e.preventDefault();
+          useFileStore.getState().closePreview();
+          return;
+        }
         if ((activeSelected?.size ?? 0) > 0) {
           e.preventDefault();
           clearSelection(activePaneId);
+        }
+        return;
+      }
+
+      // G006: Space 打开/关闭当前选中/光标文件的预览(quick-look)
+      if (key === ' ' && !isMeta && !isAlt && !isShift) {
+        e.preventDefault();
+        const fileState = useFileStore.getState();
+        const data = fileState.panes[activePaneId];
+        if (!data) return;
+        // 目标条目:1 选中 → 那个;否则用光标
+        let target: import('@tabula/bridge').FsEntry | null = null;
+        if (data.selectedPaths.size === 1) {
+          const p = Array.from(data.selectedPaths)[0]!;
+          target = data.entries.find((x) => x.path === p) ?? null;
+        }
+        if (!target && data.cursorPath) {
+          target = data.entries.find((x) => x.path === data.cursorPath) ?? null;
+        }
+        if (!target) return;
+        // 目录不预览
+        if (target.isDirectory) return;
+        // 再次按 Space → 关闭;否则打开
+        const current = fileState.previewState;
+        if (current && current.entry.path === target.path) {
+          fileState.closePreview();
+        } else {
+          fileState.openPreview(target);
         }
         return;
       }
