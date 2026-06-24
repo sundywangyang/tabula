@@ -106,3 +106,57 @@
 :root[data-theme="dark"] .context-menu-divider {
   background: var(--border, #444);
 }
+
+/* 二级菜单 */
+.context-menu-submenu {
+  position: relative;
+}
+
+.context-menu-item.has-submenu::after {
+  content: '›';
+  margin-left: 8px;
+  color: var(--text-muted, #888);
+  font-size: 14px;
+}
+
+.context-menu-item.has-submenu:hover,
+.context-menu-item.has-submenu:focus {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.submenu-panel {
+  position: absolute;
+  top: -4px;
+  left: 100%;
+  z-index: 10000;
+  background: var(--bg-elevated, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  min-width: 160px;
+  animation: context-menu-appear 0.1s ease-out;
+}
+
+.submenu-back-btn {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.submenu-back-btn:hover {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.submenu-divider {
+  height: 1px;
+  background: var(--border, #e0e0e0);
+  margin: 3px 0;
+}

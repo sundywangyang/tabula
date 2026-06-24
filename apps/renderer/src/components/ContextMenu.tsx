@@ -61,6 +61,7 @@ interface MenuItem {
   danger?: boolean;
   divider?: boolean;
   action?: () => void;
+  submenu?: MenuItem[]; // 二级菜单
 }
 
 /** G008: 5 个颜色预设 (红/橙/黄/绿/蓝) — 每个加一个带 emoji 的彩色标签 */
@@ -424,16 +425,19 @@ function buildMenuItems(args: {
       });
     }
 
-    // G008: 标签子菜单(添加 / 颜色预设 / 移除现有标签)
+    // G008: 标签 → 二级子菜单
     {
-      const entryPath = targetEntry!.path; // isEmptySpace=false 时 targetEntry 必定存在
+      const entryPath = targetEntry!.path;
       const existingTags = getCachedTags(entryPath);
-      // 「添加标签...」: 弹 InputDialog
-      items.push({
+
+      // 二级菜单内容: 添加 + 颜色预设 + 已有标签移除
+      const tagSubmenu: MenuItem[] = [];
+
+      // 「添加标签...」→ 弹 InputDialog
+      tagSubmenu.push({
         label: '添加标签...',
         icon: '🏷',
         action: () => {
-          // 触发一个全局事件, App 监听并弹 InputDialog
           window.dispatchEvent(
             new CustomEvent('tabula:add-tag', { detail: { path: entryPath } }),
           );
@@ -441,43 +445,49 @@ function buildMenuItems(args: {
         },
       });
 
-      // 5 个颜色预设
+      // 颜色预设（已有颜色标签的显示 ✖ 移除，未有的显示添加）
       for (const preset of TAG_COLOR_PRESETS) {
-        if (existingTags.includes(preset.tag)) continue; // 已存在则跳过
-        items.push({
-          label: `标记为 ${preset.label}`,
-          icon: preset.emoji,
+        const alreadyTagged = existingTags.includes(preset.tag);
+        tagSubmenu.push({
+          label: alreadyTagged ? `移除 ${preset.tag}` : `标记为 ${preset.label}`,
+          icon: alreadyTagged ? '✖' : preset.emoji,
           action: () => {
-            void addTagForPath(entryPath, preset.tag);
-            actions.showToast(`已添加标签: ${preset.tag}`, 'success', 1500);
+            if (alreadyTagged) {
+              void removeTagForPath(entryPath, preset.tag);
+              actions.showToast(`已移除标签: ${preset.tag}`, 'success', 1500);
+            } else {
+              void addTagForPath(entryPath, preset.tag);
+              actions.showToast(`已添加标签: ${preset.tag}`, 'success', 1500);
+            }
             hideGlobalMenu();
           },
         });
       }
 
-      // 已有标签 → 移除
-      if (existingTags.length > 0) {
-        items.push({ label: '', divider: true });
-        items.push({
-          label: `移除标签 (${existingTags.length})`,
-          icon: '✖',
-          action: () => {
-            window.dispatchEvent(
-              new CustomEvent('tabula:remove-tag', { detail: { path: entryPath, existingTags } }),
-            );
-            hideGlobalMenu();
-          },
-        });
-      } else {
-        items.push({
-          label: '(无标签)',
-          icon: '',
-          disabled: true,
-          action: () => {
-            hideGlobalMenu();
-          },
-        });
+      // 已有标签（非颜色预设的标签）
+      const nonPresetTags = existingTags.filter(
+        (t) => !TAG_COLOR_PRESETS.some((p) => p.tag === t),
+      );
+      if (nonPresetTags.length > 0) {
+        tagSubmenu.push({ label: '', divider: true });
+        for (const tag of nonPresetTags) {
+          tagSubmenu.push({
+            label: `移除 ${tag}`,
+            icon: '✖',
+            action: () => {
+              void removeTagForPath(entryPath, tag);
+              actions.showToast(`已移除标签: ${tag}`, 'success', 1500);
+              hideGlobalMenu();
+            },
+          });
+        }
       }
+
+      items.push({
+        label: '标签',
+        icon: '🏷',
+        submenu: tagSubmenu,
+      });
     }
 
     // P3: 发送到...
@@ -735,6 +745,9 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
     | null
   >(null);
 
+	  // 二级菜单状态
+	  const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
+
   // 监听 add/remove tag 全局事件
   useEffect(() => {
     const onAdd = (e: Event) => {
@@ -833,6 +846,7 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
         visible: true,
         pos: { x, y },
       });
+      setOpenSubmenu(null);
       e.preventDefault();
     };
 
@@ -972,21 +986,49 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
         if (item.divider) {
           return <div key={index} className="context-menu-divider" />;
         }
+        const hasSub = !!item.submenu?.length;
+        const isOpen = openSubmenu === index;
         return (
-          <button
-            key={index}
-            className={`context-menu-item ${item.disabled ? 'disabled' : ''} ${item.danger ? 'danger' : ''}`}
-            onClick={() => {
-              if (!item.disabled && item.action) {
-                item.action();
-              }
-            }}
-            disabled={item.disabled}
-          >
-            {item.icon && <span className="context-menu-icon">{item.icon}</span>}
-            <span className="context-menu-label">{item.label}</span>
-            {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
-          </button>
+          <div key={index} className={hasSub ? 'context-menu-submenu' : ''}>
+            <button
+              className={`context-menu-item ${item.disabled ? 'disabled' : ''} ${item.danger ? 'danger' : ''} ${hasSub ? 'has-submenu' : ''}`}
+              onClick={() => {
+                if (item.disabled) return;
+                if (hasSub) {
+                  setOpenSubmenu(isOpen ? null : index);
+                } else if (item.action) {
+                  item.action();
+                }
+              }}
+              disabled={item.disabled}
+              onMouseEnter={() => { if (hasSub) setOpenSubmenu(index); }}
+            >
+              {item.icon && <span className="context-menu-icon">{item.icon}</span>}
+              <span className="context-menu-label">{item.label}</span>
+              {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
+            </button>
+
+            {/* 二级面板 */}
+            {hasSub && isOpen && (
+              <div className="submenu-panel">
+{item.submenu!.map((sub, si) => {
+                  if (sub.divider) return <div key={si} className="submenu-divider" />;
+                  return (
+                    <button
+                      key={si}
+                      className={`context-menu-item ${sub.disabled ? 'disabled' : ''} ${sub.danger ? 'danger' : ''}`}
+                      onClick={() => { if (!sub.disabled && sub.action) sub.action(); setOpenSubmenu(null); }}
+                      disabled={sub.disabled}
+                    >
+                      {sub.icon && <span className="context-menu-icon">{sub.icon}</span>}
+                      <span className="context-menu-label">{sub.label}</span>
+                      {sub.shortcut && <span className="context-menu-shortcut">{sub.shortcut}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         );
       })}
       {dialogs}
