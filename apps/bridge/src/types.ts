@@ -47,6 +47,26 @@ export interface FsCreateSymlinkRequest {
   linkPath: string;
 }
 
+/** G015: 计算文件哈希 (sha256/sha1/md5)。流式 createHash,适合大文件。 */
+export interface FsChecksumRequest {
+  /** 目标文件绝对路径 */
+  path: string;
+  /** 哈希算法;默认 sha256 */
+  algorithm?: 'sha256' | 'sha1' | 'md5';
+}
+
+/** G015: 哈希结果 (hex) */
+export interface FsChecksumResult {
+  path: string;
+  algorithm: string;
+  /** hex-encoded hash */
+  hash: string;
+  /** 文件大小(字节) */
+  size: number;
+  /** 计算耗时(ms) */
+  durationMs: number;
+}
+
 export type FsErrorCode =
   | 'ENOENT'
   | 'EACCES'

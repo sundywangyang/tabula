@@ -41,6 +41,7 @@ export const IpcChannels = {
   FS_SAVE_DIALOG: 'fs:save-dialog',
   FS_SET_PERMISSIONS: 'fs:set-permissions',
   FS_CREATE_SYMLINK: 'fs:create-symlink',
+  FS_CHECKSUM: 'fs:checksum',
 
   // 标签
   TABS_OPEN: 'tabs:open',

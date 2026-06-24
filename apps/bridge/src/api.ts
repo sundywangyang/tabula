@@ -17,6 +17,8 @@ import type {
   ExtractRequest,
   FileTypeFilter,
   FsEntry,
+  FsChecksumRequest,
+  FsChecksumResult,
   FsCreateSymlinkRequest,
   FsSetPermissionsRequest,
   KeyCombo,
@@ -191,6 +193,12 @@ export interface TabulaAPI {
      * 成功返回 linkPath(写入的链接绝对路径)。
      */
     createSymlink(req: FsCreateSymlinkRequest): Promise<Result<string>>;
+    /**
+     * G015: 流式计算文件哈希 (sha256/sha1/md5)。大文件友好(createReadStream)。
+     * - 失败时返回 `ok=false` + IO_ERROR 错误码(ENOENT / EACCES 透传)。
+     * - `size` 取自 statSync;`durationMs` 是整段耗时。
+     */
+    checksum(req: FsChecksumRequest): Promise<Result<FsChecksumResult>>;
     /**
      * G012: 撤销最近一次可逆操作。
      * - 空栈时返回 `ok=true` + `data=null`,不抛错

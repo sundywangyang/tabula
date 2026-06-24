@@ -10,12 +10,13 @@ import { join, basename } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
 import type {
   AppConfig,
+  FsChecksumRequest,
   FsCreateSymlinkRequest,
   FsErrorCode,
   FsSetPermissionsRequest,
   UpdateStatus,
 } from '@tabula/bridge';
-import { handleSetPermissions, handleCreateSymlink } from './handlers';
+import { handleSetPermissions, handleCreateSymlink, handleChecksum } from './handlers';
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
 import * as trashService from '../fs/trash';
@@ -200,6 +201,12 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // Windows: junction(目录)/ file symlink(文件);Unix: dir / file
   ipcMain.handle(IpcChannels.FS_CREATE_SYMLINK, (_e, req: FsCreateSymlinkRequest) =>
     handleCreateSymlink(req),
+  );
+
+  // =================== Checksum (G015: SHA-256 / SHA-1 / MD5) ===================
+  // 流式 createReadStream + crypto.createHash,大文件友好
+  ipcMain.handle(IpcChannels.FS_CHECKSUM, (_e, req: FsChecksumRequest) =>
+    handleChecksum(req),
   );
 
   // =================== Thumbnail (P7 v1) ===================

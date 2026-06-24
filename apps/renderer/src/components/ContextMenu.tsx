@@ -641,6 +641,37 @@ function buildMenuItems(args: {
 
     items.push({ label: '', divider: true });
 
+    // G015: 计算 SHA-256(仅文件,流式哈希大文件友好)
+    if (targetEntry && !targetEntry.isDirectory) {
+      items.push({
+        label: '计算 SHA-256',
+        icon: '#️⃣',
+        action: () => {
+          if (targetEntry) {
+            const p = targetEntry.path;
+            const toastId = actions.showToast('正在计算 SHA-256…', 'info', 0);
+            void window.tabula.fs.checksum({ path: p, algorithm: 'sha256' }).then((result) => {
+              actions.dismissToast(toastId);
+              if (result.ok) {
+                const { hash } = result.data;
+                // 64-char hex 过长不适合 toast;写剪贴板 + 弹带 hash 的简单对话框
+                void window.tabula.fs.writeClipboard(hash);
+                // 用一个简短的确认 toast,再弹一个原生 alert 显示完整 hash
+                actions.showToast('SHA-256 已复制到剪贴板', 'success', 2000);
+                // eslint-disable-next-line no-alert
+                window.alert(
+                  `SHA-256\n${hash}\n\n(已自动复制到剪贴板,可粘贴到校验工具)`,
+                );
+              } else {
+                actions.showToast(`计算失败: ${result.error.message}`, 'error', 3000);
+              }
+            });
+          }
+          hideGlobalMenu();
+        },
+      });
+    }
+
     items.push({
       label: '属性',
       icon: 'ℹ',

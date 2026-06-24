@@ -90,3 +90,69 @@ export async function handleCreateSymlink(
     return { ok: false, error };
   }
 }
+
+/**
+ * G015: 计算文件哈希。
+ * - 大文件友好:createReadStream + crypto.createHash streaming。
+ * - 算法: 'sha256' (default) | 'sha1' | 'md5'。
+ * - 失败时返回统一 FsError(ENOENT / EACCES / IO_ERROR 透传)。
+ *
+ * 函数签名接受可注入的 stream/hash/statSync,便于单测;
+ * 真实 IPC 路由处不传(走默认值)。
+ */
+import type { ReadStream } from 'node:fs';
+import type { Hash } from 'node:crypto';
+import { statSync as realStatSync } from 'node:fs';
+import { createReadStream as realCreateReadStream } from 'node:fs';
+import { createHash as realCreateHash } from 'node:crypto';
+import type { FsChecksumRequest, FsChecksumResult } from '@tabula/bridge';
+
+export type CreateReadStreamFn = (path: string) => ReadStream;
+export type StatSyncFn = (path: string) => { size: number };
+export type CreateHashFn = (algorithm: string) => Hash;
+
+const SUPPORTED_ALGOS = new Set(['sha256', 'sha1', 'md5']);
+
+export async function handleChecksum(
+  req: FsChecksumRequest,
+  createReadStreamFn: CreateReadStreamFn = realCreateReadStream,
+  createHashFn: CreateHashFn = realCreateHash,
+  statSyncFn: StatSyncFn = realStatSync,
+): Promise<Result<FsChecksumResult>> {
+  try {
+    if (!req || typeof req.path !== 'string' || req.path.length === 0) {
+      return { ok: false, error: { code: 'UNKNOWN' as FsErrorCode, message: 'invalid path' } };
+    }
+    const algo = req.algorithm ?? 'sha256';
+    if (!SUPPORTED_ALGOS.has(algo)) {
+      return { ok: false, error: { code: 'UNKNOWN' as FsErrorCode, message: `unsupported algorithm: ${algo}` } };
+    }
+    const start = Date.now();
+    const stat = statSyncFn(req.path);
+    const hash = createHashFn(algo);
+    await new Promise<void>((resolve, reject) => {
+      const stream = createReadStreamFn(req.path);
+      stream.on('data', (chunk: Buffer | string) => hash.update(chunk));
+      stream.on('end', () => resolve());
+      stream.on('error', reject);
+    });
+    return {
+      ok: true,
+      data: {
+        path: req.path,
+        algorithm: algo,
+        hash: hash.digest('hex'),
+        size: stat.size,
+        durationMs: Date.now() - start,
+      },
+    };
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    const error: FsError = {
+      code: (err.code as FsErrorCode) ?? 'IO_ERROR',
+      message: err.message,
+      path: req?.path,
+    };
+    return { ok: false, error };
+  }
+}
