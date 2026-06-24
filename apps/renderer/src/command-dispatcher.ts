@@ -191,6 +191,32 @@ export function runCommandById(commandId: string): boolean {
       if (target) file.beginRename(activePaneId, target);
       return true;
     }
+    case 'file.batch-rename': {
+      const data = file.panes[activePaneId];
+      const selected = data?.selectedPaths ?? new Set<string>();
+      if (selected.size < 2) {
+        showToast('请至少选择 2 个文件', 'warn', 1500);
+        return false;
+      }
+      // 从 entries 派生 names(与路径同序);缺失的退化为 basename
+      const entries = data?.entries ?? [];
+      const entryByPath = new Map(entries.map((e) => [e.path, e]));
+      const paths = Array.from(selected);
+      const names = paths.map((p) => {
+        const e = entryByPath.get(p);
+        if (e) return e.name;
+        // 退化:取 basename
+        const sep = p.includes('\\') ? '\\' : '/';
+        const idx = p.lastIndexOf(sep);
+        return idx >= 0 ? p.substring(idx + 1) : p;
+      });
+      window.dispatchEvent(
+        new CustomEvent('tabula:batch-rename', {
+          detail: { paneId: activePaneId, paths, names },
+        }),
+      );
+      return true;
+    }
     case 'file.new-folder': {
       dialogs.setNewFolder(true, activePaneId);
       return true;

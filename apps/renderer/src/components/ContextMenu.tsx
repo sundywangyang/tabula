@@ -324,6 +324,21 @@ function buildMenuItems(args: {
       },
     });
 
+    // G013: 批量重命名 — 仅当选中 2+ 项时显示
+    if (selectedPaths.size >= 2) {
+      items.push({
+        label: '批量重命名',
+        icon: '📝',
+        action: () => {
+          // 复用命令派发(同时支持命令面板 / 快捷键 / 右键菜单)
+          void import('../command-dispatcher').then((m) =>
+            m.runCommandById('file.batch-rename'),
+          );
+          hideGlobalMenu();
+        },
+      });
+    }
+
     items.push({
       label: '复制到当前位置',
       icon: '📑',

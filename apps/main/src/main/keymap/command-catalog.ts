@@ -122,6 +122,14 @@ export const COMMAND_CATALOG: CommandSpec[] = [
     reserved: false,
   },
   {
+    id: 'file.batch-rename',
+    title: '批量重命名',
+    category: '文件',
+    defaultCombo: null,
+    description: '对选中的 2+ 个文件/文件夹打开批量重命名对话框(查找/替换 + 预览)',
+    reserved: false,
+  },
+  {
     id: 'file.new-folder',
     title: '新建文件夹',
     category: '文件',
