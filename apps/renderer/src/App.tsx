@@ -71,6 +71,7 @@ export function App() {
   const newFolderOpen = useUiDialogsStore((s) => s.newFolderOpen);
   const setNewFolder = useUiDialogsStore((s) => s.setNewFolder);
   const newFileOpen = useUiDialogsStore((s) => s.newFileOpen);
+  const newFileTargetPane = useUiDialogsStore((s) => s.newFileTargetPane);
   const setNewFile = useUiDialogsStore((s) => s.setNewFile);
   const newTargetPane = useUiDialogsStore((s) => s.newFolderTargetPane);
   const confirmDeleteOpen = useUiDialogsStore((s) => s.confirmDeleteOpen);
@@ -799,7 +800,7 @@ export function App() {
         defaultValue="new.txt"
         okLabel="创建"
         onSubmit={(name) => {
-          if (newTargetPane) void createFile(newTargetPane, name);
+          if (newFileTargetPane) void createFile(newFileTargetPane, name);
           setNewFile(false, null);
         }}
         onCancel={() => setNewFile(false, null)}
