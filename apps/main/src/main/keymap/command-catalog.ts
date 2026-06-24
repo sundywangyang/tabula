@@ -170,6 +170,14 @@ export const COMMAND_CATALOG: CommandSpec[] = [
     reserved: false,
   },
   {
+    id: 'file.invert-selection',
+    title: '反选',
+    category: '文件',
+    defaultCombo: parseKeyCombo('Ctrl+Shift+I'),
+    description: '反转当前目录的选中状态(已选中 → 未选中,未选中 → 已选中)',
+    reserved: false,
+  },
+  {
     id: 'file.path-bar',
     title: '编辑地址栏',
     category: '文件',
@@ -419,7 +427,7 @@ export const COMMAND_CATALOG: CommandSpec[] = [
     id: 'app.devtools',
     title: '开发者工具',
     category: '设置',
-    defaultCombo: parseKeyCombo('Ctrl+Shift+I'),
+    defaultCombo: parseKeyCombo('F12'),
     description: '打开 DevTools',
     reserved: false,
   },

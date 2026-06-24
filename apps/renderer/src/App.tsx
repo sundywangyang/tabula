@@ -564,8 +564,15 @@ export function App() {
         return;
       }
 
-      // P7: Ctrl+Shift+I 打开开发者工具
+      // G002: Ctrl+Shift+I 反选
       if (isMeta && !isAlt && isShift && (key === 'i' || key === 'I')) {
+        e.preventDefault();
+        runCommandById('file.invert-selection');
+        return;
+      }
+
+      // P7: F12 打开开发者工具
+      if (key === 'F12') {
         e.preventDefault();
         void window.tabula.app.openDevTools();
         return;

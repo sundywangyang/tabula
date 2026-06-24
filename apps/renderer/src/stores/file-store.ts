@@ -291,6 +291,7 @@ interface FileStore {
   rangeSelect: (paneId: string, path: string) => void;
   clearSelection: (paneId: string) => void;
   selectAll: (paneId: string) => void;
+  selectInvert: (paneId: string) => void;
   setCursor: (paneId: string, path: string | null) => void;
   moveCursor: (paneId: string, delta: number, viewportSize: number) => void;
   cursorToEdge: (paneId: string, edge: 'start' | 'end') => void;
@@ -898,6 +899,24 @@ export const useFileStore = create<FileStore>((set, get) => {
         panes: {
           ...s.panes,
           [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), selectedPaths: new Set(list.map((e) => e.path)) },
+        },
+      }));
+    },
+
+    // G002: 反选 — 已选中变未选中,未选中变已选中(限定当前可见/过滤后的 entries)
+    selectInvert: (paneId) => {
+      const data = get().panes[paneId];
+      if (!data) return;
+      const { sortBy, sortDir, showHidden } = get();
+      const list = computeFilteredSorted(data.entries, { sortBy, sortDir, showHidden, searchQuery: data.searchQuery });
+      const inverted = new Set<string>();
+      for (const e of list) {
+        if (!data.selectedPaths.has(e.path)) inverted.add(e.path);
+      }
+      set((s) => ({
+        panes: {
+          ...s.panes,
+          [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), selectedPaths: inverted },
         },
       }));
     },

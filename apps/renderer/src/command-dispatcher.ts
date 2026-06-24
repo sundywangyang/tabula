@@ -231,6 +231,10 @@ export function runCommandById(commandId: string): boolean {
       file.selectAll(activePaneId);
       return true;
     }
+    case 'file.invert-selection': {
+      file.selectInvert(activePaneId);
+      return true;
+    }
     case 'file.path-bar': {
       file.openPathBar(activePaneId);
       return true;

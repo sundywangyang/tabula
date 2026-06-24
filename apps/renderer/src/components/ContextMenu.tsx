@@ -107,6 +107,13 @@ function buildMenuItems(args: {
       shortcut: 'F5',
       action: () => { void actions.loadDir(paneId, currentPath); hideGlobalMenu(); },
     });
+    // G002: 空右键菜单也提供反选
+    items.push({
+      label: '反选',
+      icon: '⇄',
+      shortcut: 'Ctrl+Shift+I',
+      action: () => { actions.selectInvert(paneId); hideGlobalMenu(); },
+    });
   } else {
     const hasSelection = selectedPaths.size > 0 || targetEntry !== null;
 
@@ -163,6 +170,16 @@ function buildMenuItems(args: {
       shortcut: 'Ctrl+V',
       disabled: !hasClipboard,
       action: () => { void actions.pasteToPane(paneId); hideGlobalMenu(); },
+    });
+
+    items.push({ label: '', divider: true });
+
+    // G002: 反选 — 在「复制路径」组,与选择相关动作放一起
+    items.push({
+      label: '反选',
+      icon: '⇄',
+      shortcut: 'Ctrl+Shift+I',
+      action: () => { actions.selectInvert(paneId); hideGlobalMenu(); },
     });
 
     items.push({ label: '', divider: true });
