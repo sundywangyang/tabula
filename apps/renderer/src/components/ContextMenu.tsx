@@ -989,8 +989,9 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
         const hasSub = !!item.submenu?.length;
         const isOpen = openSubmenu === index;
         return (
-          <div key={index} className={hasSub ? 'context-menu-submenu' : ''}>
+          <div key={index} className={hasSub ? 'context-menu-submenu' : ''} onMouseLeave={() => { if (hasSub) setOpenSubmenu(null); }}>
             <button
+  
               className={`context-menu-item ${item.disabled ? 'disabled' : ''} ${item.danger ? 'danger' : ''} ${hasSub ? 'has-submenu' : ''}`}
               onClick={() => {
                 if (item.disabled) return;
