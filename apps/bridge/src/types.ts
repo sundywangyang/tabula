@@ -551,6 +551,11 @@ export interface LogEntry {
   timestamp: number;
 }
 
+// =================== Tags (文件标记,G008) ===================
+
+/** 完整 tags 状态(path → string[])。 */
+export type TagsState = Record<string, string[]>;
+
 // =================== Archive (压缩 / 解压) ===================
 
 /** 当前支持的归档格式 (v1: 仅 zip) */

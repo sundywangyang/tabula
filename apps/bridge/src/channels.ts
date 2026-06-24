@@ -144,6 +144,12 @@ export const IpcChannels = {
   ARCHIVE_CANCEL_JOB: 'archive:cancel-job',  // 取消任务
   // 事件: 主进程 → 渲染端
   ARCHIVE_JOB_UPDATE: 'archive:job-update',  // 推: ArchiveProgress
+
+  // 标签 (文件标记,G008)
+  TAGS_GET: 'tags:get',          // 取某路径的标签列表
+  TAGS_SET: 'tags:set',          // 覆盖设置整组标签
+  TAGS_ADD: 'tags:add',          // 添加单个标签(去重)
+  TAGS_REMOVE: 'tags:remove',    // 移除单个标签
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];

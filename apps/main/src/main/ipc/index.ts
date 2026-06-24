@@ -30,6 +30,7 @@ import { dispatchRunCommand } from '../keymap/command-dispatcher';
 import { getWindowProvider } from '../providers/window';
 import { getShellProvider } from '../providers/shell';
 import { archiveManager } from '../archive/archive-manager';
+import * as tagsStore from '../store/tags-store';
 import type { CompressRequest, ExtractRequest } from '@tabula/bridge';
 
 export interface IpcContext {
@@ -364,4 +365,16 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
   // 注: ARCHIVE_JOB_UPDATE 推送由 archive-manager 在订阅 provider 时自动发到所有窗口,
   // 不在这里 register handler(那是渲染端 subscribe 的 channel)
+
+  // =================== Tags (G008: 文件标记) ===================
+  ipcMain.handle(IpcChannels.TAGS_GET, (_e, path: string) => tagsStore.getTags(path));
+  ipcMain.handle(IpcChannels.TAGS_SET, (_e, path: string, tags: string[]) => {
+    tagsStore.setTags(path, tags);
+  });
+  ipcMain.handle(IpcChannels.TAGS_ADD, (_e, path: string, tag: string) => {
+    tagsStore.addTag(path, tag);
+  });
+  ipcMain.handle(IpcChannels.TAGS_REMOVE, (_e, path: string, tag: string) => {
+    tagsStore.removeTag(path, tag);
+  });
 }

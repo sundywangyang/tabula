@@ -251,6 +251,14 @@ const api: TabulaAPI = {
       return () => ipcRenderer.removeListener(IpcChannels.ARCHIVE_JOB_UPDATE, wrapped);
     },
   },
+
+  // G008: 标签 (文件标记)
+  tags: {
+    get: (p: string) => ipcRenderer.invoke(IpcChannels.TAGS_GET, p),
+    set: (p: string, tags: string[]) => ipcRenderer.invoke(IpcChannels.TAGS_SET, p, tags),
+    add: (p: string, tag: string) => ipcRenderer.invoke(IpcChannels.TAGS_ADD, p, tag),
+    remove: (p: string, tag: string) => ipcRenderer.invoke(IpcChannels.TAGS_REMOVE, p, tag),
+  },
 };
 
 contextBridge.exposeInMainWorld('tabula', api);

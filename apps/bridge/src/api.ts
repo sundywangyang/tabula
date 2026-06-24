@@ -43,6 +43,18 @@ import type {
   UpdateStatus,
 } from './types';
 
+/** G008: tags API */
+export interface TagsApi {
+  /** 取某路径的标签列表(无则返回空数组) */
+  get(path: string): Promise<string[]>;
+  /** 覆盖设置某路径的标签列表 */
+  set(path: string, tags: string[]): Promise<void>;
+  /** 添加单个标签(重复忽略) */
+  add(path: string, tag: string): Promise<void>;
+  /** 移除单个标签 */
+  remove(path: string, tag: string): Promise<void>;
+}
+
 export type PlatformType = 'windows' | 'macos' | 'linux';
 
 export interface TabulaAPI {
@@ -287,6 +299,9 @@ export interface TabulaAPI {
     /** 订阅主进程推送的进度事件;返回取消订阅函数 */
     onJobUpdate(listener: (progress: ArchiveProgress) => void): () => void;
   };
+
+  // G008: 标签 (文件标记)
+  tags: TagsApi;
 }
 
 declare global {

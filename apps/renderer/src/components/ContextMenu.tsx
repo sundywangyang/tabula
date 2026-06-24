@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useFileStore, makeFolderTab } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
+import { InputDialog } from './InputDialog';
 import type { FsEntry } from '@tabula/bridge';
 import './ContextMenu.css';
 
@@ -58,6 +59,79 @@ interface MenuItem {
   danger?: boolean;
   divider?: boolean;
   action?: () => void;
+}
+
+/** G008: 5 个颜色预设 (红/橙/黄/绿/蓝) — 每个加一个带 emoji 的彩色标签 */
+const TAG_COLOR_PRESETS: ReadonlyArray<{ color: string; emoji: string; label: string; tag: string }> = [
+  { color: 'red',    emoji: '🔴', label: '红色', tag: '🔴红色' },
+  { color: 'orange', emoji: '🟠', label: '橙色', tag: '🟠橙色' },
+  { color: 'yellow', emoji: '🟡', label: '黄色', tag: '🟡黄色' },
+  { color: 'green',  emoji: '🟢', label: '绿色', tag: '🟢绿色' },
+  { color: 'blue',   emoji: '🔵', label: '蓝色', tag: '🔵蓝色' },
+];
+
+/** G008: 缓存 entry → tags 的内存映射(避免每次右键都打 IPC) */
+const tagsCache = new Map<string, string[]>();
+const tagsCacheListeners = new Set<() => void>();
+let tagsCacheLoaded = false;
+let tagsCacheLoading: Promise<void> | null = null;
+
+async function ensureTagsCacheLoaded(): Promise<void> {
+  if (tagsCacheLoaded) return;
+  if (tagsCacheLoading) return tagsCacheLoading;
+  tagsCacheLoading = (async () => {
+    try {
+      // getAllTags 是主进程的导出;渲染端没有,改为逐项读取
+      // 渲染端走 window.tabula.tags.get(path) — 缓存机制:右键时拉一次
+      // 这里我们不在每次右键前主动拉所有 — ContextMenu 内会按需拉
+      tagsCacheLoaded = true;
+    } finally {
+      tagsCacheLoading = null;
+    }
+  })();
+  return tagsCacheLoading;
+}
+
+/** 取某路径当前的 tags(从缓存;无则返回空) */
+export function getCachedTags(path: string): string[] {
+  return tagsCache.get(path) ?? [];
+}
+
+/** 设置某路径的 tags(主进程返回后调用) */
+export function setCachedTags(path: string, tags: string[]): void {
+  tagsCache.set(path, tags);
+  tagsCacheListeners.forEach((fn) => fn());
+}
+
+/** 订阅 tags 变化(ContextMenu 在打开时刷新会用到) */
+export function subscribeTagsCache(fn: () => void): () => void {
+  tagsCacheListeners.add(fn);
+  return () => tagsCacheListeners.delete(fn);
+}
+
+/** 给路径添加 tag(IPC + 写缓存) */
+async function addTagForPath(path: string, tag: string): Promise<void> {
+  await window.tabula.tags.add(path, tag);
+  const cur = tagsCache.get(path) ?? [];
+  if (!cur.includes(tag)) {
+    tagsCache.set(path, [...cur, tag]);
+    tagsCacheListeners.forEach((fn) => fn());
+  }
+}
+
+/** 给路径移除 tag(IPC + 写缓存) */
+async function removeTagForPath(path: string, tag: string): Promise<void> {
+  await window.tabula.tags.remove(path, tag);
+  const cur = tagsCache.get(path) ?? [];
+  tagsCache.set(path, cur.filter((t) => t !== tag));
+  tagsCacheListeners.forEach((fn) => fn());
+}
+
+/** 主进程拉一次 path 的 tags(并写缓存) */
+export async function loadTagsForPath(path: string): Promise<string[]> {
+  const tags = await window.tabula.tags.get(path);
+  tagsCache.set(path, tags);
+  return tags;
 }
 
 /** buildMenuItems 提到组件外面:纯函数 + 闭包传参,避免 hooks 顺序问题 */
@@ -310,6 +384,62 @@ function buildMenuItems(args: {
       });
     }
 
+    // G008: 标签子菜单(添加 / 颜色预设 / 移除现有标签)
+    {
+      const entryPath = targetEntry!.path; // isEmptySpace=false 时 targetEntry 必定存在
+      const existingTags = getCachedTags(entryPath);
+      // 「添加标签...」: 弹 InputDialog
+      items.push({
+        label: '添加标签...',
+        icon: '🏷',
+        action: () => {
+          // 触发一个全局事件, App 监听并弹 InputDialog
+          window.dispatchEvent(
+            new CustomEvent('tabula:add-tag', { detail: { path: entryPath } }),
+          );
+          hideGlobalMenu();
+        },
+      });
+
+      // 5 个颜色预设
+      for (const preset of TAG_COLOR_PRESETS) {
+        if (existingTags.includes(preset.tag)) continue; // 已存在则跳过
+        items.push({
+          label: `标记为 ${preset.label}`,
+          icon: preset.emoji,
+          action: () => {
+            void addTagForPath(entryPath, preset.tag);
+            actions.showToast(`已添加标签: ${preset.tag}`, 'success', 1500);
+            hideGlobalMenu();
+          },
+        });
+      }
+
+      // 已有标签 → 移除
+      if (existingTags.length > 0) {
+        items.push({ label: '', divider: true });
+        items.push({
+          label: `移除标签 (${existingTags.length})`,
+          icon: '✖',
+          action: () => {
+            window.dispatchEvent(
+              new CustomEvent('tabula:remove-tag', { detail: { path: entryPath, existingTags } }),
+            );
+            hideGlobalMenu();
+          },
+        });
+      } else {
+        items.push({
+          label: '(无标签)',
+          icon: '',
+          disabled: true,
+          action: () => {
+            hideGlobalMenu();
+          },
+        });
+      }
+    }
+
     // P3: 发送到...
     items.push({
       label: '发送到...',
@@ -434,6 +564,35 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
     };
   }, []);
 
+  // G008: tag dialog 状态(从全局事件中填)
+  const [tagDialog, setTagDialog] = useState<
+    | { mode: 'add' | 'remove'; path: string; existingTags: string[] }
+    | null
+  >(null);
+
+  // 监听 add/remove tag 全局事件
+  useEffect(() => {
+    const onAdd = (e: Event) => {
+      const detail = (e as CustomEvent<{ path: string }>).detail;
+      setTagDialog({ mode: 'add', path: detail.path, existingTags: [] });
+    };
+    const onRemove = (e: Event) => {
+      const detail = (e as CustomEvent<{ path: string; existingTags: string[] }>).detail;
+      setTagDialog({ mode: 'remove', path: detail.path, existingTags: detail.existingTags });
+    };
+    window.addEventListener('tabula:add-tag', onAdd);
+    window.addEventListener('tabula:remove-tag', onRemove);
+    return () => {
+      window.removeEventListener('tabula:add-tag', onAdd);
+      window.removeEventListener('tabula:remove-tag', onRemove);
+    };
+  }, []);
+
+  // 订阅 tags 缓存变化(右键刷新用)
+  useEffect(() => {
+    return subscribeTagsCache(() => force((n) => n + 1));
+  }, []);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   // 第一次 mount 注册全局 listener(只挂一次,全生命周期不卸载)
@@ -475,6 +634,8 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
           if (!sel || !sel.has(entryPath)) {
             useFileStore.getState().selectOne(pickedPaneId, entryPath);
           }
+          // G008: 右键打开菜单时,拉一次该 entry 的 tags(写入缓存)
+          void loadTagsForPath(entryPath);
         }
       }
 
@@ -561,6 +722,36 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
           </button>
         );
       })}
+      {tagDialog && (
+        <InputDialog
+          open={true}
+          title={tagDialog.mode === 'add' ? '添加标签' : '移除标签(输入要移除的完整标签)'}
+          placeholder={tagDialog.mode === 'add' ? '输入标签名' : tagDialog.existingTags.join(' / ')}
+          defaultValue=""
+          okLabel={tagDialog.mode === 'add' ? '添加' : '移除'}
+          onSubmit={async (value) => {
+            const trimmed = value.trim();
+            if (!trimmed) return;
+            if (tagDialog.mode === 'add') {
+              await addTagForPath(tagDialog.path, trimmed);
+              const actions = useFileStore.getState();
+              actions.showToast(`已添加标签: ${trimmed}`, 'success', 1500);
+            } else {
+              if (!tagDialog.existingTags.includes(trimmed)) {
+                const actions = useFileStore.getState();
+                actions.showToast('该标签不存在', 'warn', 1500);
+                setTagDialog(null);
+                return;
+              }
+              await removeTagForPath(tagDialog.path, trimmed);
+              const actions = useFileStore.getState();
+              actions.showToast(`已移除标签: ${trimmed}`, 'success', 1500);
+            }
+            setTagDialog(null);
+          }}
+          onCancel={() => setTagDialog(null)}
+        />
+      )}
     </div>
   );
 }
