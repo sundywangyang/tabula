@@ -52,10 +52,10 @@
       "title": "详情视图列头点击排序",
       "objective": "详情视图点击列头按该列排序",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "SortHeader with onSort={cycleSort} already exists in FileList.tsx lines 617-641. cycleSort in file-store.ts lines 786-799 cycles asc→desc→null. Already fully implemented.",
+      "attempt": 2,
+      "evidence": "SortHeader in FileList.tsx + cycleSort() in file-store.ts (asc→desc→null cycle). TC:0 err, tests:104/104.",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:25:00.000Z"
+      "updatedAt": "2026-06-24T12:48:00.000Z"
     },
     {
       "id": "G006-quick-look-shortcut",
