@@ -101,10 +101,10 @@
       "title": "Lock File (只读/锁定)",
       "objective": "右键文件属性设只读/锁定",
       "status": "completed",
-      "attempt": 2,
-      "evidence": "FS_SET_PERMISSIONS IPC + chmod 0o444/0o644 + ContextMenu 锁定/解锁. TC:0 err, tests:137/137 passed.",
+      "attempt": 3,
+      "evidence": "FIX: 0o400 → 0o200 (correct write-bit discriminator for Windows). isReadOnly() helper extracted to apps/renderer/src/utils/permissions.ts. 8 new regression tests in ContextMenu-lock.test.ts covering 0o444/0o644/0o600/0o400 + Windows S_IFREG variants + bit-discriminator proof. TC:0 err, tests:145/145 passed (commit 8133f80).",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-24T13:25:00.000Z"
+      "updatedAt": "2026-06-24T13:31:00.000Z"
     },
     {
       "id": "G011-make-alias",
