@@ -230,9 +230,12 @@ export function registerIpcHandlers(ctx: IpcContext) {
       return { ok: false, error: { code: 'UNKNOWN', message: 'No window' } };
     }
     // fallback 图标:packaged 走 resourcesPath/resources;dev 走 build-assets/icon。
-    const fallbackIconPath = process.resourcesPath
+    // G018: 用 app.isPackaged + app.getAppPath() 替代 process.resourcesPath/__dirname 探测。
+    // dev 模式 process.resourcesPath 非空(指向 electron dist resources),且 __dirname 解析到
+    // electron-vite outDir,手算层级不可靠;统一走 window-manager:44 / index.ts:70 的模式。
+    const fallbackIconPath = app.isPackaged
       ? join(process.resourcesPath, 'resources', 'Tabula.ico')
-      : join(__dirname, '..', '..', 'build-assets', 'icon', 'Tabula.ico');
+      : join(app.getAppPath(), 'build-assets', 'icon', 'Tabula.ico');
     return handleStartDrag(paths, {
       startDrag: (item) => e.sender.startDrag(item),
       createImage: (p) => nativeImage.createFromPath(p),

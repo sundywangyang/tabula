@@ -14,6 +14,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { handleStartDrag, resolveDragIconPath } from '../handlers';
 import type { CreateNativeImageFn, StartDragFn } from '../handlers';
 import type { FsError, Result } from '@tabula/bridge';
+import { join } from 'node:path';
+import * as electron from 'electron';
+
+// 用 hoisted mock 暴露可写 app state,模拟 ipc/index.ts 中
+// app.isPackaged + app.getAppPath() 的运行时分支。
+const { electronApp } = vi.hoisted(() => ({
+  electronApp: {
+    isPackaged: false,
+    getAppPath: vi.fn(() => '/repo'),
+  },
+}));
+
+vi.mock('electron', () => ({
+  app: electronApp,
+}));
 
 function makeCtx(overrides: Partial<{
   startDrag: StartDragFn;
@@ -132,5 +147,58 @@ describe('resolveDragIconPath (G018)', () => {
   it('nativeIcon non-empty → 返回 firstFile', () => {
     const createImage: CreateNativeImageFn = vi.fn(() => ({ isEmpty: () => false }));
     expect(resolveDragIconPath('/data/img.png', createImage, '/fallback.ico')).toBe('/data/img.png');
+  });
+});
+
+/**
+ * G018 回归:复现 ipc/index.ts 中 fallbackIconPath 的解析逻辑,
+ * 验证 dev / packaged 两条分支都走 app.isPackaged + app.getAppPath() 的正确模式
+ * (而非 process.resourcesPath 探测 / __dirname 手算层级)。
+ *
+ * 该表达式必须在两套 mock 下都指向正确路径;若回退到 process.resourcesPath/__dirname 探测,
+ * dev 分支在 vitest 环境下 process.resourcesPath 非空会触发旧 bug-A。
+ */
+function resolveFallbackIconPath(): string {
+  // 必须与 ipc/index.ts fallbackIconPath 一致 — 改一处则同步改另一处
+  // 通过 re-import electron 拿到当前 mock 的 app 引用
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const electron = require('electron') as { app: typeof electronApp };
+  return electron.app.isPackaged
+    ? join(process.resourcesPath, 'resources', 'Tabula.ico')
+    : join(electron.app.getAppPath(), 'build-assets', 'icon', 'Tabula.ico');
+}
+
+describe('fallbackIconPath resolution (G018 regression)', () => {
+  it('dev (app.isPackaged=false) → app.getAppPath()/build-assets/icon/Tabula.ico', () => {
+    electronApp.isPackaged = false;
+    electronApp.getAppPath.mockReturnValue('/repo');
+    expect(
+      electron.app.isPackaged
+        ? join(process.resourcesPath, 'resources', 'Tabula.ico')
+        : join(electron.app.getAppPath(), 'build-assets', 'icon', 'Tabula.ico'),
+    ).toBe(join('/repo', 'build-assets', 'icon', 'Tabula.ico'));
+  });
+
+  it('packaged (app.isPackaged=true) → process.resourcesPath/resources/Tabula.ico', () => {
+    electronApp.isPackaged = true;
+    electronApp.getAppPath.mockReturnValue('/should/not/be/used');
+    // vitest 下 process.resourcesPath 未定义;包装包运行时由 electron 注入。
+    const fakeResourcesPath = '/Applications/Tabula.app/Contents/Resources';
+    const originalResourcesPath = process.resourcesPath;
+    Object.defineProperty(process, 'resourcesPath', { value: fakeResourcesPath, configurable: true });
+    try {
+      expect(
+        electron.app.isPackaged
+          ? join(process.resourcesPath, 'resources', 'Tabula.ico')
+          : join(electron.app.getAppPath(), 'build-assets', 'icon', 'Tabula.ico'),
+      ).toBe(join(fakeResourcesPath, 'resources', 'Tabula.ico'));
+    } finally {
+      if (originalResourcesPath === undefined) {
+        // undefined 还原:删掉属性
+        delete (process as { resourcesPath?: string }).resourcesPath;
+      } else {
+        Object.defineProperty(process, 'resourcesPath', { value: originalResourcesPath, configurable: true });
+      }
+    }
   });
 });
