@@ -156,3 +156,69 @@ export async function handleChecksum(
     return { ok: false, error };
   }
 }
+
+// =================== G018: 系统原生拖拽 ===================
+
+/**
+ * 与 Electron `webContents.startDrag({ file, icon })` 同形的注入点,便于单测。
+ * 测试时传 mock,生产由 ipc/index.ts 包一层 `e.sender.startDrag`。
+ */
+export type StartDragFn = (item: { file: string; icon: string }) => void;
+
+/**
+ * `nativeImage.createFromPath(path).isEmpty()` 的最小替身,便于单测注入。
+ */
+export type NativeImageLike = { isEmpty(): boolean };
+
+/**
+ * `nativeImage.createFromPath` 的注入点(便于 mock)。
+ */
+export type CreateNativeImageFn = (path: string) => NativeImageLike;
+
+/**
+ * 解析拖拽图标的优先级:
+ * 1. first 文件自身的 NativeImage(图片能拿到真实缩略图)
+ * 2. 非图片 → Tabula.ico(packaged: resourcesPath/resources/Tabula.ico;
+ *    dev: build-assets/icon/Tabula.ico 相对当前文件)
+ */
+export function resolveDragIconPath(
+  firstFile: string,
+  createImage: CreateNativeImageFn,
+  fallbackPath: string,
+): string {
+  const nativeIcon = createImage(firstFile);
+  if (!nativeIcon.isEmpty()) return firstFile;
+  return fallbackPath;
+}
+
+/**
+ * G018: 启动一次系统原生拖拽。
+ *
+ * 把 paths[0] 作为真实文件交给 OS drag session。webContents.startDrag 一次只支持
+ * 一个文件 — 多文件选择时仅第一个文件会被 OS 作为被拖项目接受。
+ *
+ * 必须在渲染端 DOM `ondragstart` handler 内**同步**调用;主进程这一侧 startDragFn
+ * 仍处在 OS drag 生命周期内,目标 app(桌面 / VSCode / 微信 / 7-Zip)收到的是真实文件
+ * 而非路径字符串。
+ */
+export async function handleStartDrag(
+  paths: string[],
+  ctx: {
+    startDrag: StartDragFn;
+    createImage: CreateNativeImageFn;
+    fallbackIconPath: string;
+  },
+): Promise<Result<void>> {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    return { ok: false, error: { code: 'UNKNOWN', message: 'No paths' } };
+  }
+  const firstFile = paths[0]!;
+  const iconPath = resolveDragIconPath(firstFile, ctx.createImage, ctx.fallbackIconPath);
+  try {
+    ctx.startDrag({ file: firstFile, icon: iconPath });
+    return { ok: true, data: undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: { code: 'UNKNOWN', message } };
+  }
+}

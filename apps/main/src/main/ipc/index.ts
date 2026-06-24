@@ -3,7 +3,7 @@
  *
  * 所有 ipcMain.handle 集中在这里,主进程 API 入口。
  */
-import { ipcMain, dialog, shell, app, clipboard } from 'electron';
+import { ipcMain, dialog, shell, app, clipboard, BrowserWindow, nativeImage } from 'electron';
 import { promises as fs } from 'node:fs';
 import { chmod } from 'node:fs/promises';
 import { join, basename } from 'node:path';
@@ -16,7 +16,7 @@ import type {
   FsSetPermissionsRequest,
   UpdateStatus,
 } from '@tabula/bridge';
-import { handleSetPermissions, handleCreateSymlink, handleChecksum } from './handlers';
+import { handleSetPermissions, handleCreateSymlink, handleChecksum, handleStartDrag } from './handlers';
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
 import * as trashService from '../fs/trash';
@@ -218,6 +218,26 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // =================== Thumbnail (P7 v1) ===================
   ipcMain.handle(IpcChannels.FS_GET_THUMBNAIL, (_e, p: string) => {
     return getThumbnail(p);
+  });
+
+  // =================== G018: 系统原生拖拽 ===================
+  // 把 paths[0] 作为真实文件交给 OS drag session(webContents.startDrag 一次只支持一个文件)。
+  // 必须在渲染端 dragstart handler 同步调用,主进程这一侧 e.sender.startDrag 仍处在
+  // OS drag 生命周期里,因此目标 app 收到的是真实文件而非路径字符串。
+  ipcMain.handle(IpcChannels.FS_START_DRAG, async (e, paths: string[]) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win) {
+      return { ok: false, error: { code: 'UNKNOWN', message: 'No window' } };
+    }
+    // fallback 图标:packaged 走 resourcesPath/resources;dev 走 build-assets/icon。
+    const fallbackIconPath = process.resourcesPath
+      ? join(process.resourcesPath, 'resources', 'Tabula.ico')
+      : join(__dirname, '..', '..', 'build-assets', 'icon', 'Tabula.ico');
+    return handleStartDrag(paths, {
+      startDrag: (item) => e.sender.startDrag(item),
+      createImage: (p) => nativeImage.createFromPath(p),
+      fallbackIconPath,
+    });
   });
 
   // =================== Tabs (P0 桩) ===================

@@ -222,6 +222,17 @@ export interface TabulaAPI {
      * G012: 拉取 undo/redo 两栈的当前快照(只读,给 UI 展示)。
      */
     getUndoStack(): Promise<Result<UndoStackSnapshot>>;
+    /**
+     * G018: 启动一次系统原生拖拽操作,把 paths[0] 作为真实文件拖出到外部 app。
+     * - 必须在渲染端 DOM `ondragstart` handler 内**同步**调用(ipcRenderer.invoke 会
+     *   立即排队,主进程 `e.sender.startDrag()` 会在 OS drag 仍然存活的同一 tick 内
+     *   执行,因此用户拖到桌面/VSCode/微信/7-Zip 时会得到真正的文件而非路径字符串。
+     * - `webContents.startDrag` 一次只支持一个文件;多文件选择时仅第一个文件会被 OS
+     *   作为被拖项目接受(其它路径仍可被 Tabula 内部继续处理)。
+     * - icon 优先取 paths[0] 的 NativeImage(图片文件自带缩略图),非图片文件回退到
+     *   Tabula.ico。
+     */
+    startDrag(paths: string[]): Promise<Result<void>>;
   };
 
   // 标签

@@ -151,20 +151,20 @@
       "title": "文件校验和 SHA-256",
       "objective": "右键属性加SHA-256列",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "fs:checksum IPC (crypto.createHash streaming) + bridge channel + preload + api.ts type + ContextMenu '计算 SHA-256'. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "FS_CHECKSUM IPC + streaming createHash (sha256/sha1/md5) + ContextMenu 计算 SHA-256. TC:0 err, tests:174/174 (8 new checksum tests cover hello/world chunks, sha1, md5, stream-error, ENOENT, unsupported-algo, empty-path).",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:42:00.000Z"
+      "updatedAt": "2026-06-24T14:05:00.000Z"
     },
     {
       "id": "G016-dir-size-improvement",
       "title": "目录大小计算改善",
       "objective": "计算文件夹大小后台异步化+取消支持",
       "status": "completed",
-      "attempt": 1,
-      "evidence": "DirSizeJob registry + cancelDirSize(jobId) + fs:cancel-dir-size IPC + CANCELLED error code. TC:0, tests 75/75 passed.",
+      "attempt": 2,
+      "evidence": "FS_CANCEL_DIR_SIZE + FS_DIR_SIZE_PROGRESS IPC + startDirSize/cancelDirSize with job registry + 60s cleanup. Tree-walk broadcast at 100-entry intervals; cancellable mid-walk. PropertiesPanel + ContextMenu wired to new job-based API. TC:0 err, tests:189/189 (15 new dir-size tests: completion / cancel / idempotent-cancel / missing-job / multi-job / empty-dir / missing-path / unsub / handlers / IPC broadcast).",
       "createdAt": "2026-06-23T11:12:45.915Z",
-      "updatedAt": "2026-06-23T19:45:00.000Z"
+      "updatedAt": "2026-06-24T14:20:00.000Z"
     },
     {
       "id": "G017-tar-tgz",

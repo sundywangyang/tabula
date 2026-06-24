@@ -183,6 +183,8 @@ const api: TabulaAPI = {
     undo: () => ipcRenderer.invoke(IpcChannels.UNDO_UNDO),
     redo: () => ipcRenderer.invoke(IpcChannels.UNDO_REDO),
     getUndoStack: () => ipcRenderer.invoke(IpcChannels.UNDO_GET_STACK),
+    // G018: 系统原生拖拽 — 必须在渲染端 dragstart handler 同步调用
+    startDrag: (paths: string[]) => ipcRenderer.invoke(IpcChannels.FS_START_DRAG, paths),
   },
 
   tabs: {
