@@ -99,6 +99,13 @@ export function BatchRenameDialog({
       const parent = oldPath.slice(0, lastSep + 1);
       const newPath = parent + newName;
 
+      // 目标已存在时跳过（防止 EEXIST 被抛出到 failed 而后续仍继续）
+      const exists = await window.tabula.fs.stat(newPath);
+      if (exists.ok) {
+        failed.push(`${oldName}: 目标已存在 "${newName}"`);
+        continue;
+      }
+
       const res = await window.tabula.fs.rename(oldPath, newPath);
       if (!res.ok) {
         failed.push(`${oldName}: ${res.error.message}`);
