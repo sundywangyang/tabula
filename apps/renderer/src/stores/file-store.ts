@@ -1139,7 +1139,11 @@ export const useFileStore = create<FileStore>((set, get) => {
 
     renameEntry: async (paneId, oldPath, newName) => {
       const trimmed = newName.trim();
-      if (!trimmed) return { ok: false, error: '名称不能为空' };
+      if (!trimmed) {
+        const msg = '重命名失败: 名称不能为空';
+        get().showToast(msg, 'error', 4000);
+        return { ok: false, error: msg };
+      }
       const oldName = basename(oldPath);
       if (trimmed === oldName) {
         set((s) => ({
@@ -1159,12 +1163,16 @@ export const useFileStore = create<FileStore>((set, get) => {
       if (newPath !== oldPath) {
         const exists = await window.tabula.fs.stat(newPath);
         if (exists.ok) {
-          return { ok: false, error: `已存在同名项: ${trimmed}` };
+          const msg = `重命名失败: 已存在同名项 "${trimmed}"`;
+          get().showToast(msg, 'error', 4000);
+          return { ok: false, error: msg };
         }
       }
       const res = await window.tabula.fs.rename(oldPath, newPath);
       if (!res.ok) {
-        return { ok: false, error: res.error.message };
+        const msg = `重命名失败: ${res.error.message}`;
+        get().showToast(msg, 'error', 4000);
+        return { ok: false, error: msg };
       }
       set((s) => ({
         panes: {
