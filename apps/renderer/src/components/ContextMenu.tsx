@@ -235,27 +235,31 @@ function buildMenuItems(args: {
     items.push({ label: '', divider: true });
 
     items.push({
-      label: '复制',
-      icon: '📋',
-      shortcut: 'Ctrl+C',
-      disabled: !hasSelection,
-      action: () => { actions.copySelected(paneId); hideGlobalMenu(); },
-    });
-    items.push({
-      label: '剪切',
-      icon: '✂',
-      shortcut: 'Ctrl+X',
-      disabled: !hasSelection,
-      action: () => { actions.cutSelected(paneId); hideGlobalMenu(); },
-    });
-
-    const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
-    items.push({
-      label: '粘贴',
-      icon: '📄',
-      shortcut: 'Ctrl+V',
-      disabled: !hasClipboard,
-      action: () => { void actions.pasteToPane(paneId); hideGlobalMenu(); },
+      label: '文件操作',
+      icon: '📂',
+      submenu: [
+        {
+          label: '复制',
+          icon: '📋',
+          shortcut: 'Ctrl+C',
+          disabled: !hasSelection,
+          action: () => { actions.copySelected(paneId); hideGlobalMenu(); },
+        },
+        {
+          label: '剪切',
+          icon: '✂',
+          shortcut: 'Ctrl+X',
+          disabled: !hasSelection,
+          action: () => { actions.cutSelected(paneId); hideGlobalMenu(); },
+        },
+        {
+          label: '粘贴',
+          icon: '📄',
+          shortcut: 'Ctrl+V',
+          disabled: !clipboard || clipboard.paths.length === 0,
+          action: () => { void actions.pasteToPane(paneId); hideGlobalMenu(); },
+        },
+      ],
     });
 
     items.push({ label: '', divider: true });
