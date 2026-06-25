@@ -11,7 +11,7 @@
  * - resolveDragIconPath 单独:empty → fallback / non-empty → first file
  */
 import { describe, expect, it, vi } from 'vitest';
-import { handleStartDrag, resolveDragIconPath } from '../handlers';
+import { handleStartDrag, resolveDragIconPath, pickPlatformFallbackIcon } from '../handlers';
 import type { CreateNativeImageFn, StartDragFn } from '../handlers';
 import type { FsError, Result } from '@tabula/bridge';
 import { join } from 'node:path';
@@ -34,11 +34,14 @@ function makeCtx(overrides: Partial<{
   startDrag: StartDragFn;
   createImage: CreateNativeImageFn;
   fallbackIconPath: string;
+  /** G018 防御:默认视为文件存在且 isFile(),需要模拟不存在或目录的测试覆盖 */
+  statSync?: (p: string) => { isFile(): boolean; isDirectory(): boolean } | null;
 }> = {}) {
   return {
     startDrag: overrides.startDrag ?? vi.fn(),
     createImage: overrides.createImage ?? vi.fn(() => ({ isEmpty: () => true })),
     fallbackIconPath: overrides.fallbackIconPath ?? '/fake/build-assets/icon/Tabula.ico',
+    statSync: overrides.statSync ?? vi.fn(() => ({ isFile: () => true, isDirectory: () => false })),
   };
 }
 
@@ -135,6 +138,74 @@ describe('handleStartDrag (G018)', () => {
       expect((res.error as FsError).code).toBe('UNKNOWN');
     }
     expect(startDrag).not.toHaveBeenCalled();
+  });
+
+  it('first 文件不存在 (statSync 返回 null) → Result.error ENOENT, 不调 startDrag', async () => {
+    const startDrag = vi.fn();
+    const createImage = vi.fn();
+    const ctx = makeCtx({
+      startDrag,
+      createImage,
+      statSync: vi.fn(() => null),
+    });
+    const res = (await handleStartDrag(['/data/ghost.txt'], ctx)) as Result<void>;
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect((res.error as FsError).code).toBe('ENOENT');
+      expect((res.error as FsError).path).toBe('/data/ghost.txt');
+    }
+    expect(startDrag).not.toHaveBeenCalled();
+  });
+
+  it('first 是目录 → Result.error "directories not supported", 不调 startDrag', async () => {
+    const startDrag = vi.fn();
+    const createImage = vi.fn();
+    const ctx = makeCtx({
+      startDrag,
+      createImage,
+      statSync: vi.fn(() => ({ isFile: () => false, isDirectory: () => true })),
+    });
+    const res = (await handleStartDrag(['/data/some-folder'], ctx)) as Result<void>;
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect((res.error as FsError).code).toBe('UNKNOWN');
+      expect((res.error as FsError).message).toMatch(/directories not supported/);
+    }
+    expect(startDrag).not.toHaveBeenCalled();
+  });
+
+  it('statSync 抛错 → 视为文件不存在(ENOENT)', async () => {
+    const startDrag = vi.fn();
+    const ctx = makeCtx({
+      startDrag,
+      statSync: vi.fn(() => {
+        throw new Error('EACCES');
+      }),
+    });
+    const res = (await handleStartDrag(['/data/locked.txt'], ctx)) as Result<void>;
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect((res.error as FsError).code).toBe('ENOENT');
+    }
+    expect(startDrag).not.toHaveBeenCalled();
+  });
+});
+
+describe('pickPlatformFallbackIcon (G018 cross-platform)', () => {
+  it('当前 platform 的图标存在 → 返回绝对路径', () => {
+    const candidates: Record<string, string> = {
+      win32: 'build-assets/icon/Tabula.ico',
+      darwin: 'build-assets/icon/Tabula.icns',
+      linux: 'build-assets/icon/png/16.png',
+    };
+    const rel = candidates[process.platform];
+    if (!rel) return; // 当前 OS 不在候选里,跳过
+    const root = process.cwd();
+    expect(pickPlatformFallbackIcon(root)).toMatch(new RegExp(rel.replace(/\//g, '[\\\\/]')));
+  });
+
+  it('appRoot 不存在 → 返回 null(不抛)', () => {
+    expect(pickPlatformFallbackIcon('/this/path/does/not/exist/anywhere')).toBe(null);
   });
 });
 

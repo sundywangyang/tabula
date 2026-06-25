@@ -455,16 +455,15 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        {VIEW_MODES.map((m) => (
-          <Tooltip key={m.mode} label={`${m.label}视图`}>
-            <button
-              className={`toolbar-btn ${viewMode === m.mode ? 'active' : ''}`}
-              onClick={() => setViewMode(paneId, m.mode)}
-            >
-              {m.icon}
-            </button>
-          </Tooltip>
-        ))}
+        <Tooltip label={`视图: ${VIEW_MODES.find((m) => m.mode === viewMode)?.label ?? '详情'}`}>
+          <button
+            className="toolbar-btn"
+            onClick={() => cycleViewMode(paneId, viewMode, setViewMode)}
+          >
+            {VIEW_MODES.find((m) => m.mode === viewMode)?.icon ?? <LayoutList size={16} />}
+            <span className="toolbar-label">{VIEW_MODES.find((m) => m.mode === viewMode)?.label ?? '详情'}</span>
+          </button>
+        </Tooltip>
       </div>
 
       <div className="toolbar-divider" />
@@ -548,6 +547,20 @@ import type { LayoutNode } from '@tabula/bridge';
 
 /** G007: Group By 循环顺序 */
 const GROUP_BY_CYCLE: GroupByMode[] = ['none', 'type', 'date', 'size'];
+
+/** 视图模式循环顺序 */
+const VIEW_MODE_CYCLE: ViewMode[] = ['details', 'list', 'grid'];
+
+/** 循环切换 pane 的视图模式 */
+function cycleViewMode(
+  paneId: string,
+  current: ViewMode,
+  setViewMode: (paneId: string, mode: ViewMode) => void,
+): void {
+  const idx = VIEW_MODE_CYCLE.indexOf(current);
+  const next = VIEW_MODE_CYCLE[(idx + 1) % VIEW_MODE_CYCLE.length] ?? 'details';
+  setViewMode(paneId, next);
+}
 
 /** 循环切换 pane 的分组模式 */
 function cycleGroupBy(

@@ -16,7 +16,7 @@ import type {
   FsSetPermissionsRequest,
   UpdateStatus,
 } from '@tabula/bridge';
-import { handleSetPermissions, handleCreateSymlink, handleChecksum, handleStartDrag } from './handlers';
+import { handleSetPermissions, handleCreateSymlink, handleChecksum, handleStartDrag, pickPlatformFallbackIcon } from './handlers';
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
 import * as trashService from '../fs/trash';
@@ -229,17 +229,16 @@ export function registerIpcHandlers(ctx: IpcContext) {
     if (!win) {
       return { ok: false, error: { code: 'UNKNOWN', message: 'No window' } };
     }
-    // fallback 图标:packaged 走 resourcesPath/resources;dev 走 build-assets/icon。
-    // G018: 用 app.isPackaged + app.getAppPath() 替代 process.resourcesPath/__dirname 探测。
-    // dev 模式 process.resourcesPath 非空(指向 electron dist resources),且 __dirname 解析到
-    // electron-vite outDir,手算层级不可靠;统一走 window-manager:44 / index.ts:70 的模式。
-    const fallbackIconPath = app.isPackaged
-      ? join(process.resourcesPath, 'resources', 'Tabula.ico')
-      : join(app.getAppPath(), 'build-assets', 'icon', 'Tabula.ico');
+    // G018: 图标按平台选择 — macOS 不识别 .ico 会导致 nativeImage 为空 → startDrag 抛错。
+    // packaged 走 resourcesPath/resources;dev 走 app.getAppPath()/build-assets/icon。
+    const iconBase = app.isPackaged
+      ? join(process.resourcesPath, 'resources')
+      : app.getAppPath();
+    const fallbackIconPath = pickPlatformFallbackIcon(iconBase);
     return handleStartDrag(paths, {
       startDrag: (item) => e.sender.startDrag(item),
       createImage: (p) => nativeImage.createFromPath(p),
-      fallbackIconPath,
+      fallbackIconPath: fallbackIconPath ?? '',
     });
   });
 

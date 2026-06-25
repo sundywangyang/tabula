@@ -207,12 +207,23 @@ export async function handleStartDrag(
     startDrag: StartDragFn;
     createImage: CreateNativeImageFn;
     fallbackIconPath: string;
+    statSync?: (p: string) => { isFile(): boolean; isDirectory(): boolean } | null;
   },
 ): Promise<Result<void>> {
   if (!Array.isArray(paths) || paths.length === 0) {
     return { ok: false, error: { code: 'UNKNOWN', message: 'No paths' } };
   }
   const firstFile = paths[0]!;
+  // 防御:文件不存在时直接 reject,避免 electron 内部抛错
+  const statFn = ctx.statSync ?? defaultStatSync;
+  const st = safeStatSync(statFn, firstFile);
+  if (!st) {
+    return { ok: false, error: { code: 'ENOENT', message: `Source file not found: ${firstFile}`, path: firstFile } };
+  }
+  if (!st.isFile()) {
+    // 目录走 OS 原生拖拽会触发不一样行为(Windows 资源管理器会遍历目录),统一 reject
+    return { ok: false, error: { code: 'UNKNOWN', message: 'Only files can be dragged out (directories not supported)', path: firstFile } };
+  }
   const iconPath = resolveDragIconPath(firstFile, ctx.createImage, ctx.fallbackIconPath);
   try {
     ctx.startDrag({ file: firstFile, icon: iconPath });
@@ -221,4 +232,51 @@ export async function handleStartDrag(
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: { code: 'UNKNOWN', message } };
   }
+}
+
+/** 默认 statSync:依赖 fs.existsSync + fs.statSync(只在主进程路径走) */
+function defaultStatSync(p: string): { isFile(): boolean; isDirectory(): boolean } | null {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('node:fs') as typeof import('node:fs');
+  try {
+    const s = fs.statSync(p);
+    return { isFile: () => s.isFile(), isDirectory: () => s.isDirectory() };
+  } catch {
+    return null;
+  }
+}
+
+function safeStatSync(
+  statFn: NonNullable<Parameters<typeof handleStartDrag>[1]['statSync']>,
+  p: string,
+): { isFile(): boolean; isDirectory(): boolean } | null {
+  try {
+    return statFn(p);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 按平台挑一个当前 OS 真正能识别的 fallback 图标路径。
+ * - Windows: .ico
+ * - macOS:   .icns(macOS 不识别 .ico → nativeImage.createFromPath 返回空 → startDrag 抛错)
+ * - Linux:   .png(可能不存在 → 返回 null,调用方用空 image 兜底)
+ */
+export function pickPlatformFallbackIcon(appRoot: string): string | null {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('node:fs') as typeof import('node:fs');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require('node:path') as typeof import('node:path');
+  const candidates: Record<string, string[]> = {
+    win32: ['build-assets/icon/Tabula.ico'],
+    darwin: ['build-assets/icon/Tabula.icns'],
+    linux: ['build-assets/icon/png/16.png', 'build-assets/icon/png/32.png', 'build-assets/icon/png/256.png', 'build-assets/icon/Tabula.png'],
+  };
+  const list = candidates[process.platform] ?? [];
+  for (const rel of list) {
+    const abs = path.join(appRoot, rel);
+    if (fs.existsSync(abs)) return abs;
+  }
+  return null;
 }
