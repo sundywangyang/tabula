@@ -1052,6 +1052,17 @@ function DetailsRow({
     >
       <div className="col col-name">
         <FileThumb entry={entry} variant="row" />
+        {(() => {
+          const tags = getCachedTags(entry.path);
+          if (tags.length === 0) return null;
+          return (
+            <span className="row-tags">
+              {tags.map((t) => (
+                <span key={t} className="row-tag-chip">{t}</span>
+              ))}
+            </span>
+          );
+        })()}
         {renaming ? (
           <RenameInput
             entry={entry}
@@ -1170,6 +1181,17 @@ function ListView({
             >
               <div className="col col-name-full">
                 <FileThumb entry={entry} variant="row" />
+                {(() => {
+                  const tags = getCachedTags(entry.path);
+                  if (tags.length === 0) return null;
+                  return (
+                    <span className="row-tags">
+                      {tags.map((t) => (
+                        <span key={t} className="row-tag-chip">{t}</span>
+                      ))}
+                    </span>
+                  );
+                })()}
                 {renameTarget === entry.path ? (
                   <RenameInput
                     entry={entry}
@@ -1296,6 +1318,17 @@ function GridView({
                   data-entry-path={entry.path}
                 >
                   <FileThumb entry={entry} variant="grid" />
+                  {(() => {
+                    const tags = getCachedTags(entry.path);
+                    if (tags.length === 0) return null;
+                    return (
+                      <span className="row-tags row-tags-grid">
+                        {tags.map((t) => (
+                          <span key={t} className="row-tag-chip">{t}</span>
+                        ))}
+                      </span>
+                    );
+                  })()}
                   {renameTarget === entry.path ? (
                     <RenameInput
                       entry={entry}
