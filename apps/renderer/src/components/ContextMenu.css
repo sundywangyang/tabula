@@ -6,6 +6,10 @@
   z-index: 9999;
   min-width: 180px;
   max-width: 280px;
+  /* 内容超出 root(主窗口)高度时,在 menu 内部上下滚动,而不是溢出截断 */
+  max-height: calc(100vh - 12px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--bg-elevated, #fff);
   border: 1px solid var(--border, #e0e0e0);
   border-radius: 6px;
@@ -13,6 +17,22 @@
   padding: 4px 0;
   user-select: none;
   animation: context-menu-appear 0.1s ease-out;
+}
+
+/* 滚动条美化(Webkit + Firefox) */
+.context-menu::-webkit-scrollbar {
+  width: 8px;
+}
+.context-menu::-webkit-scrollbar-thumb {
+  background: var(--border-strong, #bbb);
+  border-radius: 4px;
+}
+.context-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+.context-menu {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong, #bbb) transparent;
 }
 
 @keyframes context-menu-appear {
