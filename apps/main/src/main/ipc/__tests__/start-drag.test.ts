@@ -128,6 +128,17 @@ describe('handleStartDrag (G018)', () => {
     expect(createImage).not.toHaveBeenCalled();
   });
 
+  it('handleStartDrag 返回同步 plain object(非 Promise)— sendSync 结构化克隆需要', () => {
+    const ctx = makeCtx();
+    const res = handleStartDrag(['/data/a.txt'], ctx) as unknown;
+    // G018: ipcRenderer.sendSync 通过 Event.returnValue 把返回值走结构化克隆;
+    // Promise 对象不可克隆 → "An object could not be cloned" → app 卡死。
+    // 这里直接验证返回值不是 Promise,且是 plain object。
+    expect(res).not.toBeInstanceOf(Promise);
+    expect(typeof res).toBe('object');
+    expect(res).not.toBeNull();
+  });
+
   it('paths 是 undefined → Result.error (UNKNOWN "No paths")', async () => {
     const startDrag = vi.fn();
     const ctx = makeCtx({ startDrag });

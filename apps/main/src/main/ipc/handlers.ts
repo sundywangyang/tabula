@@ -200,8 +200,12 @@ export function resolveDragIconPath(
  * 必须在渲染端 DOM `ondragstart` handler 内**同步**调用;主进程这一侧 startDragFn
  * 仍处在 OS drag 生命周期内,目标 app(桌面 / VSCode / 微信 / 7-Zip)收到的是真实文件
  * 而非路径字符串。
+ *
+ * **必须是同步函数**(返回 `Result<void>` 而非 Promise):`ipcRenderer.sendSync` 通过
+ * `Event.returnValue` 把结果走结构化克隆回渲染端,Promise 不可克隆会抛
+ * "An object could not be cloned" 导致 app 卡死。
  */
-export async function handleStartDrag(
+export function handleStartDrag(
   paths: string[],
   ctx: {
     startDrag: StartDragFn;
@@ -209,7 +213,7 @@ export async function handleStartDrag(
     fallbackIconPath: string;
     statSync?: (p: string) => { isFile(): boolean; isDirectory(): boolean } | null;
   },
-): Promise<Result<void>> {
+): Result<void> {
   if (!Array.isArray(paths) || paths.length === 0) {
     return { ok: false, error: { code: 'UNKNOWN', message: 'No paths' } };
   }
