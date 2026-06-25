@@ -20,7 +20,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Archive, File as FileIcon, FileCode2, FileText, Film, Folder, Image, Music, Settings } from 'lucide-react';
 import type { FsEntry } from '@tabula/bridge';
 import { useFileStore, isThumbnailable, type SortField } from '../../stores/file-store';
-import { getCachedTags } from '../../components/ContextMenu';
+import { getCachedTags, loadTagsForPath, subscribeTagsCache } from '../../components/ContextMenu';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
 
@@ -89,6 +89,17 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [entries, sortBy, sortDir, showHidden, paneId],
   );
+
+  // G008: 订阅 tags cache 变化(异步 loadTagsForPath 返回后强制 re-render)
+  const [, setTick] = useState(0);
+  useEffect(() => subscribeTagsCache(() => setTick((n) => n + 1)), []);
+
+  // G008: 当 entries 变化时,批量预拉每个 entry 的 tags(填入 cache)
+  useEffect(() => {
+    for (const e of entries) {
+      void loadTagsForPath(e.path);
+    }
+  }, [entries]);
 
   // P7 v1:file-list 渲染时间埋点(从排序完成到 React commit)
   useFileListPerfReport(viewMode, sortedEntries.length);
