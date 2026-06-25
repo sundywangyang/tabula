@@ -529,11 +529,13 @@ function buildMenuItems(args: {
         },
       });
     }
-    // Archive: 压缩 / 解压
+    // Archive: 压缩 / 解压 → 二级子菜单
     // - 选中文件 / 文件夹 → 显示「压缩为 ZIP...」
-    // - 选中单个 .zip 文件 → 显示「解压到...」(合并单选 / 多选,多选时取第一个 .zip)
+    // - 选中包含至少一个 .zip → 显示「解压到...」「解压到此处」
     if (hasSelection) {
-      items.push({
+      const archiveSubmenu: MenuItem[] = [];
+
+      archiveSubmenu.push({
         label: '压缩为 ZIP…',
         icon: '🗜',
         action: () => {
@@ -547,7 +549,7 @@ function buildMenuItems(args: {
       // 解压:仅当选中里包含至少一个 .zip 才显示
       const hasZip = Array.from(selectedPaths).some((p) => /\.zip(x)?$/i.test(p));
       if (hasZip && targetEntry && !targetEntry.isDirectory) {
-        items.push({
+        archiveSubmenu.push({
           label: '解压到…',
           icon: '📦',
           action: () => {
@@ -558,7 +560,26 @@ function buildMenuItems(args: {
             hideGlobalMenu();
           },
         });
+
+        // 解压到此处:直接把 .zip 解压到当前目录(currentPath),无需选择目标
+        const extractHereZipPath = Array.from(selectedPaths).find((p) => /\.zip(x)?$/i.test(p));
+        if (extractHereZipPath && currentPath) {
+          archiveSubmenu.push({
+            label: '解压到此处',
+            icon: '📂',
+            action: () => {
+              void useFileStore.getState().startExtract(extractHereZipPath, currentPath, paneId);
+              hideGlobalMenu();
+            },
+          });
+        }
       }
+
+      items.push({
+        label: '压缩/解压',
+        icon: '🗜',
+        submenu: archiveSubmenu,
+      });
     }
 
     items.push({ label: '', divider: true });
