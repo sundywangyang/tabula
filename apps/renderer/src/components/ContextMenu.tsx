@@ -11,6 +11,7 @@
  * - 在文件/文件夹上右键:完整菜单(复制/剪切/粘贴/删除/重命名/属性/打开方式)
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFileStore, makeFolderTab } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
@@ -780,6 +781,10 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
 
 	  // 二级菜单状态
 	  const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
+	  // 二级菜单位置(portal 模式)— 从父 item 的 getBoundingClientRect 派生
+	  const [submenuPos, setSubmenuPos] = useState<{ top: number; left: number } | null>(null);
+	  // 父 item refs 字典,onMouseEnter 时读 rect
+	  const itemRefs = useRef(new Map<number, HTMLDivElement>());
 
   // 监听 add/remove tag 全局事件
   useEffect(() => {
@@ -1052,29 +1057,58 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
         const hasSub = !!item.submenu?.length;
         const isOpen = openSubmenu === index;
         return (
-          <div key={index} className={hasSub ? 'context-menu-submenu' : ''} onMouseLeave={() => { if (hasSub) setOpenSubmenu(null); }}>
+          <div
+            key={index}
+            className={hasSub ? 'context-menu-submenu' : ''}
+            ref={(el) => {
+              if (el) itemRefs.current.set(index, el);
+              else itemRefs.current.delete(index);
+            }}
+            onMouseLeave={() => { if (hasSub) setOpenSubmenu(null); }}
+          >
             <button
-  
+
               className={`context-menu-item ${item.disabled ? 'disabled' : ''} ${item.danger ? 'danger' : ''} ${hasSub ? 'has-submenu' : ''}`}
               onClick={() => {
                 if (item.disabled) return;
                 if (hasSub) {
-                  setOpenSubmenu(isOpen ? null : index);
+                  if (!isOpen) {
+                    // 打开时同步测父 item 位置,设给 portal 渲染的二级面板
+                    const el = itemRefs.current.get(index);
+                    if (el) {
+                      const r = el.getBoundingClientRect();
+                      setSubmenuPos({ top: r.top - 4, left: r.right });
+                    }
+                    setOpenSubmenu(index);
+                  } else {
+                    setOpenSubmenu(null);
+                  }
                 } else if (item.action) {
                   item.action();
                 }
               }}
               disabled={item.disabled}
-              onMouseEnter={() => { if (hasSub) setOpenSubmenu(index); }}
+              onMouseEnter={() => {
+                if (!hasSub) return;
+                const el = itemRefs.current.get(index);
+                if (el) {
+                  const r = el.getBoundingClientRect();
+                  setSubmenuPos({ top: r.top - 4, left: r.right });
+                }
+                setOpenSubmenu(index);
+              }}
             >
               {item.icon && <span className="context-menu-icon">{item.icon}</span>}
               <span className="context-menu-label">{item.label}</span>
               {item.shortcut && <span className="context-menu-shortcut">{item.shortcut}</span>}
             </button>
 
-            {/* 二级面板 */}
-            {hasSub && isOpen && (
-              <div className="submenu-panel">
+            {/* 二级面板用 portal 渲染到 body 避免被父 overflow 裁切 */}
+            {hasSub && isOpen && submenuPos && createPortal(
+              <div
+                className="submenu-panel"
+                style={{ position: 'fixed', top: submenuPos.top, left: submenuPos.left }}
+              >
 {item.submenu!.map((sub, si) => {
                   if (sub.divider) return <div key={si} className="submenu-divider" />;
                   return (
@@ -1090,7 +1124,8 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
                     </button>
                   );
                 })}
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
         );
