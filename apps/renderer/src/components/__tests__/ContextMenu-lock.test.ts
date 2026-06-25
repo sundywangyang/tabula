@@ -11,6 +11,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { isReadOnly } from '../../utils/permissions';
+import {
+  getCachedReadonly,
+  resolveLockMenuLabel,
+  setCachedReadonly,
+  subscribeReadonlyCache,
+} from '../readonly-cache';
 
 describe('ContextMenu.isReadOnly (G010)', () => {
   it('mode=0o444 → read-only (write bit 缺失)', () => {
@@ -51,5 +57,71 @@ describe('ContextMenu.isReadOnly (G010)', () => {
   it('mode=0o444 与 0o644 用 0o200 位可正确区分', () => {
     expect((0o444 & 0o200) === 0).toBe(true); // locked
     expect((0o644 & 0o200) === 0).toBe(false); // unlocked
+  });
+});
+
+describe('ContextMenu.resolveLockMenuLabel (G010)', () => {
+  it('cache 缺失(undefined) → 乐观显示「锁定」', () => {
+    expect(resolveLockMenuLabel(undefined)).toEqual({ label: '锁定', icon: '🔒' });
+  });
+
+  it('mode=0o444 (locked) → 显示「解锁」', () => {
+    expect(resolveLockMenuLabel(0o444)).toEqual({ label: '解锁', icon: '🔓' });
+  });
+
+  it('mode=0o644 (unlocked) → 显示「锁定」', () => {
+    expect(resolveLockMenuLabel(0o644)).toEqual({ label: '锁定', icon: '🔒' });
+  });
+
+  it('Windows mode=100444 → 显示「解锁」', () => {
+    expect(resolveLockMenuLabel(0o100444)).toEqual({ label: '解锁', icon: '🔓' });
+  });
+
+  it('Windows mode=100666 → 显示「锁定」', () => {
+    expect(resolveLockMenuLabel(0o100666)).toEqual({ label: '锁定', icon: '🔒' });
+  });
+
+  // 缓存里只有 write 位存在/缺失决定文案,与 0o400 read 位无关
+  it('mode=0o600 (write 位存在) → 显示「锁定」', () => {
+    expect(resolveLockMenuLabel(0o600)).toEqual({ label: '锁定', icon: '🔒' });
+  });
+
+  it('mode=0o400 (无 write 位) → 显示「解锁」', () => {
+    expect(resolveLockMenuLabel(0o400)).toEqual({ label: '解锁', icon: '🔓' });
+  });
+});
+
+describe('ContextMenu readonly cache + listener (G010)', () => {
+  const TEST_PATH = '/__test__/lock-cache-1.txt';
+
+  it('getCachedReadonly 初始为 undefined', () => {
+    // 隔离:此测试用唯一 path 避免受其它测试影响
+    expect(getCachedReadonly('/__test__/lock-cache-isolated.txt')).toBeUndefined();
+  });
+
+  it('setCachedReadonly 写入后 getCachedReadonly 立即返回该 mode', () => {
+    setCachedReadonly(TEST_PATH, 0o444);
+    expect(getCachedReadonly(TEST_PATH)).toBe(0o444);
+  });
+
+  it('setCachedReadonly 触发 subscribeReadonlyCache 回调(re-render hook)', () => {
+    let called = 0;
+    const unsub = subscribeReadonlyCache(() => {
+      called += 1;
+    });
+    setCachedReadonly(TEST_PATH, 0o644);
+    expect(called).toBeGreaterThanOrEqual(1);
+    unsub();
+  });
+
+  it('unsubscribe 后,setCachedReadonly 不再触发回调', () => {
+    let called = 0;
+    const unsub = subscribeReadonlyCache(() => {
+      called += 1;
+    });
+    const before = called;
+    unsub();
+    setCachedReadonly(TEST_PATH, 0o444);
+    expect(called).toBe(before);
   });
 });

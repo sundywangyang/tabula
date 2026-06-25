@@ -19,6 +19,13 @@ import type { FsEntry } from '@tabula/bridge';
 import './ContextMenu.css';
 import { isReadOnly } from '../utils/permissions';
 import { shouldContextMenuReturnNull } from './context-menu-shared';
+import {
+  getCachedReadonly,
+  loadReadonlyForPath,
+  resolveLockMenuLabel,
+  setCachedReadonly,
+  subscribeReadonlyCache,
+} from './readonly-cache';
 
 /** 全局单例:模块级 state,所有 ContextMenu 实例共享 */
 interface GlobalState {
@@ -76,8 +83,7 @@ const TAG_COLOR_PRESETS: ReadonlyArray<{ color: string; emoji: string; label: st
 /** G008: 缓存 entry → tags 的内存映射(避免每次右键都打 IPC) */
 const tagsCache = new Map<string, string[]>();
 
-/** G010: 缓存 path → 上次读到的 POSIX mode(用于「锁定/解锁」菜单显示状态) */
-const readonlyCache = new Map<string, number>();
+/** G010: readonlyCache 与 listeners 已抽到 ./readonly-cache(便于纯函数单测) */
 const tagsCacheListeners = new Set<() => void>();
 let tagsCacheLoaded = false;
 let tagsCacheLoading: Promise<void> | null = null;
@@ -636,14 +642,15 @@ function buildMenuItems(args: {
         targetPaths.push(targetEntry.path);
       }
       // 异步取第一个目标的当前 read-only 状态作为菜单显示依据
-      // 简化策略:第一次打开时为同步读 cache,否则等异步拉一次
+      // 简化策略:第一次打开时为同步读 cache,否则等异步拉一次(stat 拉回后会通过
+      // subscribeReadonlyCache 触发 force re-render,菜单会刷新成正确文案)
       const firstPath = targetPaths[0];
-      const cachedMode = readonlyCache.get(firstPath);
+      const cachedMode = firstPath ? getCachedReadonly(firstPath) : undefined;
+      const { label, icon } = resolveLockMenuLabel(cachedMode);
       const anyWritable = cachedMode === undefined ? true : !isReadOnly(cachedMode);
-      // 用缓存不可知时,不显示等异步,可以乐观选择"锁定"(常见默认是可写)
       items.push({
-        label: anyWritable ? '锁定' : '解锁',
-        icon: anyWritable ? '🔒' : '🔓',
+        label,
+        icon,
         disabled: targetPaths.length === 0,
         action: async () => {
           // 取每个 path 的最新 mode,按各自当前状态取反
@@ -661,7 +668,8 @@ function buildMenuItems(args: {
             const nextReadonly = !currentIsReadonly;
             const r = await window.tabula.fs.setPermissions({ path: p, readonly: nextReadonly });
             if (r.ok) {
-              readonlyCache.set(p, nextReadonly ? 0o444 : 0o644);
+              // 用 stat 返回的 mode 写回缓存(WIndows 上是 100444/100666,Unix 上是 0o444/0o644)
+              setCachedReadonly(p, statRes.data.mode);
               succeeded++;
             } else {
               failed++;
@@ -801,6 +809,11 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
     return subscribeTagsCache(() => force((n) => n + 1));
   }, []);
 
+  // G010: 订阅 readonly 缓存变化 — stat 拉回后菜单需要刷新「锁定/解锁」文案
+  useEffect(() => {
+    return subscribeReadonlyCache(() => force((n) => n + 1));
+  }, []);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   // 第一次 mount 注册全局 listener(只挂一次,全生命周期不卸载)
@@ -845,11 +858,8 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
           // G008: 右键打开菜单时,拉一次该 entry 的 tags(写入缓存)
           void loadTagsForPath(entryPath);
           // G010: 拉一次该 entry 的 stat(mode)用于「锁定/解锁」菜单显示
-          void window.tabula.fs.stat(entryPath).then((res) => {
-            if (res.ok) {
-              readonlyCache.set(entryPath, res.data.mode);
-            }
-          });
+          //   - loadReadonlyForPath 内部会 setCachedReadonly → 通知订阅者 → force re-render
+          void loadReadonlyForPath(entryPath);
         }
       }
 
