@@ -224,15 +224,19 @@ export interface TabulaAPI {
     getUndoStack(): Promise<Result<UndoStackSnapshot>>;
     /**
      * G018: 启动一次系统原生拖拽操作,把 paths[0] 作为真实文件拖出到外部 app。
-     * - 必须在渲染端 DOM `ondragstart` handler 内**同步**调用(ipcRenderer.invoke 会
-     *   立即排队,主进程 `e.sender.startDrag()` 会在 OS drag 仍然存活的同一 tick 内
-     *   执行,因此用户拖到桌面/VSCode/微信/7-Zip 时会得到真正的文件而非路径字符串。
+     *
+     * **同步 IPC(sendSync)**:`webContents.startDrag()` 必须在 OS drag 生命周期内同步
+     * 执行;异步 invoke 会在 microtask 排队,主进程到达时 OS drag 已结束,导致 Chromium
+     * 内部崩溃(crashpad_client_win.cc not connected / exit 0x...)。这里用 sendSync
+     * 让主进程 e.sender.startDrag 仍在 OS drag handler 的同一 tick 内执行。
+     *
+     * - 必须在渲染端 DOM `ondragstart` handler 内调用。
      * - `webContents.startDrag` 一次只支持一个文件;多文件选择时仅第一个文件会被 OS
      *   作为被拖项目接受(其它路径仍可被 Tabula 内部继续处理)。
      * - icon 优先取 paths[0] 的 NativeImage(图片文件自带缩略图),非图片文件回退到
-     *   Tabula.ico。
+     *   平台对应的 icon(.ico / .icns / .png)。
      */
-    startDrag(paths: string[]): Promise<Result<void>>;
+    startDrag(paths: string[]): Result<void>;
   };
 
   // 标签

@@ -164,10 +164,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       } else {
         startDrag(paths, paneId);
       }
-      // G018: 系统原生拖拽 — 在 dragstart 同步调用 IPC,主进程 e.sender.startDrag 会
-      // 同步触达 OS,把 paths[0] 作为真实文件交给目标 app(桌面 / VSCode / 微信 / 7-Zip)。
-      // 之前 dataTransfer.setData('text/plain', paths.join('\n')) 的实现会让目标收到
-      // 一段路径文本而非文件。
+      // G018: 系统原生拖拽 — 同步 IPC(sendSync)。webContents.startDrag() 必须在
+      // OS drag 生命周期内同步执行,异步 invoke 会跨 microtask → Chromium 内部崩溃
+      // (crashpad_client_win.cc not connected + 非 0 退出码)。
       e.dataTransfer.effectAllowed = 'all';
       // 内部拖拽仍用自定义 mime(同 pane 内的 drop 用);不再写 text/plain,避免外部
       // app 把它当文本接收。
@@ -175,8 +174,18 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         'application/x-tabula-paths',
         JSON.stringify({ paths, sourcePaneId: paneId }),
       );
-      // 必须同步发起;invoke 内部立即排队,主进程处理仍发生在本次 drag 生命周期内。
-      void window.tabula.fs.startDrag(paths);
+      // 同步调用 — sendSync 阻塞直到主进程 e.sender.startDrag 执行完毕,期间一直
+      // 在 OS drag 生命周期内。失败时给用户提示(目录 / 文件不存在 / 平台图标缺失)
+      try {
+        const res = window.tabula.fs.startDrag(paths);
+        if (!res.ok) {
+          // eslint-disable-next-line no-console
+          console.warn('[drag] startDrag failed:', res.error);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[drag] startDrag threw:', err);
+      }
     },
     [getDragPaths, paneId, selectOne, startDrag],
   );

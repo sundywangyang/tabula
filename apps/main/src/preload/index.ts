@@ -14,6 +14,7 @@ import type {
   FsChecksumRequest,
   FsCreateSymlinkRequest,
   FsSetPermissionsRequest,
+  Result,
   TabulaAPI,
 } from '@tabula/bridge';
 
@@ -183,8 +184,10 @@ const api: TabulaAPI = {
     undo: () => ipcRenderer.invoke(IpcChannels.UNDO_UNDO),
     redo: () => ipcRenderer.invoke(IpcChannels.UNDO_REDO),
     getUndoStack: () => ipcRenderer.invoke(IpcChannels.UNDO_GET_STACK),
-    // G018: 系统原生拖拽 — 必须在渲染端 dragstart handler 同步调用
-    startDrag: (paths: string[]) => ipcRenderer.invoke(IpcChannels.FS_START_DRAG, paths),
+    // G018: 系统原生拖拽 — 同步 IPC,必须在 dragstart handler 调用。
+    // 异步 invoke 会跨 microtask,到达主进程时 OS drag 已结束 → Chromium 内部崩溃。
+    startDrag: (paths: string[]) =>
+      ipcRenderer.sendSync(IpcChannels.FS_START_DRAG, paths) as Result<void>,
   },
 
   tabs: {

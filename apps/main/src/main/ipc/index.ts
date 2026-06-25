@@ -220,14 +220,20 @@ export function registerIpcHandlers(ctx: IpcContext) {
     return getThumbnail(p);
   });
 
-  // =================== G018: 系统原生拖拽 ===================
+  // =================== G018: 系统原生拖拽(同步 IPC)===================
   // 把 paths[0] 作为真实文件交给 OS drag session(webContents.startDrag 一次只支持一个文件)。
-  // 必须在渲染端 dragstart handler 同步调用,主进程这一侧 e.sender.startDrag 仍处在
-  // OS drag 生命周期里,因此目标 app 收到的是真实文件而非路径字符串。
-  ipcMain.handle(IpcChannels.FS_START_DRAG, async (e, paths: string[]) => {
+  //
+  // **必须用同步 IPC**:`webContents.startDrag()` 必须在 OS drag 生命周期内同步执行;
+  // 异步 invoke 在 microtask 排队,主进程到达时 OS drag 已结束,触发 Chromium 内部
+  // 崩溃(crashpad_client_win.cc not connected / 非 0 退出码)。
+  //
+  // 同步语义:渲染端 sendSync → 主进程 ipcMain.on → e.sender.startDrag() 同步执行,
+  // → e.returnValue = Result<void> 同步返回。整个 chain 都在 OS drag 生命周期内。
+  ipcMain.on(IpcChannels.FS_START_DRAG, (e, paths: string[]) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) {
-      return { ok: false, error: { code: 'UNKNOWN', message: 'No window' } };
+      e.returnValue = { ok: false, error: { code: 'UNKNOWN', message: 'No window' } };
+      return;
     }
     // G018: 图标按平台选择 — macOS 不识别 .ico 会导致 nativeImage 为空 → startDrag 抛错。
     // packaged 走 resourcesPath/resources;dev 走 app.getAppPath()/build-assets/icon。
@@ -235,7 +241,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
       ? join(process.resourcesPath, 'resources')
       : app.getAppPath();
     const fallbackIconPath = pickPlatformFallbackIcon(iconBase);
-    return handleStartDrag(paths, {
+    e.returnValue = handleStartDrag(paths, {
       startDrag: (item) => e.sender.startDrag(item),
       createImage: (p) => nativeImage.createFromPath(p),
       fallbackIconPath: fallbackIconPath ?? '',
