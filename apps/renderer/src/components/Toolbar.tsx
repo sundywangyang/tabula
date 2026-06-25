@@ -34,8 +34,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Terminal,
+  Layers,
 } from 'lucide-react';
-import { useFileStore, type ViewMode } from '../stores/file-store';
+import { useFileStore, type ViewMode, type GroupByMode } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
 import { Tooltip } from './Tooltip';
@@ -69,6 +70,7 @@ function getTabHistory(tab: Tab): string[] {
 export function Toolbar({ paneId }: { paneId: string }) {
   // 数据切片（值类型，不创建新引用）
   const viewMode = useFileStore((s) => s.panes[paneId]?.viewMode ?? 'details');
+  const groupBy = useFileStore((s) => s.panes[paneId]?.groupBy ?? 'none');
   const showHidden = useFileStore((s) => s.showHidden);
   const showExtensions = useFileStore((s) => s.showExtensions);
   const currentPath = useFileStore((s) => s.panes[paneId]?.currentPath ?? EMPTY_PATH);
@@ -140,7 +142,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
   const menuItems = historyMenuOpen === 'back' ? backHistory : forwardHistory;
 
   // 所有 action 用 getState() 获取（避免 selector 返回函数导致 getSnapshot 缓存失效）
-  const { setViewMode, openPathBar, refresh, showToast } = useFileStore.getState();
+  const { setViewMode, setGroupBy, openPathBar, refresh, showToast } = useFileStore.getState();
   const toggleShowHidden = useFileStore.getState().toggleShowHidden;
   const toggleShowExtensions = useFileStore.getState().toggleShowExtensions;
   const copySelected = useFileStore.getState().copySelected;
@@ -467,6 +469,21 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
       <div className="toolbar-divider" />
 
+      {/* G007: 分组切换 (none → type → date → size → none 循环) */}
+      <div className="toolbar-group">
+        <Tooltip label={`分组: ${groupByLabel(groupBy)}`}>
+          <button
+            className={`toolbar-btn ${groupBy !== 'none' ? 'active' : ''}`}
+            onClick={() => cycleGroupBy(paneId, groupBy, setGroupBy)}
+          >
+            <Layers size={16} />
+            <span className="toolbar-label">{groupByShort(groupBy)}</span>
+          </button>
+        </Tooltip>
+      </div>
+
+      <div className="toolbar-divider" />
+
       {/* P2 v2: 分屏 — 左/右 / 上/下 */}
       <div className="toolbar-group">
         <Tooltip label="左右分屏" shortcut="Ctrl+\\">
@@ -528,6 +545,48 @@ export function Toolbar({ paneId }: { paneId: string }) {
 // =================== 辅助函数 ===================
 
 import type { LayoutNode } from '@tabula/bridge';
+
+/** G007: Group By 循环顺序 */
+const GROUP_BY_CYCLE: GroupByMode[] = ['none', 'type', 'date', 'size'];
+
+/** 循环切换 pane 的分组模式 */
+function cycleGroupBy(
+  paneId: string,
+  current: GroupByMode,
+  setGroupBy: (paneId: string, mode: GroupByMode) => void,
+): void {
+  const idx = GROUP_BY_CYCLE.indexOf(current);
+  const next = GROUP_BY_CYCLE[(idx + 1) % GROUP_BY_CYCLE.length] ?? 'none';
+  setGroupBy(paneId, next);
+}
+
+/** Group By 完整标签(tooltip 用) */
+function groupByLabel(mode: GroupByMode): string {
+  switch (mode) {
+    case 'none':
+      return '未分组';
+    case 'type':
+      return '按类型分组';
+    case 'date':
+      return '按日期分组';
+    case 'size':
+      return '按大小分组';
+  }
+}
+
+/** Group By 短标签(按钮内显示) */
+function groupByShort(mode: GroupByMode): string {
+  switch (mode) {
+    case 'none':
+      return '分组';
+    case 'type':
+      return '类型';
+    case 'date':
+      return '日期';
+    case 'size':
+      return '大小';
+  }
+}
 
 /** 在布局树中查找 pane 节点 */
 function findPaneNode(node: LayoutNode, paneId: string): LayoutNode | null {

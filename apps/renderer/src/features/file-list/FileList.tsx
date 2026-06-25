@@ -19,7 +19,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Archive, File as FileIcon, FileCode2, FileText, Film, Folder, Image, Music, Settings } from 'lucide-react';
 import type { FsEntry } from '@tabula/bridge';
-import { useFileStore, isThumbnailable, type SortField } from '../../stores/file-store';
+import { useFileStore, isThumbnailable, type SortField, type GroupByMode, groupEntries } from '../../stores/file-store';
 import { getCachedTags, loadTagsForPath, subscribeTagsCache } from '../../components/ContextMenu';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
@@ -38,6 +38,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
 
   const paneData = useFileStore((s) => s.panes[paneId]);
   const viewMode = paneData?.viewMode ?? 'details';
+  const groupBy = paneData?.groupBy ?? 'none';
   const selectedPaths = paneData?.selectedPaths ?? new Set<string>();
   const cursorPath = paneData?.cursorPath ?? null;
   const renameTarget = paneData?.renameTarget ?? null;
@@ -743,6 +744,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       {viewMode === 'details' && (
         <DetailsView
           entries={sortedEntries}
+          groupBy={groupBy}
           showExtensions={showExtensions}
           selectedPaths={selectedPaths}
           cursorPath={cursorPath}
@@ -764,6 +766,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       {viewMode === 'list' && (
         <ListView
           entries={sortedEntries}
+          groupBy={groupBy}
           showExtensions={showExtensions}
           selectedPaths={selectedPaths}
           cursorPath={cursorPath}
@@ -862,8 +865,15 @@ function FileThumb({ entry, variant }: { entry: FsEntry; variant: 'row' | 'grid'
 
 // =================== 详情视图 ===================
 
+/** G007: 视图内一行可能是 header 或 entry */
+type ViewRow =
+  | { kind: 'header'; key: string; header: string }
+  | { kind: 'entry'; key: string; entry: FsEntry };
+
 interface DetailsViewProps {
   entries: FsEntry[];
+  /** G007: 分组模式;为 'none' 时退化为单段(不渲染任何 header) */
+  groupBy: GroupByMode;
   sortBy: SortField;
   sortDir: 'asc' | 'desc' | null;
   showExtensions: boolean;
@@ -891,6 +901,7 @@ interface DetailsViewProps {
 
 function DetailsView({
   entries,
+  groupBy,
   showExtensions,
   selectedPaths,
   cursorPath,
@@ -909,8 +920,24 @@ function DetailsView({
   rubberBand,
 }: Omit<DetailsViewProps, 'sortBy' | 'sortDir' | 'onHeaderSort'>) {
   const parentRef = useRef<HTMLDivElement | null>(null);
+
+  // G007: 用 groupEntries 把 entries 拆成分组,渲染 header 行
+  const rows = useMemo<ViewRow[]>(() => {
+    const sections = groupEntries(entries, groupBy);
+    const out: ViewRow[] = [];
+    for (const sec of sections) {
+      if (sec.header) {
+        out.push({ kind: 'header', key: `h:${sec.header}`, header: sec.header });
+      }
+      for (const e of sec.entries) {
+        out.push({ kind: 'entry', key: `e:${e.path}`, entry: e });
+      }
+    }
+    return out;
+  }, [entries, groupBy]);
+
   const rowVirtualizer = useVirtualizer({
-    count: entries.length,
+    count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 28,
     overscan: 12,
@@ -942,11 +969,30 @@ function DetailsView({
         }}
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const entry = entries[virtualRow.index];
+          const row = rows[virtualRow.index];
+          if (!row) return null;
+          if (row.kind === 'header') {
+            return (
+              <div
+                key={row.key}
+                className="file-list-group-header"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  height: `${virtualRow.size}px`,
+                }}
+              >
+                <span className="group-header-label">{row.header}</span>
+              </div>
+            );
+          }
           return (
             <DetailsRow
-              key={entry.path}
-              entry={entry}
+              key={row.key}
+              entry={row.entry}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -956,9 +1002,9 @@ function DetailsView({
                 height: `${virtualRow.size}px`,
               }}
               showExtensions={showExtensions}
-              selected={selectedPaths.has(entry.path)}
-              cursor={cursorPath === entry.path}
-              renaming={renameTarget === entry.path}
+              selected={selectedPaths.has(row.entry.path)}
+              cursor={cursorPath === row.entry.path}
+              renaming={renameTarget === row.entry.path}
               onClick={onRowClick}
               onDoubleClick={onRowDoubleClick}
               onRenameSubmit={onRenameSubmit}
@@ -1082,6 +1128,7 @@ function DetailsRow({
 
 function ListView({
   entries,
+  groupBy,
   showExtensions,
   selectedPaths,
   cursorPath,
@@ -1100,6 +1147,7 @@ function ListView({
   rubberBand,
 }: {
   entries: FsEntry[];
+  groupBy: GroupByMode;
   showExtensions: boolean;
   selectedPaths: Set<string>;
   cursorPath: string | null;
@@ -1118,8 +1166,24 @@ function ListView({
   rubberBand?: { startX: number; startY: number; curX: number; curY: number } | null;
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null);
+
+  // G007: 分组 — 与 DetailsView 同样的 header 行
+  const rows = useMemo<ViewRow[]>(() => {
+    const sections = groupEntries(entries, groupBy);
+    const out: ViewRow[] = [];
+    for (const sec of sections) {
+      if (sec.header) {
+        out.push({ kind: 'header', key: `h:${sec.header}`, header: sec.header });
+      }
+      for (const e of sec.entries) {
+        out.push({ kind: 'entry', key: `e:${e.path}`, entry: e });
+      }
+    }
+    return out;
+  }, [entries, groupBy]);
+
   const rowVirtualizer = useVirtualizer({
-    count: entries.length,
+    count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 28,
     overscan: 12,
@@ -1150,10 +1214,30 @@ function ListView({
         }}
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const entry = entries[virtualRow.index];
+          const row = rows[virtualRow.index];
+          if (!row) return null;
+          if (row.kind === 'header') {
+            return (
+              <div
+                key={row.key}
+                className="file-list-group-header"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  height: `${virtualRow.size}px`,
+                }}
+              >
+                <span className="group-header-label">{row.header}</span>
+              </div>
+            );
+          }
+          const entry = row.entry;
           return (
             <div
-              key={entry.path}
+              key={row.key}
               style={{
                 position: 'absolute',
                 top: 0,

@@ -297,6 +297,30 @@
   font-size: 12px;
 }
 
+/* G007: 分组 header 行(详情视图 / 列表视图) */
+.file-list-group-header {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--bg-overlay, rgba(0, 0, 0, 0.04));
+  color: var(--fg-secondary, #555);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  user-select: none;
+  pointer-events: none; /* 不可点击 / 不可拖放 / 不可选中 */
+  border-top: 1px solid var(--border, #e0e0e0);
+  border-bottom: 1px solid var(--border, #e0e0e0);
+}
+
+.file-list-group-header:first-child {
+  border-top: none;
+}
+
+.group-header-label {
+  text-transform: uppercase;
+}
+
 /* 加载/空/错 */
 .file-list-loading,
 .file-list-empty,
