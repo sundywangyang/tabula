@@ -1153,6 +1153,15 @@ export const useFileStore = create<FileStore>((set, get) => {
       const data = get().panes[paneId];
       const parent = parentPath(oldPath);
       const newPath = joinPath(parent, trimmed);
+      // POSIX rename(2) 在目标已存在时静默覆盖 — 必须 stat 预检
+      // 注意:排除"自己改自己名"的情况(trimmed === oldName 已上面拦截,但 basename
+      // 大小写敏感的 FS 上 case-only rename 是允许的,这里也放过)
+      if (newPath !== oldPath) {
+        const exists = await window.tabula.fs.stat(newPath);
+        if (exists.ok) {
+          return { ok: false, error: `已存在同名项: ${trimmed}` };
+        }
+      }
       const res = await window.tabula.fs.rename(oldPath, newPath);
       if (!res.ok) {
         return { ok: false, error: res.error.message };
