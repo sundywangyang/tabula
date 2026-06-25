@@ -891,28 +891,10 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
     window.addEventListener('keydown', onKey);
   }, []);
 
-  // early return 必须放在所有 hooks 之后,否则 hooks 顺序会被破坏
-  // G008 fix: 菜单关闭但 dialog 已开,仍要渲染 InputDialog,否则 hideGlobalMenu 后
-  // 与 setTagDialog 一起被批量 setState 抹掉,用户看到「下次右键才弹」的现象。
-  if (
-    shouldContextMenuReturnNull({
-      visible: globalState.visible,
-      paneId: globalState.paneId,
-      hasTagDialog: tagDialog !== null,
-      hasSymlinkDialog: symlinkDialog !== null,
-    })
-  ) {
-    return null;
-  }
-
-  const paneId = globalState.paneId;
-  const targetEntry = globalState.entry;
-  const position = globalState.pos;
-  const isEmptySpace = !targetEntry;
-
   // 真实尺寸边界保护:store 里 setPos 用了硬编码 menuWidth=220/menuHeight=360 估算;
   // 实际菜单更长时(尤其带二级子菜单)会超出屏幕。useLayoutEffect 在浏览器绘制前测
   // 量 getBoundingClientRect,超界时用 transform 平移修正(不动 store,避免循环渲染)。
+  // 必须在所有 early return 之前,否则 hooks 顺序变化 → React 报错。
   useLayoutEffect(() => {
     const el = menuRef.current;
     if (!el) return;
@@ -935,7 +917,26 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
     } else {
       el.style.transform = '';
     }
-  }, [position.x, position.y]);
+  }, [globalState.pos.x, globalState.pos.y]);
+
+  // early return 必须放在所有 hooks 之后,否则 hooks 顺序会被破坏
+  // G008 fix: 菜单关闭但 dialog 已开,仍要渲染 InputDialog,否则 hideGlobalMenu 后
+  // 与 setTagDialog 一起被批量 setState 抹掉,用户看到「下次右键才弹」的现象。
+  if (
+    shouldContextMenuReturnNull({
+      visible: globalState.visible,
+      paneId: globalState.paneId,
+      hasTagDialog: tagDialog !== null,
+      hasSymlinkDialog: symlinkDialog !== null,
+    })
+  ) {
+    return null;
+  }
+
+  const paneId = globalState.paneId;
+  const targetEntry = globalState.entry;
+  const position = globalState.pos;
+  const isEmptySpace = !targetEntry;
 
   // 从 store 取当前 pane 数据(读一次,菜单打开期间用)
   const paneData = paneId ? useFileStore.getState().panes[paneId] : undefined;
