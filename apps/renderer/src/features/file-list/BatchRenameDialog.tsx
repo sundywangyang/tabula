@@ -85,30 +85,70 @@ export function BatchRenameDialog({
     setRenaming(true);
     setErrors([]);
 
-    const failed: string[] = [];
-
+    // 构造 (oldPath, newPath) 列表,过滤掉 newName === oldName 的
+    const tasks: { oldPath: string; oldName: string; newPath: string; newName: string }[] = [];
     for (let i = 0; i < paths.length; i++) {
       const oldPath = paths[i]!;
       const oldName = names[i]!;
       const newName = find ? oldName.split(find).join(replace) : oldName;
-
       if (newName === oldName) continue;
-
-      // 从 oldPath 提取父目录
       const lastSep = Math.max(oldPath.lastIndexOf('\\'), oldPath.lastIndexOf('/'));
       const parent = oldPath.slice(0, lastSep + 1);
-      const newPath = parent + newName;
+      tasks.push({ oldPath, oldName, newPath: parent + newName, newName });
+    }
 
-      // 目标已存在时跳过（防止 EEXIST 被抛出到 failed 而后续仍继续）
-      const exists = await window.tabula.fs.stat(newPath);
-      if (exists.ok) {
-        failed.push(`${oldName}: 目标已存在 "${newName}"`);
-        continue;
+    if (tasks.length === 0) {
+      setRenaming(false);
+      return;
+    }
+
+    // ============ 阶段 1:dry-run 冲突检测 ============
+    // POSIX rename(2) 在目标已存在时会静默覆盖 — 必须在执行前检测
+    // 检测目标冲突:任何任务的 newPath 已存在(且不在本批次 oldPath 中)→ 冲突
+    const sourcePaths = new Set(tasks.map((t) => t.oldPath));
+    const conflicts: string[] = [];
+    for (const t of tasks) {
+      const exists = await window.tabula.fs.stat(t.newPath);
+      if (exists.ok && !sourcePaths.has(t.newPath)) {
+        conflicts.push(`${t.oldName}: 目标已存在 "${t.newName}"`);
       }
+    }
+    // 批次内 newPath 重复(把多个文件改成同一个名字)→ 冲突
+    const seen = new Map<string, string>();
+    for (const t of tasks) {
+      const prev = seen.get(t.newPath);
+      if (prev) {
+        conflicts.push(`${prev} 和 ${t.oldName} 都将被改为 "${t.newName}"`);
+      } else {
+        seen.set(t.newPath, t.oldName);
+      }
+    }
 
-      const res = await window.tabula.fs.rename(oldPath, newPath);
-      if (!res.ok) {
-        failed.push(`${oldName}: ${res.error.message}`);
+    if (conflicts.length > 0) {
+      setRenaming(false);
+      setErrors(conflicts);
+      return;
+    }
+
+    // ============ 阶段 2:执行重命名 + 失败回滚 ============
+    const completed: { oldPath: string; newPath: string; oldName: string }[] = [];
+    const failed: string[] = [];
+
+    for (const t of tasks) {
+      const res = await window.tabula.fs.rename(t.oldPath, t.newPath);
+      if (res.ok) {
+        completed.push({ oldPath: t.oldPath, newPath: t.newPath, oldName: t.oldName });
+      } else {
+        failed.push(`${t.oldName}: ${res.error.message}`);
+        // 已有失败 → 回滚已完成的(顺序倒序)
+        for (let j = completed.length - 1; j >= 0; j--) {
+          const done = completed[j]!;
+          const rollback = await window.tabula.fs.rename(done.newPath, done.oldPath);
+          if (!rollback.ok) {
+            failed.push(`回滚失败 ${done.oldName}: ${rollback.error.message}`);
+          }
+        }
+        break;
       }
     }
 
