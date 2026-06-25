@@ -10,7 +10,7 @@
  * - 在 FileList 空白处右键:粘贴 / 新建文件夹
  * - 在文件/文件夹上右键:完整菜单(复制/剪切/粘贴/删除/重命名/属性/打开方式)
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFileStore, makeFolderTab } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
@@ -909,6 +909,33 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
   const targetEntry = globalState.entry;
   const position = globalState.pos;
   const isEmptySpace = !targetEntry;
+
+  // 真实尺寸边界保护:store 里 setPos 用了硬编码 menuWidth=220/menuHeight=360 估算;
+  // 实际菜单更长时(尤其带二级子菜单)会超出屏幕。useLayoutEffect 在浏览器绘制前测
+  // 量 getBoundingClientRect,超界时用 transform 平移修正(不动 store,避免循环渲染)。
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const PAD = 6;
+    let dx = 0;
+    let dy = 0;
+    if (rect.right > window.innerWidth) {
+      dx = window.innerWidth - rect.right - PAD;
+    } else if (rect.left < 0) {
+      dx = -rect.left + PAD;
+    }
+    if (rect.bottom > window.innerHeight) {
+      dy = window.innerHeight - rect.bottom - PAD;
+    } else if (rect.top < 0) {
+      dy = -rect.top + PAD;
+    }
+    if (dx !== 0 || dy !== 0) {
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+    } else {
+      el.style.transform = '';
+    }
+  }, [position.x, position.y]);
 
   // 从 store 取当前 pane 数据(读一次,菜单打开期间用)
   const paneData = paneId ? useFileStore.getState().panes[paneId] : undefined;
