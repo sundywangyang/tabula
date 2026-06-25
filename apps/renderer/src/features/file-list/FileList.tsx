@@ -81,7 +81,8 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   // P4
   const openSearch = useFileStore((s) => s.openSearch);
   const closeSearch = useFileStore((s) => s.closeSearch);
-  const openPreview = useFileStore((s) => s.openPreview);
+  // G006: openPreview 不再在 FileList 调用,由 App.tsx 全局 keydown handler 统一处理
+  // (避免和 App.tsx 的 Space handler 冲突,导致 1 次按键被 open→close 翻转)
 
   // 用 entries 触发重算(getFilteredSortedEntries 不订阅 entries,需主动调用)
   const sortedEntries = useMemo(
@@ -320,16 +321,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         openSearch(paneId);
         return;
       }
-      // P4: Space 预览(仅单选 + 单文件)
-      if (path === ' ' || path === 'Spacebar') {
-        const target = cursorPath ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
-        if (!target) return;
-        const entry = list.find((x) => x.path === target);
-        if (!entry || entry.isDirectory) return;
-        e.preventDefault();
-        openPreview(entry);
-        return;
-      }
+      // G006: Space 预览统一由 App.tsx 全局 keydown handler 处理
+      // (App.tsx:407-433)。这里不再处理,避免和全局 handler 抢同一个按键
+      // 导致「open 之后立即 close」的翻转,出现需要按 2 次 Space 才唤起预览的 bug。
       // F2 重命名 — 仅在选中 1 项或光标 1 项时启用
       if (path === 'F2') {
         e.preventDefault();
@@ -448,7 +442,6 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       paneId,
       openSearch,
       closeSearch,
-      openPreview,
     ],
   );
 
