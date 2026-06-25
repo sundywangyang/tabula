@@ -1420,6 +1420,15 @@ export const useFileStore = create<FileStore>((set, get) => {
       if (!trimmed) return { ok: false, error: '名称不能为空' };
       const destDir = get().getPanePath(paneId);
       if (!destDir) return { ok: false, error: '当前目录未加载' };
+      // 目标已存在 → 拒绝(POSIX mkdir 目录已存在会返回 EEXIST,但写文件式的 fs.mkdir
+      // 实现可能直接当 OK 处理;统一用 stat 预检避免覆盖/歧义)
+      const target = joinPath(destDir, trimmed);
+      const exists = await window.tabula.fs.stat(target);
+      if (exists.ok) {
+        const msg = `已存在同名项: ${trimmed}`;
+        get().showToast(msg, 'error', 4000);
+        return { ok: false, error: msg };
+      }
       const res = await window.tabula.fs.mkdir(destDir, trimmed);
       if (!res.ok) {
         get().showToast(`新建文件夹失败: ${res.error.message}`, 'error', 4000);
@@ -1436,6 +1445,13 @@ export const useFileStore = create<FileStore>((set, get) => {
       const destDir = get().getPanePath(paneId);
       if (!destDir) return { ok: false, error: '当前目录未加载' };
       const target = joinPath(destDir, trimmed);
+      // writeFile('') 会直接覆盖已存在文件(文件内容清空)→ 必须先 stat 拦截
+      const exists = await window.tabula.fs.stat(target);
+      if (exists.ok) {
+        const msg = `已存在同名文件: ${trimmed}`;
+        get().showToast(msg, 'error', 4000);
+        return { ok: false, error: msg };
+      }
       const res = await window.tabula.fs.writeFile(target, '');
       if (!res.ok) {
         get().showToast(`新建文件失败: ${res.error.message}`, 'error', 4000);
