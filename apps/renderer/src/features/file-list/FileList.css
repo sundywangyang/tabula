@@ -455,3 +455,20 @@
   z-index: 10;
   box-sizing: border-box;
 }
+
+/* G008: 标签 chip 在行内 */
+.row-tags {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.row-tag-chip {
+  display: inline-block;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--bg-hover, #e8e8e8);
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+}

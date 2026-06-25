@@ -20,6 +20,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Archive, File as FileIcon, FileCode2, FileText, Film, Folder, Image, Music, Settings } from 'lucide-react';
 import type { FsEntry } from '@tabula/bridge';
 import { useFileStore, isThumbnailable, type SortField } from '../../stores/file-store';
+import { getCachedTags } from '../../components/ContextMenu';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
 
