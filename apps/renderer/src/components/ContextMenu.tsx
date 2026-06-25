@@ -204,6 +204,7 @@ function buildMenuItems(args: {
   } else {
     const hasSelection = selectedPaths.size > 0 || targetEntry !== null;
 
+    // 1. 打开 (顶层,最常用)
     items.push({
       label: '打开',
       icon: '📂',
@@ -219,25 +220,10 @@ function buildMenuItems(args: {
       },
     });
 
-    if (targetEntry?.isDirectory) {
-      items.push({
-        label: '在新标签页打开',
-        icon: '🏷',
-        action: () => {
-          if (targetEntry) {
-            const newTab = makeFolderTab(targetEntry.path, targetEntry.name);
-            useLayoutStore.getState().pane.openTab(paneId, newTab);
-          }
-          hideGlobalMenu();
-        },
-      });
-    }
-
-    items.push({ label: '', divider: true });
-
+    // 2. 文件操作 (二级: 复制/剪切/粘贴)
     items.push({
       label: '文件操作',
-      icon: '📂',
+      icon: '📁',
       submenu: [
         {
           label: '复制',
@@ -263,200 +249,200 @@ function buildMenuItems(args: {
       ],
     });
 
-    items.push({ label: '', divider: true });
+    // 3. 打开方式 (二级: 多种打开方式)
+    {
+      const openSubmenu: MenuItem[] = [];
+      if (targetEntry?.isDirectory) {
+        openSubmenu.push({
+          label: '在新标签页打开',
+          icon: '🏷',
+          action: () => {
+            if (targetEntry) {
+              const newTab = makeFolderTab(targetEntry.path, targetEntry.name);
+              useLayoutStore.getState().pane.openTab(paneId, newTab);
+            }
+            hideGlobalMenu();
+          },
+        });
+        openSubmenu.push({
+          label: '在新窗口中打开',
+          icon: '🪟',
+          action: () => {
+            if (targetEntry) {
+              void window.tabula.windows.open(targetEntry.path);
+            }
+            hideGlobalMenu();
+          },
+        });
+      }
+      if (targetEntry) {
+        openSubmenu.push({
+          label: '在文件资源管理器中打开',
+          icon: '📁',
+          action: () => {
+            if (targetEntry) {
+              void window.tabula.fs.showInFolder(targetEntry.path);
+            }
+            hideGlobalMenu();
+          },
+        });
+      }
+      if (targetEntry && !targetEntry.isDirectory) {
+        openSubmenu.push({
+          label: '打开方式...',
+          icon: '⚡',
+          action: () => {
+            if (targetEntry) {
+              void window.tabula.fs.openWithDialog(targetEntry.path);
+            }
+            hideGlobalMenu();
+          },
+        });
+      }
+      if (openSubmenu.length > 0) {
+        items.push({
+          label: '打开方式',
+          icon: '↗',
+          submenu: openSubmenu,
+        });
+      }
+    }
 
-    // G002: 反选 — 在「复制路径」组,与选择相关动作放一起
-    items.push({
-      label: '反选',
-      icon: '⇄',
-      shortcut: 'Ctrl+Shift+I',
-      action: () => { actions.selectInvert(paneId); hideGlobalMenu(); },
-    });
+    // 4. 编辑 (二级: 重命名 / 批量重命名 / 收藏 / 复制路径 / 复制到当前位置 / 发送到)
+    {
+      const editSubmenu: MenuItem[] = [];
 
-    items.push({ label: '', divider: true });
-
-    // P3: 复制路径
-    items.push({
-      label: '复制路径',
-      icon: '🔗',
-      disabled: !hasSelection && !targetEntry,
-      action: async () => {
-        const paths: string[] = [];
-        if (targetEntry) {
-          paths.push(targetEntry.path);
-        } else if (selectedPaths.size > 0) {
-          paths.push(...selectedPaths);
-        }
-        if (paths.length > 0) {
-          await window.tabula.fs.writeClipboard(paths.join('\n'));
-          actions.showToast('路径已复制', 'success', 1500);
-        }
-        hideGlobalMenu();
-      },
-    });
-
-    // P3: 在资源管理器中打开
-    items.push({
-      label: '在文件资源管理器中打开',
-      icon: '📁',
-      disabled: !targetEntry,
-      action: () => {
-        if (targetEntry) {
-          void window.tabula.fs.showInFolder(targetEntry.path);
-        }
-        hideGlobalMenu();
-      },
-    });
-
-    // P3: 在新窗口中打开（仅文件夹）
-    if (targetEntry?.isDirectory) {
-      items.push({
-        label: '在新窗口中打开',
-        icon: '🪟',
+      editSubmenu.push({
+        label: '重命名',
+        icon: '✏',
+        shortcut: 'F2',
+        disabled: selectedPaths.size !== 1 && !targetEntry,
         action: () => {
           if (targetEntry) {
-            void window.tabula.windows.open(targetEntry.path);
+            actions.beginRename(paneId, targetEntry.path);
           }
           hideGlobalMenu();
         },
       });
-    }
 
-    items.push({ label: '', divider: true });
+      if (selectedPaths.size >= 2) {
+        editSubmenu.push({
+          label: '批量重命名',
+          icon: '📝',
+          action: () => {
+            void import('../command-dispatcher').then((m) =>
+              m.runCommandById('file.batch-rename'),
+            );
+            hideGlobalMenu();
+          },
+        });
+      }
 
-    items.push({
-      label: '重命名',
-      icon: '✏',
-      shortcut: 'F2',
-      disabled: selectedPaths.size !== 1 && !targetEntry,
-      action: () => {
-        if (targetEntry) {
-          actions.beginRename(paneId, targetEntry.path);
-        }
-        hideGlobalMenu();
-      },
-    });
+      editSubmenu.push({
+        label: '复制路径',
+        icon: '🔗',
+        disabled: !hasSelection && !targetEntry,
+        action: async () => {
+          const paths: string[] = [];
+          if (targetEntry) {
+            paths.push(targetEntry.path);
+          } else if (selectedPaths.size > 0) {
+            paths.push(...selectedPaths);
+          }
+          if (paths.length > 0) {
+            await window.tabula.fs.writeClipboard(paths.join('\n'));
+            actions.showToast('路径已复制', 'success', 1500);
+          }
+          hideGlobalMenu();
+        },
+      });
 
-    // G013: 批量重命名 — 仅当选中 2+ 项时显示
-    if (selectedPaths.size >= 2) {
-      items.push({
-        label: '批量重命名',
-        icon: '📝',
+      editSubmenu.push({
+        label: '复制到当前位置',
+        icon: '📑',
+        shortcut: 'Ctrl+D',
+        disabled: selectedPaths.size !== 1 && !targetEntry,
         action: () => {
-          // 复用命令派发(同时支持命令面板 / 快捷键 / 右键菜单)
-          void import('../command-dispatcher').then((m) =>
-            m.runCommandById('file.batch-rename'),
-          );
-          hideGlobalMenu();
-        },
-      });
-    }
-
-    items.push({
-      label: '复制到当前位置',
-      icon: '📑',
-      shortcut: 'Ctrl+D',
-      disabled: selectedPaths.size !== 1 && !targetEntry,
-      action: () => {
-        const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
-        if (srcPath && currentPath) {
-          const sep = srcPath.includes('\\') ? '\\' : '/';
-          const parent = srcPath.substring(0, srcPath.lastIndexOf(sep));
-          if (parent !== currentPath) {
-            void actions.performBulk([srcPath], currentPath, 'copy', paneId);
-          } else {
-            actions.showToast('已在当前位置', 'info', 1500);
-          }
-        }
-        hideGlobalMenu();
-      },
-    });
-
-    // P5: 添加到收藏夹
-    items.push({
-      label: '添加到收藏夹',
-      icon: '★',
-      action: () => {
-        if (targetEntry) {
-          const pathToFav = targetEntry.isDirectory ? targetEntry.path : currentPath;
-          if (pathToFav) {
-            const { addFavorite, isFavorite } = useFavoritesStore.getState();
-            if (isFavorite(pathToFav)) {
-              actions.showToast('已在收藏夹中', 'info', 1500);
+          const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
+          if (srcPath && currentPath) {
+            const sep = srcPath.includes('\\') ? '\\' : '/';
+            const parent = srcPath.substring(0, srcPath.lastIndexOf(sep));
+            if (parent !== currentPath) {
+              void actions.performBulk([srcPath], currentPath, 'copy', paneId);
             } else {
-              addFavorite(pathToFav, targetEntry.isDirectory ? targetEntry.name : undefined);
-              actions.showToast(`已添加到收藏夹`, 'success', 1500);
+              actions.showToast('已在当前位置', 'info', 1500);
             }
           }
-        }
-        hideGlobalMenu();
-      },
-    });
+          hideGlobalMenu();
+        },
+      });
 
-    // P3 + G016: 计算文件夹大小（仅文件夹）。G016 后改为后台异步,
-    // invoke 立即返回 jobId,后续通过 onDirSizeProgress 收进度。
-    if (targetEntry?.isDirectory) {
-      items.push({
-        label: '计算文件夹大小',
-        icon: '📊',
-        action: () => {
-          if (targetEntry) {
-            const path = targetEntry.path;
-            const toastId = actions.showToast('正在计算…', 'info', 0);
-            void window.tabula.fs.getDirSize(path).then((startRes) => {
-              if (!startRes.ok) {
-                actions.dismissToast(toastId);
-                actions.showToast(`启动失败: ${startRes.error.message}`, 'error', 3000);
-                return;
-              }
-              const { jobId } = startRes.data;
-              const unsub = window.tabula.fs.onDirSizeProgress((p) => {
-                if (p.jobId !== jobId) return;
-                if (p.done) {
-                  actions.dismissToast(toastId);
-                  unsub();
-                  if (p.cancelled) {
-                    actions.showToast('已取消', 'info', 1500);
-                  } else if (p.error) {
-                    actions.showToast(`计算失败: ${p.error}`, 'error', 3000);
-                  } else {
-                    actions.showToast(
-                      `大小: ${formatSize(p.totalBytes)} · 文件: ${p.processedEntries}`,
-                      'success',
-                      3000,
-                    );
-                  }
-                }
-                // 中间进度点(每 100 个文件一次)不弹 toast,只显示「计算中…」
-              });
-            });
+      editSubmenu.push({
+        label: '发送到...',
+        icon: '📨',
+        disabled: !hasSelection && !targetEntry,
+        action: async () => {
+          const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
+          if (!srcPath) {
+            hideGlobalMenu();
+            return;
+          }
+          const targetDir = await window.tabula.fs.pickDirectory();
+          if (targetDir) {
+            const srcPaths = selectedPaths.size > 0 ? Array.from(selectedPaths) : [srcPath];
+            const srcDir = srcPath.substring(0, srcPath.lastIndexOf(srcPath.includes('\\') ? '\\' : '/'));
+            if (srcDir === targetDir) {
+              actions.showToast('已在目标位置', 'info', 1500);
+            } else {
+              void actions.performBulk(srcPaths, targetDir, 'copy', paneId);
+            }
           }
           hideGlobalMenu();
         },
       });
+
+      if (targetEntry) {
+        editSubmenu.push({
+          label: '添加到收藏夹',
+          icon: '★',
+          action: () => {
+            if (targetEntry) {
+              const pathToFav = targetEntry.isDirectory ? targetEntry.path : currentPath;
+              if (pathToFav) {
+                const { addFavorite, isFavorite } = useFavoritesStore.getState();
+                if (isFavorite(pathToFav)) {
+                  actions.showToast('已在收藏夹中', 'info', 1500);
+                } else {
+                  addFavorite(pathToFav, targetEntry.isDirectory ? targetEntry.name : undefined);
+                  actions.showToast(`已添加到收藏夹`, 'success', 1500);
+                }
+              }
+            }
+            hideGlobalMenu();
+          },
+        });
+      }
+
+      items.push({
+        label: '编辑',
+        icon: '✏',
+        submenu: editSubmenu,
+      });
     }
 
-    // G008: 标签 → 二级子菜单
+    // 5. 标签 (二级) — 已有逻辑
     {
       const entryPath = targetEntry!.path;
       const existingTags = getCachedTags(entryPath);
-
-      // 二级菜单内容: 添加 + 颜色预设 + 已有标签移除
       const tagSubmenu: MenuItem[] = [];
-
-      // 「添加标签...」→ 弹 InputDialog
       tagSubmenu.push({
         label: '添加标签...',
         icon: '🏷',
         action: () => {
-          window.dispatchEvent(
-            new CustomEvent('tabula:add-tag', { detail: { path: entryPath } }),
-          );
+          window.dispatchEvent(new CustomEvent('tabula:add-tag', { detail: { path: entryPath } }));
           hideGlobalMenu();
         },
       });
-
-      // 颜色预设（已有颜色标签的显示 ✖ 移除，未有的显示添加）
       for (const preset of TAG_COLOR_PRESETS) {
         const alreadyTagged = existingTags.includes(preset.tag);
         tagSubmenu.push({
@@ -474,8 +460,6 @@ function buildMenuItems(args: {
           },
         });
       }
-
-      // 已有标签（非颜色预设的标签）
       const nonPresetTags = existingTags.filter(
         (t) => !TAG_COLOR_PRESETS.some((p) => p.tag === t),
       );
@@ -493,7 +477,6 @@ function buildMenuItems(args: {
           });
         }
       }
-
       items.push({
         label: '标签',
         icon: '🏷',
@@ -501,51 +484,9 @@ function buildMenuItems(args: {
       });
     }
 
-    // P3: 发送到...
-    items.push({
-      label: '发送到...',
-      icon: '📨',
-      disabled: !hasSelection && !targetEntry,
-      action: async () => {
-        const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
-        if (!srcPath) {
-          hideGlobalMenu();
-          return;
-        }
-        const targetDir = await window.tabula.fs.pickDirectory();
-        if (targetDir) {
-          const srcPaths = selectedPaths.size > 0 ? Array.from(selectedPaths) : [srcPath];
-          // 检查源和目标是否相同
-          const srcDir = srcPath.substring(0, srcPath.lastIndexOf(srcPath.includes('\\') ? '\\' : '/'));
-          if (srcDir === targetDir) {
-            actions.showToast('已在目标位置', 'info', 1500);
-          } else {
-            void actions.performBulk(srcPaths, targetDir, 'copy', paneId);
-          }
-        }
-        hideGlobalMenu();
-      },
-    });
-
-    // P3: 打开方式（仅文件）
-    if (targetEntry && !targetEntry.isDirectory) {
-      items.push({
-        label: '打开方式',
-        icon: '⚡',
-        action: () => {
-          if (targetEntry) {
-            void window.tabula.fs.openWithDialog(targetEntry.path);
-          }
-          hideGlobalMenu();
-        },
-      });
-    }
-    // Archive: 压缩 / 解压 → 二级子菜单
-    // - 选中文件 / 文件夹 → 显示「压缩为 ZIP...」
-    // - 选中包含至少一个 .zip → 显示「解压到...」「解压到此处」
+    // 6. 压缩/解压 (二级) — 已有逻辑
     if (hasSelection) {
       const archiveSubmenu: MenuItem[] = [];
-
       archiveSubmenu.push({
         label: '压缩为 ZIP…',
         icon: '🗜',
@@ -556,8 +497,6 @@ function buildMenuItems(args: {
           hideGlobalMenu();
         },
       });
-
-      // 解压:仅当选中里包含至少一个 .zip 才显示
       const hasZip = Array.from(selectedPaths).some((p) => /\.zip(x)?$/i.test(p));
       if (hasZip && targetEntry && !targetEntry.isDirectory) {
         archiveSubmenu.push({
@@ -571,8 +510,6 @@ function buildMenuItems(args: {
             hideGlobalMenu();
           },
         });
-
-        // 解压到此处:直接把 .zip 解压到当前目录(currentPath),无需选择目标
         const extractHereZipPath = Array.from(selectedPaths).find((p) => /\.zip(x)?$/i.test(p));
         if (extractHereZipPath && currentPath) {
           archiveSubmenu.push({
@@ -585,7 +522,6 @@ function buildMenuItems(args: {
           });
         }
       }
-
       items.push({
         label: '压缩/解压',
         icon: '🗜',
@@ -593,52 +529,95 @@ function buildMenuItems(args: {
       });
     }
 
-    items.push({ label: '', divider: true });
-
-    items.push({
-      label: '删除',
-      icon: '🗑',
-      shortcut: 'Delete',
-      danger: true,
-      disabled: !hasSelection,
-      action: () => {
-        if (selectedPaths.size > 0) {
-          window.dispatchEvent(
-            new CustomEvent('tabula:confirm-delete', {
-              detail: { paneId, count: selectedPaths.size },
-            }),
-          );
-        }
-        hideGlobalMenu();
-      },
-    });
-
-    items.push({ label: '', divider: true });
-
-    // G011: 创建快捷方式 (symlink / junction) — 仅单选
+    // 7. 计算 (二级: 文件夹大小 / SHA-256)
     {
-      const singlePath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
-      items.push({
-        label: '创建快捷方式',
-        icon: '🔗',
-        disabled: !singlePath,
-        action: () => {
-          if (singlePath) {
-            window.dispatchEvent(
-              new CustomEvent('tabula:create-symlink', { detail: { paneId, sourcePath: singlePath } }),
-            );
-          }
-          hideGlobalMenu();
-        },
-      });
+      const computeSubmenu: MenuItem[] = [];
+      if (targetEntry?.isDirectory) {
+        computeSubmenu.push({
+          label: '计算文件夹大小',
+          icon: '📊',
+          action: () => {
+            if (targetEntry) {
+              const path = targetEntry.path;
+              const toastId = actions.showToast('正在计算…', 'info', 0);
+              void window.tabula.fs.getDirSize(path).then((startRes) => {
+                if (!startRes.ok) {
+                  actions.dismissToast(toastId);
+                  actions.showToast(`启动失败: ${startRes.error.message}`, 'error', 3000);
+                  return;
+                }
+                const { jobId } = startRes.data;
+                const unsub = window.tabula.fs.onDirSizeProgress((p) => {
+                  if (p.jobId !== jobId) return;
+                  if (p.done) {
+                    actions.dismissToast(toastId);
+                    unsub();
+                    if (p.cancelled) {
+                      actions.showToast('已取消', 'info', 1500);
+                    } else if (p.error) {
+                      actions.showToast(`计算失败: ${p.error}`, 'error', 3000);
+                    } else {
+                      actions.showToast(
+                        `大小: ${formatSize(p.totalBytes)} · 文件: ${p.processedEntries}`,
+                        'success',
+                        3000,
+                      );
+                    }
+                  }
+                });
+              });
+            }
+            hideGlobalMenu();
+          },
+        });
+      }
+      if (targetEntry && !targetEntry.isDirectory) {
+        computeSubmenu.push({
+          label: '计算 SHA-256',
+          icon: '#️⃣',
+          action: () => {
+            if (targetEntry) {
+              const p = targetEntry.path;
+              const toastId = actions.showToast('正在计算 SHA-256…', 'info', 0);
+              void window.tabula.fs.checksum({ path: p, algorithm: 'sha256' }).then((result) => {
+                actions.dismissToast(toastId);
+                if (result.ok) {
+                  const { hash } = result.data;
+                  void window.tabula.fs.writeClipboard(hash);
+                  actions.showToast('SHA-256 已复制到剪贴板', 'success', 2000);
+                  // eslint-disable-next-line no-alert
+                  window.alert(
+                    `SHA-256\n${hash}\n\n(已自动复制到剪贴板,可粘贴到校验工具)`,
+                  );
+                } else {
+                  actions.showToast(`计算失败: ${result.error.message}`, 'error', 3000);
+                }
+              });
+            }
+            hideGlobalMenu();
+          },
+        });
+      }
+      if (computeSubmenu.length > 0) {
+        items.push({
+          label: '计算',
+          icon: '🧮',
+          submenu: computeSubmenu,
+        });
+      }
     }
 
     items.push({ label: '', divider: true });
 
-    // G010: 锁定 / 解锁 — 通过 FS_SET_PERMISSIONS 切换 read-only 权限位
-    // - 锁定:对 owner 取消 w 位 (0o444);Windows:FS ReadOnly bit
-    // - 解锁:恢复 0o644
-    // - 多选时,按"任一未锁"决定显示「锁定」,否则显示「解锁」;操作应用到所有选中项
+    // 8. G002: 反选 — 与选择相关,留在顶层(高频)
+    items.push({
+      label: '反选',
+      icon: '⇄',
+      shortcut: 'Ctrl+Shift+I',
+      action: () => { actions.selectInvert(paneId); hideGlobalMenu(); },
+    });
+
+    // 9. G010: 锁定/解锁 — 顶层(高频)
     {
       const targetPaths: string[] = [];
       if (selectedPaths.size > 0) {
@@ -646,9 +625,6 @@ function buildMenuItems(args: {
       } else if (targetEntry) {
         targetPaths.push(targetEntry.path);
       }
-      // 异步取第一个目标的当前 read-only 状态作为菜单显示依据
-      // 简化策略:第一次打开时为同步读 cache,否则等异步拉一次(stat 拉回后会通过
-      // subscribeReadonlyCache 触发 force re-render,菜单会刷新成正确文案)
       const firstPath = targetPaths[0];
       const cachedMode = firstPath ? getCachedReadonly(firstPath) : undefined;
       const { label, icon } = resolveLockMenuLabel(cachedMode);
@@ -658,9 +634,6 @@ function buildMenuItems(args: {
         icon,
         disabled: targetPaths.length === 0,
         action: async () => {
-          // 取每个 path 的最新 mode,按各自当前状态取反
-          // 简化:如果 firstPath 已知是 read-only → 全部解锁;否则 → 全部锁定
-          // 为更稳妥,逐个 stat
           let succeeded = 0;
           let failed = 0;
           for (const p of targetPaths) {
@@ -673,7 +646,6 @@ function buildMenuItems(args: {
             const nextReadonly = !currentIsReadonly;
             const r = await window.tabula.fs.setPermissions({ path: p, readonly: nextReadonly });
             if (r.ok) {
-              // 用 stat 返回的 mode 写回缓存(WIndows 上是 100444/100666,Unix 上是 0o444/0o644)
               setCachedReadonly(p, statRes.data.mode);
               succeeded++;
             } else {
@@ -706,37 +678,48 @@ function buildMenuItems(args: {
 
     items.push({ label: '', divider: true });
 
-    // G015: 计算 SHA-256(仅文件,流式哈希大文件友好)
-    if (targetEntry && !targetEntry.isDirectory) {
+    // 10. 删除 (顶层,高频独立)
+    items.push({
+      label: '删除',
+      icon: '🗑',
+      shortcut: 'Delete',
+      danger: true,
+      disabled: !hasSelection,
+      action: () => {
+        if (selectedPaths.size > 0) {
+          window.dispatchEvent(
+            new CustomEvent('tabula:confirm-delete', {
+              detail: { paneId, count: selectedPaths.size },
+            }),
+          );
+        }
+        hideGlobalMenu();
+      },
+    });
+
+    items.push({ label: '', divider: true });
+
+    // 11. G011: 创建快捷方式 (顶层,独立)
+    {
+      const singlePath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
       items.push({
-        label: '计算 SHA-256',
-        icon: '#️⃣',
+        label: '创建快捷方式',
+        icon: '🔗',
+        disabled: !singlePath,
         action: () => {
-          if (targetEntry) {
-            const p = targetEntry.path;
-            const toastId = actions.showToast('正在计算 SHA-256…', 'info', 0);
-            void window.tabula.fs.checksum({ path: p, algorithm: 'sha256' }).then((result) => {
-              actions.dismissToast(toastId);
-              if (result.ok) {
-                const { hash } = result.data;
-                // 64-char hex 过长不适合 toast;写剪贴板 + 弹带 hash 的简单对话框
-                void window.tabula.fs.writeClipboard(hash);
-                // 用一个简短的确认 toast,再弹一个原生 alert 显示完整 hash
-                actions.showToast('SHA-256 已复制到剪贴板', 'success', 2000);
-                // eslint-disable-next-line no-alert
-                window.alert(
-                  `SHA-256\n${hash}\n\n(已自动复制到剪贴板,可粘贴到校验工具)`,
-                );
-              } else {
-                actions.showToast(`计算失败: ${result.error.message}`, 'error', 3000);
-              }
-            });
+          if (singlePath) {
+            window.dispatchEvent(
+              new CustomEvent('tabula:create-symlink', { detail: { paneId, sourcePath: singlePath } }),
+            );
           }
           hideGlobalMenu();
         },
       });
     }
 
+    items.push({ label: '', divider: true });
+
+    // 12. 属性 (顶层,常驻)
     items.push({
       label: '属性',
       icon: 'ℹ',
