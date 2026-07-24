@@ -576,9 +576,10 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       if (e.target !== e.currentTarget) return;
       // preventDefault 阻止默认文本选择。
       // 注意:不调 stopPropagation — 否则 mousedown 不会冒泡到 PaneView 的
-      // onMouseDown,导致「点 body 自身空白」时 pane 无法聚焦,也无法触发
-      // handleBlankAreaMouseDown 切目录。rows 是 body 的后代,click 事件不会
-      // 从 body 下行到 row,所以不需要在这里拦 stopPropagation。
+      // onMouseDown,导致「点 body 自身空白」时 pane 无法聚焦,也无法让
+      // handleBlankAreaMouseDown 拿到 mousedown(虽然现在 focus-only 不切目录,
+      // 但 blank handler 仍然要负责聚焦 + clearSelection)。rows 是 body 的后代,
+      // click 事件不会从 body 下行到 row,所以不需要在这里拦 stopPropagation。
       e.preventDefault();
       const startX = e.clientX;
       const startY = e.clientY;
