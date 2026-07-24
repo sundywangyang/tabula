@@ -86,6 +86,18 @@ export interface MoveOrCopyRequest {
   sources: string[];
   destination: string;
   overwrite?: boolean;
+  /**
+   * 可选:与 sources 一一对应的完整目标路径(用于在粘贴到同目录时
+   * 显式指定 `- 副本` 后缀的新名)。
+   *
+   * 提供时,主进程用 `destinations[i]` 而不是默认的
+   * `join(destination, basename(sources[i]))`,这样可避免:
+   * - 同目录复制时 src===dest → fs.cp EINVAL
+   * - 同目录移动时的 noop 误判
+   *
+   * 缺省或长度不足时,该下标回退到默认行为,保持向后兼容。
+   */
+  destinations?: string[];
 }
 
 /** 回收站条目 (P3) */

@@ -20,6 +20,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Archive, File as FileIcon, FileCode2, FileText, Film, Folder, Image, Music, Settings } from 'lucide-react';
 import type { FsEntry } from '@tabula/bridge';
 import { useFileStore, isThumbnailable, type SortField, type GroupByMode, groupEntries } from '../../stores/file-store';
+import { useLayoutStore } from '../../stores/layout-store';
 import { getCachedTags, loadTagsForPath, subscribeTagsCache } from '../../components/ContextMenu';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
@@ -291,24 +292,11 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       const isMeta = e.ctrlKey || e.metaKey;
       const path = e.key;
 
-      // Ctrl+C 复制选中
-      if (isMeta && !e.shiftKey && !e.altKey && (path === 'c' || path === 'C')) {
-        e.preventDefault();
-        copySelected(paneId);
-        return;
-      }
-      // Ctrl+X 剪切
-      if (isMeta && !e.shiftKey && !e.altKey && (path === 'x' || path === 'X')) {
-        e.preventDefault();
-        cutSelected(paneId);
-        return;
-      }
-      // Ctrl+V 粘贴
-      if (isMeta && !e.shiftKey && !e.altKey && (path === 'v' || path === 'V')) {
-        e.preventDefault();
-        void pasteToPane(paneId);
-        return;
-      }
+      // Ctrl+C / Ctrl+X / Ctrl+V 由 App.tsx 全局 keydown 统一处理 — 不要在这里再处理,
+      // 否则会和 window-level listener 重复触发,导致:
+      // - 复制/剪切时 toast 弹 2 次
+      // - 粘贴时并发两次 performBulk,目标文件可能已被第一次创建 → 第二次失败
+      // Ctrl+A 全选是 file-list 局部动作(不影响外部),保留在这里。
       // Ctrl+A 全选
       if (isMeta && (path === 'a' || path === 'A')) {
         e.preventDefault();
@@ -586,9 +574,12 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       // 若点击命中 row / header / cell,这些元素自己处理,不进入拖框分支。
       if (e.button !== 0) return;
       if (e.target !== e.currentTarget) return;
-      // 必须阻止默认文本选择 + 防止后续 click 触发 row 处理
+      // preventDefault 阻止默认文本选择。
+      // 注意:不调 stopPropagation — 否则 mousedown 不会冒泡到 PaneView 的
+      // onMouseDown,导致「点 body 自身空白」时 pane 无法聚焦,也无法触发
+      // handleBlankAreaMouseDown 切目录。rows 是 body 的后代,click 事件不会
+      // 从 body 下行到 row,所以不需要在这里拦 stopPropagation。
       e.preventDefault();
-      e.stopPropagation();
       const startX = e.clientX;
       const startY = e.clientY;
       const initial: RubberBand = { startX, startY, curX: startX, curY: startY };
@@ -596,6 +587,36 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       setRubberBand(initial);
     },
     [],
+  );
+
+  // === 点空白区域:聚焦当前 pane + 清选中;不改 currentPath ===
+  // 旧实现用 `e.target === e.currentTarget` 判空白,在 .file-list 根 div 上
+  // 永远成立 false(根 div 没 padding,header + body 两个 flex 子元素填满),
+  // 导致 handler 第一行 return,功能失效。改用 `closest('.file-list-row')`
+  // 排除 row 内点击,再 `closest('.file-list-header')` 排除 column header
+  // (用户点 header 是想排序,不是切 pane)。
+  //
+  // **不切目录**:用户最终决定点空白仅做聚焦 + 清选中,不改 activeTab.path
+  // / currentPath。之前尝试过切到另一个 pane 的目录(navigate),
+  // 但语义上让用户困惑(新聚焦的 pane 内容被覆盖为另一个 pane 的内容)。
+  //
+  // **显式 focusPane** 防御任何上游 stopPropagation:虽然 handleBodyMouseDown
+  // 已经移除 stopPropagation,显式 focusPane 仍然是更稳的契约 — 不依赖事件链完整。
+  const handleBlankAreaMouseDown = useCallback(
+    (e: ReactMouseEvent<HTMLElement>) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      // 点到了 row 内部 / column header → 不是空白,跳过
+      if (target.closest('.file-list-row')) return;
+      if (target.closest('.file-list-header')) return;
+      // 显式聚焦当前 pane — 不依赖 PaneView onMouseDown 冒泡
+      if (useLayoutStore.getState().activePaneId !== paneId) {
+        useLayoutStore.getState().pane.focusPane(paneId);
+      }
+      // 单 pane / 多 pane 都清选中(避免用户点空白留下 stale selection)
+      clearSelection(paneId);
+    },
+    [paneId, clearSelection],
   );
 
   // === G004: 拖框过程 — 全局 mousemove / mouseup ===
@@ -670,9 +691,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         ref={containerRef}
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) clearSelection(paneId);
-        }}
+        onMouseDown={handleBlankAreaMouseDown}
         onDragOver={handleContainerDragOver}
         onDragLeave={handleContainerDragLeave}
         onDrop={handleContainerDrop}
@@ -701,10 +720,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       className={`file-list file-list-${viewMode} ${dropClass}`}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onMouseDown={(e) => {
-        // 点空白处清空选择
-        if (e.target === e.currentTarget) clearSelection(paneId);
-      }}
+      onMouseDown={handleBlankAreaMouseDown}
       onDragOver={handleContainerDragOver}
       onDragLeave={handleContainerDragLeave}
       onDrop={handleContainerDrop}

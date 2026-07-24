@@ -1574,6 +1574,8 @@ export const useFileStore = create<FileStore>((set, get) => {
               const r = await window.tabula.fs.copy({
                 sources: [op.source],
                 destination: head.destDir,
+                // 透传 op.dest,避免主进程重新 join() 算出 src===dest 触发 EINVAL。
+                destinations: [op.dest],
                 overwrite: op.overwrite,
               });
               if (r.ok) success++;
@@ -1582,6 +1584,7 @@ export const useFileStore = create<FileStore>((set, get) => {
               const r = await window.tabula.fs.move({
                 sources: [op.source],
                 destination: head.destDir,
+                destinations: [op.dest],
               });
               if (r.ok) success++;
               else if (!firstError) firstError = r.error.message;
@@ -2038,6 +2041,9 @@ export const useFileStore = create<FileStore>((set, get) => {
             const r = await window.tabula.fs.copy({
               sources: [op.source],
               destination: destDir,
+              // 透传 op.dest:performBulk 可能把同目录的 src 重命名成 `xxx - 副本.jpg`。
+              // 主进程优先用 destinations[i],避免重新 join() 后 src===dest 触发 EINVAL。
+              destinations: [op.dest],
               overwrite: op.overwrite,
             });
             if (r.ok) success++;
@@ -2046,6 +2052,7 @@ export const useFileStore = create<FileStore>((set, get) => {
             const r = await window.tabula.fs.move({
               sources: [op.source],
               destination: destDir,
+              destinations: [op.dest],
             });
             if (r.ok) success++;
             else if (!firstError) firstError = r.error.message;

@@ -42,6 +42,24 @@ if (process.env.TABULA_REMOTE_DEBUG === '1') {
   app.commandLine.appendSwitch('remote-debugging-port', String(port));
 }
 
+// Windows 控制台默认走 OEM 代码页(cp936 / cp437),中文路径在主进程 stdout
+// 上会被显示成 mojibake(用户报告 "[ipc-cp] copying <乱码>" 而不是中文)。
+// 强制把进程级 stdout 默认编码设为 UTF-8,electron-log 的 console transport
+// 之后写出的字符串就会以 UTF-8 输出,Windows Terminal / 现代终端可正确解码。
+// 仅在 win32 上做;其它平台已经是 UTF-8。
+if (process.platform === 'win32') {
+  // setDefaultEncoding 在 Node 的 WriteStream 上有声明,但 Electron 的
+  // process.stdout 类型签名较窄。走 unknown 转换 + 失败回退,不影响启动。
+  try {
+    const out = process.stdout as unknown as { setDefaultEncoding?: (e: string) => boolean };
+    const err = process.stderr as unknown as { setDefaultEncoding?: (e: string) => boolean };
+    out.setDefaultEncoding?.('utf8');
+    err.setDefaultEncoding?.('utf8');
+  } catch {
+    // ignore — 启动优先级高于编码美观
+  }
+}
+
 // P7: 把 logger 装在所有其它模块 import 之前的最早阶段,
 // 这样后面任何 throw 都能被 log 捕获(尽管 TS 解析的顺序是静态的,
 // 实际 Electron 运行时 app.whenReady 之前的 console.* 也走 log)。

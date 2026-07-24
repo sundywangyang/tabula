@@ -17,8 +17,17 @@ function mapError(err: unknown, path?: string): Result<never> {
 }
 
 export async function move(req: MoveOrCopyRequest): Promise<Result<void>> {
-  for (const src of req.sources) {
-    const dest = join(req.destination, basename(src));
+  const explicitDests: ReadonlyArray<string | undefined> = req.destinations ?? [];
+  for (let i = 0; i < req.sources.length; i++) {
+    const src = req.sources[i];
+    // 优先用显式 dest(透传渲染端可能生成的重命名);缺省时回退默认行为。
+    const dest = explicitDests[i] ?? join(req.destination, basename(src));
+    // 守卫:src===dest 时直接跳过(rename 自己到自己会抛,cp 也会 EINVAL)。
+    if (dest === src) {
+      // eslint-disable-next-line no-console
+      console.error('[fs-move] skipping (src==dest):', JSON.stringify(src));
+      continue;
+    }
     let renamed = false;
     try {
       await fs.rename(src, dest);

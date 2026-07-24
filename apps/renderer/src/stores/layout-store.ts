@@ -458,6 +458,16 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         const oldPane = findPane(get().rootLayout, paneId);
         if (!oldPane || oldPane.type !== 'pane') return paneId;
         const freshPaneId = makePaneId();
+
+        // 继承父 pane 当前 active tab 的 path:split 后新 pane 显示同一目录。
+        // — 否则新 tab 没有 path,PaneView 的 loadDir effect 会因
+        //   `if (!activeTabPath) return` 短路,panes[freshPaneId].currentPath
+        //   保持 `''`,空白点击切 pane 的守卫 `if (otherPath && ...)` 会被 falsy
+        //   短路,功能失效。
+        const oldActiveTab = oldPane.tabs.find((t) => t.id === oldPane.activeTabId);
+        const inheritedPath: string | undefined = oldActiveTab?.path;
+        const inheritedTitle: string = inheritedPath ? basenameOf(inheritedPath) : '新窗格';
+
         const newPane: LayoutNode = {
           type: 'pane',
           id: freshPaneId,
@@ -465,11 +475,12 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
             {
               id: `tab-${freshPaneId}`,
               type: 'folder',
-              title: '新窗格',
+              title: inheritedTitle,
               pinned: false,
               closable: true,
-              history: [],
-              historyIndex: -1,
+              path: inheritedPath,
+              history: inheritedPath ? [inheritedPath] : [],
+              historyIndex: inheritedPath ? 0 : -1,
             },
           ],
           activeTabId: `tab-${freshPaneId}`,
@@ -490,8 +501,13 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         const newRoot = mapPane(get().rootLayout, paneId, () => splitNode);
         setState({ rootLayout: newRoot, activePaneId: freshPaneId });
 
-        // 确保新 pane 在 file-store 里有数据空壳(下次操作会触发 loadDir)
+        // 确保新 pane 在 file-store 里有数据空壳;有 path 时主动 loadDir,
+        // 这样 panes[freshPaneId].currentPath 立刻有值(否则后面 click 切 pane
+        // 的 `if (otherPath && otherPath !== currentPath)` 守卫会因 `''` 短路)。
         useFileStore.getState().ensurePane(freshPaneId);
+        if (inheritedPath) {
+          void useFileStore.getState().loadDir(freshPaneId, inheritedPath);
+        }
         return freshPaneId;
       },
 

@@ -100,10 +100,23 @@ export function registerIpcHandlers(ctx: IpcContext) {
     const sources: string[] = req.sources;
     const destination: string = req.destination;
     const overwrite: boolean = req.overwrite ?? false;
+    // 显式 dest 数组(渲染端 paste 时若已生成 `- 副本` 重命名,会通过这里透传)
+    const explicitDests: ReadonlyArray<string | undefined> = req.destinations ?? [];
     // eslint-disable-next-line no-console
     console.error('[ipc-cp] sources=', sources, 'destination=', destination);
-    for (const src of sources) {
-      const dest = join(destination, basename(src));
+    const skipped: string[] = [];
+    for (let i = 0; i < sources.length; i++) {
+      const src = sources[i];
+      // 优先用显式 dest;缺省时回退到「destination + basename(src)」,保持向后兼容。
+      // 守卫:如果计算出的 dest 与 src 完全相同,跳过(否则 fs.cp 抛 EINVAL)。
+      // 这覆盖了同目录粘贴的边界情况,以及未来任何绕过渲染端保护的调用方。
+      const dest = explicitDests[i] ?? join(destination, basename(src));
+      if (dest === src) {
+        // eslint-disable-next-line no-console
+        console.error('[ipc-cp] skipping (src==dest):', src);
+        skipped.push(src);
+        continue;
+      }
       // eslint-disable-next-line no-console
       console.error('[ipc-cp] copying', src, '->', dest);
       try {
@@ -115,7 +128,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
         return { ok: false, error: { code: e.code ?? 'UNKNOWN', message: e.message, path: src } };
       }
     }
-    return { ok: true, data: undefined };
+    return { ok: true, data: undefined, skipped };
   });
   ipcMain.handle(IpcChannels.FS_MKDIR, (_e, p: string, name?: string) =>
     fsService.mkdir(p, name),
