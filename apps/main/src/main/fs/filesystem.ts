@@ -10,8 +10,10 @@
  */
 import { promises as fs, statfsSync } from 'node:fs';
 import { join, basename, extname } from 'node:path';
-import type { DriveInfo, FsEntry, ListDirResult, MoveOrCopyRequest, Result, SearchRequest, SearchResult, SearchHit, FileTypeFilter } from '@tabula/bridge';
+import type { DriveInfo, FsEntry, ListDirResult, Result, SearchRequest, SearchResult, SearchHit, FileTypeFilter } from '@tabula/bridge';
 import { getDriveProvider } from '../providers/drive';
+export { move } from './move';
+export { copy } from './copy';
 
 function mapError(err: unknown, path?: string): { ok: false; error: { code: any; message: string; path?: string } } {
   const e = err as NodeJS.ErrnoException;
@@ -141,52 +143,6 @@ export async function rename(oldPath: string, newPath: string): Promise<Result<v
   } catch (err) {
     return mapError(err, oldPath);
   }
-}
-
-export async function move(req: MoveOrCopyRequest): Promise<Result<void>> {
-  for (const src of req.sources) {
-    const dest = join(req.destination, basename(src));
-    // eslint-disable-next-line no-console
-    console.error('[fs-move] moving', JSON.stringify(src), '->', JSON.stringify(dest));
-    try {
-      await fs.rename(src, dest);
-    } catch (renameErr) {
-      // 跨盘 rename 失败，降级到 copy + delete
-      // eslint-disable-next-line no-console
-      console.error('[fs-move] rename failed, falling back to cp+rm:', renameErr);
-      try {
-        await fs.cp(src, dest, { recursive: true });
-        await fs.rm(src, { recursive: true, force: true });
-      } catch (cpErr) {
-        const e = cpErr as NodeJS.ErrnoException;
-        // eslint-disable-next-line no-console
-        console.error('[fs-move] cp+rm ERROR code=', e.code, 'msg=', e.message);
-        return mapError(cpErr, src);
-      }
-    }
-  }
-  return ok(undefined);
-}
-
-export async function copy(req: MoveOrCopyRequest): Promise<Result<void>> {
-  // eslint-disable-next-line no-console
-  console.error('[fscp] req.destination =', req?.destination, 'typeof =', typeof req?.destination, 'req =', req);
-  for (const src of req.sources) {
-    try {
-      const dest = join(req.destination, basename(src));
-      // eslint-disable-next-line no-console
-      console.error('[fscp] src=', src, 'dest=', dest);
-      await fs.cp(src, dest, { recursive: true, force: req.overwrite });
-      // eslint-disable-next-line no-console
-      console.error('[fscp] success:', dest);
-    } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      // eslint-disable-next-line no-console
-      console.error('[fscp] ERROR code=', e.code, 'msg=', e.message);
-      return mapError(err, src);
-    }
-  }
-  return ok(undefined);
 }
 
 export async function mkdir(path: string, name?: string): Promise<Result<string>> {

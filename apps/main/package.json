@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@iarna/rtf-to-html": "^1.1.0",
     "@tabula/bridge": "workspace:*",
     "@tabula/core": "workspace:*",
     "@tabula/ext-api": "workspace:*",

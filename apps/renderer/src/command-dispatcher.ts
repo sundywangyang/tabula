@@ -24,6 +24,7 @@ import { useThemeStore, type ThemeMode } from './stores/theme-store';
 import { useSettingsStore } from './stores/settings-store';
 import { useUiDialogsStore } from './stores/ui-dialogs-store';
 import { getCachedRootPath } from './platform-cache';
+import { toggleCommandPalette } from './features/command-palette/CommandPalette';
 
 /** 工具:取父路径(供 file.duplicate 用) */
 function parentPath(p: string): string {
@@ -132,6 +133,23 @@ export function runCommandById(commandId: string): boolean {
     file.showToast(msg, kind, ms);
 
   switch (commandId) {
+    case 'command-palette.toggle': {
+      toggleCommandPalette();
+      return true;
+    }
+    case 'file.undo':
+    case 'file.redo': {
+      void (async () => {
+        try {
+          const result = await window.tabula.fs[commandId === 'file.undo' ? 'undo' : 'redo']();
+          if (!result.ok) { showToast(result.error.message, 'error', 4000); return; }
+          if (!result.data) { showToast('没有可执行的历史操作', 'info'); return; }
+          await Promise.all(Object.keys(useFileStore.getState().panes).map((id) => file.refresh(id)));
+          showToast(`${commandId === 'file.undo' ? '已撤销' : '已重做'}: ${result.data.label}`, 'info', 2000);
+        } catch (error) { showToast(String(error), 'error', 4000); }
+      })();
+      return true;
+    }
     // ============ 文件 ============
     case 'file.refresh': {
       void file.refresh(activePaneId);
@@ -141,7 +159,8 @@ export function runCommandById(commandId: string): boolean {
       // 命令面板触发的「打开选中项」:取 cursor 路径,目录 → navigate,文件 → fs.openPath
       // (FileList 组件级 keydown 也处理 Enter,这里只覆盖 focus 不在 file list 的场景)
       const data = file.panes[activePaneId];
-      const cursor = data?.cursorPath ?? null;
+      if ((data?.selectedPaths.size ?? 0) > 1) { void file.openSelected(activePaneId); return true; }
+      const cursor = data?.cursorPath ?? Array.from(data?.selectedPaths ?? [])[0] ?? null;
       if (!cursor) {
         showToast('未选中任何项', 'warn');
         return false;
@@ -217,7 +236,8 @@ export function runCommandById(commandId: string): boolean {
       );
       return true;
     }
-    case 'file.new-folder': {
+    case 'file.new-folder':
+    case 'file.new-folder-quick': {
       dialogs.setNewFolder(true, activePaneId);
       return true;
     }
@@ -391,19 +411,22 @@ export function runCommandById(commandId: string): boolean {
     }
 
     // ============ 视图 / 搜索 ============
-    case 'search.global': {
+    case 'search.global':
+    case 'search.global-recursive': {
       void file.openGlobalSearch();
       return true;
     }
     case 'search.focus': {
-      // 触发 file-list 内搜索框聚焦(用 custom event,跟旧 keydown 行为一致)
-      window.dispatchEvent(new CustomEvent('tabula:focus-search-input'));
+      file.openSearch(activePaneId);
       return true;
     }
     case 'preview.toggle': {
-      // 旧 keydown:Space 触发 — 借用 file-store 的 togglePreview 之类
-      // 简化:派发一个 custom event,FileList 自己接(旧版就是这样)
-      window.dispatchEvent(new CustomEvent('tabula:toggle-preview'));
+      const data = file.panes[activePaneId];
+      const path = data?.selectedPaths.size === 1 ? Array.from(data.selectedPaths)[0] : data?.cursorPath;
+      const entry = data?.entries.find((item) => item.path === path);
+      if (!entry || entry.isDirectory) return false;
+      if (file.previewState?.entry.path === entry.path) file.closePreview();
+      else file.openPreview(entry);
       return true;
     }
     case 'theme.toggle': {

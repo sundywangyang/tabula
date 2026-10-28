@@ -23,13 +23,9 @@ import { PropertiesPanel } from './features/file-list/PropertiesPanel';
 import { BatchRenameDialog } from './features/file-list/BatchRenameDialog';
 import { ContextMenu } from './components/ContextMenu';
 import { ExtensionPanelView } from './components/ExtensionPanelView';
-import {
-  CommandPalette,
-  openCommandPalette,
-  closeCommandPalette,
-  isCommandPaletteOpen,
-} from './features/command-palette/CommandPalette';
+import { CommandPalette } from './features/command-palette/CommandPalette';
 import { runCommandById } from './command-dispatcher';
+import { handleShortcutKeyDown } from './keyboard-shortcuts';
 import { IpcChannels } from '@tabula/bridge';
 import { LayoutView } from './features/panes/PaneContainer';
 import { PerfPanel } from './features/perf/PerfPanel';
@@ -37,7 +33,7 @@ import { UpdateNotification } from './features/update/UpdateNotification';
 import { useFileStore } from './stores/file-store';
 import { useLayoutStore } from './stores/layout-store';
 import { useFavoritesStore } from './stores/favorites-store';
-import { useThemeStore, type ThemeMode } from './stores/theme-store';
+import { useThemeStore } from './stores/theme-store';
 import { useSettingsStore } from './stores/settings-store';
 import { useKeymapStore } from './stores/keymap-store';
 import { useUiDialogsStore } from './stores/ui-dialogs-store';
@@ -100,27 +96,17 @@ export function App() {
   // file-store
   const hydrateFromConfig = useFileStore((s) => s.hydrateFromConfig);
   const loadDir = useFileStore((s) => s.loadDir);
-  const openPathBar = useFileStore((s) => s.openPathBar);
   const refresh = useFileStore((s) => s.refresh);
-  const selectAll = useFileStore((s) => s.selectAll);
-  const clearSelection = useFileStore((s) => s.clearSelection);
   const ensurePane = useFileStore((s) => s.ensurePane);
-  const pathBarOpen = useFileStore((s) => s.pathBarOpen);
 
   // P3
-  const copySelected = useFileStore((s) => s.copySelected);
-  const cutSelected = useFileStore((s) => s.cutSelected);
-  const pasteToPane = useFileStore((s) => s.pasteToPane);
   const createFolder = useFileStore((s) => s.createFolder);
   const createFile = useFileStore((s) => s.createFile);
   const permanentDelete = useFileStore((s) => s.permanentDelete);
 
   // P4
-  const openGlobalSearch = useFileStore((s) => s.openGlobalSearch);
 
   // P3: 重命名/复制
-  const beginRename = useFileStore((s) => s.beginRename);
-  const performBulk = useFileStore((s) => s.performBulk);
   const clipboard = useFileStore((s) => s.clipboard);
   const deleteSelected = useFileStore((s) => s.deleteSelected);
   const getPanePath = useFileStore((s) => s.getPanePath);
@@ -255,25 +241,6 @@ export function App() {
     return () => mq.removeEventListener('change', onChange);
   }, [themeSetEffective]);
 
-  // P7 v1: Ctrl+Shift+P 切换命令面板(独立 effect,捕获阶段,
-  // 即便焦点在 path bar / dialog input 里也能触发 — 沿用 VS Code 行为)。
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const isMeta = e.ctrlKey || e.metaKey;
-      if (isMeta && e.shiftKey && !e.altKey && (e.key === 'p' || e.key === 'P')) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (isCommandPaletteOpen()) {
-          closeCommandPalette();
-        } else {
-          openCommandPalette();
-        }
-      }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, []);
-
   // P5: 监听 active pane 路径变化 → 记录到 history
   useEffect(() => {
     if (!activePath) return;
@@ -329,6 +296,10 @@ export function App() {
     const offArchiveUpdate = window.tabula.archive.onJobUpdate((progress) => {
       useFileStore.getState().updateArchiveJob(progress);
     });
+    const offFileChange = window.tabula.events.on(IpcChannels.FS_CHANGED, () => {
+      const file = useFileStore.getState();
+      for (const paneId of Object.keys(file.panes)) void file.refresh(paneId);
+    });
 
     return () => {
       window.removeEventListener('tabula:new-folder', onNewFolder);
@@ -338,385 +309,15 @@ export function App() {
       window.removeEventListener('tabula:batch-rename', onBatchRename);
       offRunCommand();
       offArchiveUpdate();
+      offFileChange();
     };
   }, []);
 
-  // 全局快捷键
+  // All configurable shortcuts use the current binding table, including unbound defaults.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const isInField =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable;
-      if (pathBarOpen) return;
-      if (isInField) return;
-
-      const isMeta = e.ctrlKey || e.metaKey;
-      const isAlt = e.altKey;
-      const isShift = e.shiftKey;
-      const key = e.key;
-
-      // Ctrl+L:打开路径栏
-      if (isMeta && !isAlt && !isShift && (key === 'l' || key === 'L')) {
-        e.preventDefault();
-        openPathBar(activePaneId);
-        return;
-      }
-
-      // P5: Ctrl+, 打开设置
-      if (isMeta && !isAlt && !isShift && key === ',') {
-        e.preventDefault();
-        setSettingsOpen(true);
-        return;
-      }
-
-      // F5:刷新
-      if (key === 'F5') {
-        e.preventDefault();
-        void refresh(activePaneId);
-        return;
-      }
-
-      // Ctrl+A:全选
-      if (isMeta && !isAlt && !isShift && (key === 'a' || key === 'A')) {
-        e.preventDefault();
-        selectAll(activePaneId);
-        return;
-      }
-
-      // Esc:清空选择 / 关闭 dialog
-      if (key === 'Escape') {
-        // dialog 优先(它们自己处理)
-        if (newFolderOpen) { setNewFolder(false, null); return; }
-        if (newFileOpen) { setNewFile(false, null); return; }
-        if (confirmDeleteOpen) { setConfirmDelete(null); return; }
-        // G006: 预览面板打开时,Esc 优先关闭预览
-        if (useFileStore.getState().previewState) {
-          e.preventDefault();
-          useFileStore.getState().closePreview();
-          return;
-        }
-        if ((activeSelected?.size ?? 0) > 0) {
-          e.preventDefault();
-          clearSelection(activePaneId);
-        }
-        return;
-      }
-
-      // G006: Space 打开/关闭当前选中/光标文件的预览(quick-look)
-      if (key === ' ' && !isMeta && !isAlt && !isShift) {
-        e.preventDefault();
-        const fileState = useFileStore.getState();
-        const data = fileState.panes[activePaneId];
-        if (!data) return;
-        // 目标条目:1 选中 → 那个;否则用光标
-        let target: import('@tabula/bridge').FsEntry | null = null;
-        if (data.selectedPaths.size === 1) {
-          const p = Array.from(data.selectedPaths)[0]!;
-          target = data.entries.find((x) => x.path === p) ?? null;
-        }
-        if (!target && data.cursorPath) {
-          target = data.entries.find((x) => x.path === data.cursorPath) ?? null;
-        }
-        if (!target) return;
-        // 目录不预览
-        if (target.isDirectory) return;
-        // 再次按 Space → 关闭;否则打开
-        const current = fileState.previewState;
-        if (current && current.entry.path === target.path) {
-          fileState.closePreview();
-        } else {
-          fileState.openPreview(target);
-        }
-        return;
-      }
-
-      // Ctrl+T:在 active pane 新开 tab
-      if (isMeta && !isAlt && !isShift && (key === 't' || key === 'T')) {
-        e.preventDefault();
-        const initPath = getCachedRootPath();
-        const tab = makeFolderTab(initPath, '新标签');
-        useLayoutStore.getState().pane.openTab(activePaneId, tab);
-        return;
-      }
-
-      // Ctrl+W:关闭 active tab
-      if (isMeta && !isAlt && !isShift && (key === 'w' || key === 'W')) {
-        e.preventDefault();
-        const layout = useLayoutStore.getState().rootLayout;
-        const pane = findPaneInLayout(layout, activePaneId);
-        if (pane?.type === 'pane' && pane.activeTabId) {
-          useLayoutStore.getState().pane.closeTab(activePaneId, pane.activeTabId);
-        }
-        return;
-      }
-
-      // Ctrl+N:新建文件夹(全局)
-      if (isMeta && !isAlt && !isShift && (key === 'n' || key === 'N')) {
-        e.preventDefault();
-        setNewFolder(true, activePaneId);
-        return;
-      }
-
-      // Ctrl+Tab / Ctrl+Shift+Tab:循环切 active tab
-      if (isMeta && !isAlt && key === 'Tab') {
-        e.preventDefault();
-        const layout = useLayoutStore.getState().rootLayout;
-        const pane = findPaneInLayout(layout, activePaneId);
-        if (pane?.type === 'pane' && pane.tabs.length > 1 && pane.activeTabId) {
-          const idx = pane.tabs.findIndex((t) => t.id === pane.activeTabId);
-          const nextIdx = isShift
-            ? (idx - 1 + pane.tabs.length) % pane.tabs.length
-            : (idx + 1) % pane.tabs.length;
-          const next = pane.tabs[nextIdx];
-          if (next) useLayoutStore.getState().pane.activateTab(activePaneId, next.id);
-        }
-        return;
-      }
-
-      // Ctrl+1~9:切到第 N 个 tab
-      if (isMeta && !isAlt && !isShift && /^[1-9]$/.test(key)) {
-        e.preventDefault();
-        const n = parseInt(key, 10);
-        const layout = useLayoutStore.getState().rootLayout;
-        const pane = findPaneInLayout(layout, activePaneId);
-        if (pane?.type === 'pane') {
-          const target = pane.tabs[n - 1];
-          if (target) useLayoutStore.getState().pane.activateTab(activePaneId, target.id);
-        }
-        return;
-      }
-
-      // Ctrl+\:横向拆分
-      if (isMeta && !isAlt && !isShift && (key === '\\' || key === '|')) {
-        e.preventDefault();
-        useLayoutStore.getState().pane.splitPane(activePaneId, 'horizontal');
-        return;
-      }
-      // Ctrl+Shift+\:纵向拆分
-      if (isMeta && !isAlt && isShift && (key === '\\' || key === '|')) {
-        e.preventDefault();
-        useLayoutStore.getState().pane.splitPane(activePaneId, 'vertical');
-        return;
-      }
-
-      // Ctrl+Alt+方向键:焦点 pane 切换
-      if (isMeta && isAlt && !isShift) {
-        let dir: 'left' | 'right' | 'up' | 'down' | null = null;
-        if (key === 'ArrowLeft') dir = 'left';
-        else if (key === 'ArrowRight') dir = 'right';
-        else if (key === 'ArrowUp') dir = 'up';
-        else if (key === 'ArrowDown') dir = 'down';
-        if (dir) {
-          e.preventDefault();
-          const layout = useLayoutStore.getState().rootLayout;
-          const neighbor = findNeighborPane(layout, activePaneId, dir);
-          if (neighbor) useLayoutStore.getState().pane.focusPane(neighbor);
-          return;
-        }
-      }
-
-      // Ctrl+Alt+Shift+\:关闭当前 pane(合并到兄弟后关闭)
-      if (isMeta && isAlt && isShift && (key === '\\' || key === '|')) {
-        e.preventDefault();
-        useLayoutStore.getState().pane.mergePane(activePaneId);
-        return;
-      }
-
-      // P2 v2 收口:Alt+方向键(单独按 Alt)调整 split 大小,步长 20px。
-      // - 命中方向后,沿 layout 树找焦点 pane 的最近祖先 split 节点;
-      // - 从 DOM 上的 [data-split-id] 读取容器实际 px 尺寸,调 setSplitSizes。
-      // - setSplitSizes 内部已有 MIN_SIZE=60 的 clamp 逻辑,这里只传 px delta。
-      if (isAlt && !isMeta && !isShift) {
-        let dir: 'left' | 'right' | 'up' | 'down' | null = null;
-        if (key === 'ArrowLeft') dir = 'left';
-        else if (key === 'ArrowRight') dir = 'right';
-        else if (key === 'ArrowUp') dir = 'up';
-        else if (key === 'ArrowDown') dir = 'down';
-        if (dir) {
-          e.preventDefault();
-          const layout = useLayoutStore.getState().rootLayout;
-          const split = findClosestSplitAncestor(layout, activePaneId);
-          if (!split || !split.id) return;
-          // 方向轴与 split 轴一致才允许调;否则不响应
-          const wantAxis = dir === 'left' || dir === 'right' ? 'horizontal' : 'vertical';
-          if (split.dir !== wantAxis) return;
-          const el = document.querySelector<HTMLElement>(`[data-split-id="${split.id}"]`);
-          if (!el) return;
-          const rect = el.getBoundingClientRect();
-          const totalPx = split.dir === 'horizontal' ? rect.width : rect.height;
-          // 左/上:第一个 child 变小(负 delta);右/下:第一个 child 变大(正 delta)
-          const sign = dir === 'left' || dir === 'up' ? -1 : 1;
-          useLayoutStore.getState().pane.setSplitSizes(split.id, sign * 20, totalPx);
-          return;
-        }
-      }
-
-      // P4: Ctrl+P 全局搜索(在任意位置打开)
-      if (isMeta && !isAlt && !isShift && (key === 'p' || key === 'P')) {
-        e.preventDefault();
-        void openGlobalSearch();
-        return;
-      }
-
-      // P4 v1: Ctrl+Shift+F 全局递归搜索(在任意位置打开)
-      if (isMeta && !isAlt && isShift && (key === 'f' || key === 'F')) {
-        e.preventDefault();
-        void openGlobalSearch();
-        return;
-      }
-
-      // P3: Ctrl+C 复制
-      if (isMeta && !isAlt && !isShift && (key === 'c' || key === 'C')) {
-        e.preventDefault();
-        copySelected(activePaneId);
-        return;
-      }
-
-      // P3: Ctrl+X 剪切
-      if (isMeta && !isAlt && !isShift && (key === 'x' || key === 'X')) {
-        e.preventDefault();
-        cutSelected(activePaneId);
-        return;
-      }
-
-      // P3: Ctrl+V 粘贴
-      if (isMeta && !isAlt && !isShift && (key === 'v' || key === 'V')) {
-        e.preventDefault();
-        void pasteToPane(activePaneId);
-        return;
-      }
-
-      // P5: Ctrl+Shift+T 切换主题(ligh/dark/system 循环)
-      if (isMeta && !isAlt && isShift && (key === 't' || key === 'T')) {
-        e.preventDefault();
-        const modes: ThemeMode[] = ['light', 'dark', 'system'];
-        const cur = useThemeStore.getState().mode;
-        const next = modes[(modes.indexOf(cur) + 1) % modes.length];
-        useThemeStore.getState().setMode(next);
-        useSettingsStore.getState().setTheme(next);
-        return;
-      }
-
-      // G012: Ctrl+Z 撤销 / Ctrl+Shift+Z 重做
-      if (isMeta && !isAlt && !isShift && (key === 'z' || key === 'Z')) {
-        e.preventDefault();
-        void (async () => {
-          const r = await window.tabula.fs.undo();
-          if (r.ok && r.data) {
-            showToast(`已撤销: ${r.data.label}`, 'info', 2000);
-          }
-        })();
-        return;
-      }
-      if (isMeta && !isAlt && isShift && (key === 'z' || key === 'Z')) {
-        e.preventDefault();
-        void (async () => {
-          const r = await window.tabula.fs.redo();
-          if (r.ok && r.data) {
-            showToast(`已重做: ${r.data.label}`, 'info', 2000);
-          }
-        })();
-        return;
-      }
-
-      // G002: Ctrl+Shift+I 反选
-      if (isMeta && !isAlt && isShift && (key === 'i' || key === 'I')) {
-        e.preventDefault();
-        runCommandById('file.invert-selection');
-        return;
-      }
-
-      // P7: F12 打开开发者工具
-      if (key === 'F12') {
-        e.preventDefault();
-        void window.tabula.app.openDevTools();
-        return;
-      }
-
-      // P3: Ctrl+D 复制到当前 pane 同级目录(duplicate)
-      if (isMeta && !isAlt && !isShift && (key === 'd' || key === 'D')) {
-        e.preventDefault();
-        const data = useFileStore.getState().panes[activePaneId];
-        const selected = data?.selectedPaths ?? new Set<string>();
-        if (selected.size === 0) {
-          showToast('未选中任何项', 'warn', 1500);
-          return;
-        }
-        if (selected.size > 1) {
-          showToast('复制到同级目录仅支持单选', 'warn', 1500);
-          return;
-        }
-        const srcPath = Array.from(selected)[0]!;
-        const destDir = parentPath(srcPath);
-        if (!destDir) {
-          showToast('无法确定目标目录', 'error', 1500);
-          return;
-        }
-        void performBulk([srcPath], destDir, 'copy', activePaneId);
-        return;
-      }
-
-      // P3: F2 重命名
-      if (key === 'F2') {
-        e.preventDefault();
-        const data = useFileStore.getState().panes[activePaneId];
-        const selected = data?.selectedPaths ?? new Set<string>();
-        const cursor = data?.cursorPath ?? null;
-        if (selected.size === 0 && !cursor) return;
-        if (selected.size > 1) {
-          showToast('重命名仅支持单选', 'warn', 2000);
-          return;
-        }
-        const target = cursor ?? Array.from(selected)[0];
-        if (target) beginRename(activePaneId, target);
-        return;
-      }
-
-      // P3: Delete 删除到回收站
-      if (key === 'Delete' && !isShift) {
-        e.preventDefault();
-        const data = useFileStore.getState().panes[activePaneId];
-        const selected = data?.selectedPaths ?? new Set<string>();
-        if (selected.size === 0) return;
-        window.dispatchEvent(
-          new CustomEvent('tabula:confirm-delete', {
-            detail: { paneId: activePaneId, count: selected.size },
-          }),
-        );
-        return;
-      }
-
-      // P3: Shift+Delete 永久删除(确认)
-      if (isShift && key === 'Delete') {
-        e.preventDefault();
-        const data = useFileStore.getState().panes[activePaneId];
-        const selected = data?.selectedPaths ?? new Set<string>();
-        if (selected.size === 0) return;
-        setConfirmPermanentDelete({
-          paneId: activePaneId,
-          count: selected.size,
-          paths: Array.from(selected),
-        });
-        return;
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [
-    pathBarOpen,
-    openPathBar,
-    refresh,
-    selectAll,
-    clearSelection,
-    activePaneId,
-    activeSelected,
-    newFolderOpen,
-    newFileOpen,
-    confirmDeleteOpen,
-    openGlobalSearch,
-  ]);
+    window.addEventListener('keydown', handleShortcutKeyDown, true);
+    return () => window.removeEventListener('keydown', handleShortcutKeyDown, true);
+  }, []);
 
   const renderLayout = useMemo(() => {
     if (!hydrated) return null;
@@ -892,76 +493,4 @@ function findPaneInLayout(node: LayoutNode, paneId: string): LayoutNode | null {
     if (r) return r;
   }
   return null;
-}
-
-function containsPane(node: LayoutNode, paneId: string): boolean {
-  if (node.type === 'pane') return node.id === paneId;
-  return node.children.some((c) => containsPane(c, paneId));
-}
-
-function findFirstPane(node: LayoutNode): string | null {
-  if (node.type === 'pane') return node.id;
-  for (const c of node.children) {
-    const r = findFirstPane(c);
-    if (r) return r;
-  }
-  return null;
-}
-
-/** 找相邻 pane(沿 split 走,嵌套时递归) */
-function findNeighborPane(
-  root: LayoutNode,
-  activePaneId: string,
-  dir: 'left' | 'right' | 'up' | 'down',
-): string | null {
-  if (root.type === 'pane') return null;
-  const idx = root.children.findIndex((c) => containsPane(c, activePaneId));
-  if (idx < 0) return null;
-  const isHoriz = dir === 'left' || dir === 'right';
-  const wantAxis: 'horizontal' | 'vertical' = isHoriz ? 'horizontal' : 'vertical';
-  if (root.dir !== wantAxis) {
-    return findNeighborPane(root.children[idx]!, activePaneId, dir);
-  }
-  let targetIdx = -1;
-  if (dir === 'left' || dir === 'up') targetIdx = idx - 1;
-  else targetIdx = idx + 1;
-  if (targetIdx < 0 || targetIdx >= root.children.length) return null;
-  return findFirstPane(root.children[targetIdx]!);
-}
-
-/**
- * 找焦点 pane 的「最近 split 祖先」(直接父节点就是 split 时返回,否则继续往上)。
- * - 顶层就是单个 pane 时返回 null(没有可调的 split 容器)
- * - 用于 Alt+方向键 调整 split 大小
- */
-function findClosestSplitAncestor(
-  root: LayoutNode,
-  paneId: string,
-): Extract<LayoutNode, { type: 'split' }> | null {
-  if (root.type === 'pane') return null;
-  // 直接子节点里包含 paneId → 当前 root 就是最近 split 祖先
-  const directHit = root.children.some(
-    (c) => c.type === 'pane' && c.id === paneId,
-  );
-  if (directHit) return root;
-  // 否则递归到每个 child 子树
-  for (const c of root.children) {
-    if (c.type === 'pane') continue;
-    const r = findClosestSplitAncestor(c, paneId);
-    if (r) return r;
-  }
-  return null;
-}
-
-/** 工具:取父路径 */
-function parentPath(p: string): string {
-  if (!p) return '';
-  if (/^[a-zA-Z]:[\\/]?$/.test(p)) return '';
-  const m = p.match(/^(.*)[\\/]([^\\/]+)[\\/]?$/);
-  if (m) {
-    const parent = m[1];
-    if (/^[a-zA-Z]:$/.test(parent)) return parent + '\\';
-    return parent;
-  }
-  return '';
 }

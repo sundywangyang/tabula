@@ -62,7 +62,7 @@ describe('fs.copy — explicit destinations + src==dest 守卫', () => {
     expect(cpSpy).toHaveBeenCalledTimes(1);
     expect(cpSpy).toHaveBeenCalledWith('/src/a.txt', join('/dst', 'a.txt'), {
       recursive: true,
-      force: false,
+      force: false, errorOnExist: true,
     });
   });
 
@@ -76,7 +76,7 @@ describe('fs.copy — explicit destinations + src==dest 守卫', () => {
     expect(cpSpy).toHaveBeenCalledTimes(1);
     expect(cpSpy).toHaveBeenCalledWith('/src/a.txt', '/dst/a - 副本.txt', {
       recursive: true,
-      force: false,
+      force: false, errorOnExist: true,
     });
   });
 
@@ -91,11 +91,11 @@ describe('fs.copy — explicit destinations + src==dest 守卫', () => {
     expect(cpSpy).toHaveBeenCalledTimes(2);
     expect(cpSpy).toHaveBeenNthCalledWith(1, '/src/a.txt', '/dst/a-renamed.txt', {
       recursive: true,
-      force: false,
+      force: false, errorOnExist: true,
     });
     expect(cpSpy).toHaveBeenNthCalledWith(2, '/src/b.txt', join('/dst', 'b.txt'), {
       recursive: true,
-      force: false,
+      force: false, errorOnExist: true,
     });
   });
 
@@ -129,7 +129,7 @@ describe('fs.copy — explicit destinations + src==dest 守卫', () => {
     expect(cpSpy).toHaveBeenCalledWith(
       '/foo/汪琼林_深圳.jpg',
       '/foo/汪琼林_深圳 - 副本.jpg',
-      { recursive: true, force: false },
+      { recursive: true, force: false, errorOnExist: true },
     );
   });
 
@@ -150,7 +150,7 @@ describe('fs.copy — explicit destinations + src==dest 守卫', () => {
     expect(cpSpy).toHaveBeenCalledTimes(1);
     expect(cpSpy).toHaveBeenCalledWith(bSrc, join(dir, 'b.txt'), {
       recursive: true,
-      force: false,
+      force: false, errorOnExist: true,
     });
   });
 
@@ -183,7 +183,7 @@ describe('fs.copy — explicit destinations + src==dest 守卫', () => {
     expect(res.ok).toBe(true);
     expect(cpSpy).toHaveBeenCalledWith('/src/a.txt', join('/dst', 'a.txt'), {
       recursive: true,
-      force: true,
+      force: true, errorOnExist: false,
     });
   });
 
@@ -196,7 +196,7 @@ describe('fs.copy — explicit destinations + src==dest 守卫', () => {
     expect(res.ok).toBe(true);
     expect(cpSpy).toHaveBeenCalledWith('/src/a.txt', join('/dst', 'a.txt'), {
       recursive: true,
-      force: false,
+      force: false, errorOnExist: true,
     });
   });
 

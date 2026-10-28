@@ -276,6 +276,13 @@ export function PreviewPanel() {
 
     const run = async () => {
       try {
+        if (initialKind === 'rtf') {
+          const result = await window.tabula.fs.readRtf(entry.path);
+          if (cancelled) return;
+          if (!result.ok) setPreviewError(result.error.message);
+          else setPreviewData({ text: result.data });
+          return;
+        }
         // 图片 / 视频 / 音频 / PDF / 字体 / 压缩包 → 走 binary 路径(blob URL)
         if (
           initialKind === 'image' ||
@@ -286,8 +293,7 @@ export function PreviewPanel() {
           initialKind === 'archive' ||
           initialKind === 'docx' ||
           initialKind === 'xlsx' ||
-          initialKind === 'pptx' ||
-          initialKind === 'rtf'
+          initialKind === 'pptx'
         ) {
           const maxBytes =
             initialKind === 'image' ? IMAGE_MAX_BYTES
@@ -297,7 +303,6 @@ export function PreviewPanel() {
             : initialKind === 'docx' ? DOCX_MAX_BYTES
             : initialKind === 'xlsx' ? XLSX_MAX_BYTES
             : initialKind === 'pptx' ? PPTX_MAX_BYTES
-            : initialKind === 'rtf' ? DOCX_MAX_BYTES
             : MEDIA_MAX_BYTES;
           if (entry.size > maxBytes) {
             const label =
@@ -309,7 +314,6 @@ export function PreviewPanel() {
               : initialKind === 'docx' ? 'Word 文档'
               : initialKind === 'xlsx' ? 'Excel 表格'
               : initialKind === 'pptx' ? 'PowerPoint 演示'
-              : initialKind === 'rtf' ? 'RTF 文档'
               : 'PDF';
             setPreviewError(
               `${label}过大 (${formatSize(entry.size)}),无法预览(>${formatSize(maxBytes)} 拒绝加载)。`,
@@ -556,8 +560,8 @@ export function PreviewPanel() {
               {kind === 'pptx' && preview.blobUrl && (
                 <PptxView url={preview.blobUrl} />
               )}
-              {kind === 'rtf' && preview.blobUrl && (
-                <RtfView url={preview.blobUrl} />
+              {kind === 'rtf' && preview.text !== null && (
+                <RtfView html={preview.text} />
               )}
               {kind === 'video' && preview.blobUrl && (
                 <MediaView url={preview.blobUrl} kind="video" />
@@ -803,47 +807,10 @@ function formatDuration(seconds: number): string {
 // =================== RTF 文档 ===================
 
 /**
- * 用 @iarna/rtf-to-html 把 RTF 转 HTML 渲染. dynamic import (~30KB).
+ * 主进程使用 Node RTF 转换器生成 HTML,渲染端只负责显示。
  * 限制: 嵌入图/复杂表格/页眉页脚 不可见 (rtf-to-html 局限).
  */
-function RtfView({ url }: { url: string }) {
-  const [html, setHtml] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setHtml(null);
-    setError(null);
-    void (async () => {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`fetch ${res.status}`);
-        const ab = await res.arrayBuffer();
-        if (cancelled) return;
-        // rtf-to-html 期望 string/Buffer, 用 TextDecoder 把 ArrayBuffer 转 str
-        const str = new TextDecoder('utf-8').decode(new Uint8Array(ab));
-        const { default: rtfToHtml } = await import('@iarna/rtf-to-html');
-        const result = await rtfToHtml.fromString(str, (err: Error) => { /* 收集 warn */ });
-        if (cancelled) return;
-        setHtml(result);
-      } catch (err) {
-        if (!cancelled) setError(String((err as Error).message ?? err));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [url]);
-
-  if (error) {
-    return (
-      <div className="preview-error">
-        <div className="error-icon">⚠</div>
-        <div className="error-message">RTF 解析失败: {error}</div>
-      </div>
-    );
-  }
-  if (html === null) {
-    return <div className="preview-loading"><div className="loading-spinner" /><div>解析中…</div></div>;
-  }
+function RtfView({ html }: { html: string }) {
   return (
     <div
       className="preview-rtf-wrap"

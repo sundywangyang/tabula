@@ -86,6 +86,8 @@ export interface MoveOrCopyRequest {
   sources: string[];
   destination: string;
   overwrite?: boolean;
+  /** Per-source conflict decisions when a batch mixes overwrite and keep-both. */
+  overwrites?: boolean[];
   /**
    * 可选:与 sources 一一对应的完整目标路径(用于在粘贴到同目录时
    * 显式指定 `- 副本` 后缀的新名)。

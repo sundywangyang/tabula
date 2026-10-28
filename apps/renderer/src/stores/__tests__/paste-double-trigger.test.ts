@@ -39,7 +39,7 @@ describe('Ctrl+C/X/V 单 handler 回归', () => {
     expect(fileListSrc).not.toMatch(/isMeta[\s\S]{0,80}['"]v['"]\s*\|\|\s*path\s*===\s*['"]V['"]/);
   });
 
-  it('FileList.tsx 应仍处理 Ctrl+A 全选(file-list 局部)', () => {
-    expect(fileListSrc).toMatch(/isMeta[\s\S]{0,80}['"]a['"]\s*\|\|\s*path\s*===\s*['"]A['"]/);
+  it('Ctrl+A 也由全局配置绑定处理,FileList 不重复处理', () => {
+    expect(fileListSrc).not.toMatch(/isMeta[\s\S]{0,80}['"]a['"]\s*\|\|\s*path\s*===\s*['"]A['"]/);
   });
 });

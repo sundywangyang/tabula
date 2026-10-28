@@ -16,11 +16,14 @@
 export const IpcChannels = {
   // 文件系统
   FS_LIST_DIR: 'fs:list-dir',
+  FS_CHANGED: 'fs:changed',
   FS_READ_FILE: 'fs:read-file',
+  FS_READ_RTF: 'fs:read-rtf',
   FS_WRITE_FILE: 'fs:write-file',
   FS_GET_THUMBNAIL: 'fs:get-thumbnail',
   FS_DELETE: 'fs:delete',
   FS_RENAME: 'fs:rename',
+  FS_BATCH_RENAME: 'fs:batch-rename',
   FS_MOVE: 'fs:move',
   FS_COPY: 'fs:copy',
   FS_MKDIR: 'fs:mkdir',

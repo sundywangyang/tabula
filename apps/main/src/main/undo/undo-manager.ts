@@ -102,6 +102,7 @@ export interface UndoOperation {
   timestamp: number;
   do: () => Promise<void>;
   undo: () => Promise<void>;
+  dispose?: () => void | Promise<void>;
 }
 
 /** UndoOperation 的对外展示形态(IPC 跨进程 + UI 用) */
@@ -130,37 +131,68 @@ export class UndoManager {
   private stack: UndoOperation[] = [];
   private redoStack: UndoOperation[] = [];
   private readonly maxSize: number;
+  private pending: Promise<unknown> = Promise.resolve();
+  private disposals = new Set<Promise<void>>();
 
   constructor(maxSize = 100) {
     this.maxSize = maxSize;
   }
 
   /** 执行 op 并入栈。do 失败时不上栈,redo 栈也不会被清空。 */
-  async execute(op: UndoOperation): Promise<void> {
-    await op.do();
-    this.stack.push(op);
-    if (this.stack.length > this.maxSize) {
-      this.stack.shift();
-    }
-    this.redoStack = [];
+  execute(op: UndoOperation): Promise<void> {
+    return this.enqueue(async () => {
+      // Failed operations retain any recovery backup instead of discarding it.
+      await op.do();
+      this.stack.push(op);
+      if (this.stack.length > this.maxSize) this.dispose(this.stack.shift());
+      for (const discarded of this.redoStack) this.dispose(discarded);
+      this.redoStack = [];
+    });
   }
 
   /** 弹栈 → undo → 推到 redo 栈。空栈返回 null。 */
-  async undo(): Promise<UndoOperation | null> {
-    const op = this.stack.pop();
-    if (!op) return null;
-    await op.undo();
-    this.redoStack.push(op);
-    return op;
+  undo(): Promise<UndoOperation | null> {
+    return this.enqueue(async () => {
+      const op = this.stack.at(-1);
+      if (!op) return null;
+      await op.undo();
+      this.stack.pop();
+      this.redoStack.push(op);
+      return op;
+    });
   }
 
   /** 弹 redo 栈 → do → 推回 undo 栈。空栈返回 null。 */
-  async redo(): Promise<UndoOperation | null> {
-    const op = this.redoStack.pop();
-    if (!op) return null;
-    await op.do();
-    this.stack.push(op);
-    return op;
+  redo(): Promise<UndoOperation | null> {
+    return this.enqueue(async () => {
+      const op = this.redoStack.at(-1);
+      if (!op) return null;
+      await op.do();
+      this.redoStack.pop();
+      this.stack.push(op);
+      return op;
+    });
+  }
+
+  /** Serialize file mutations with undo/redo, including irreversible operations. */
+  enqueue<T>(action: () => Promise<T>): Promise<T> {
+    const next = this.pending.then(action);
+    this.pending = next.catch(() => undefined);
+    return next;
+  }
+
+  private dispose(op: UndoOperation | undefined): void {
+    if (!op?.dispose) return;
+    const pending = Promise.resolve().then(op.dispose).catch(console.warn);
+    this.disposals.add(pending);
+    void pending.finally(() => this.disposals.delete(pending));
+  }
+
+  disposeAll(): Promise<void> {
+    return this.enqueue(async () => {
+      this.clear();
+      await Promise.all(this.disposals);
+    });
   }
 
   /** 当前两个栈的浅拷贝快照(不暴露 do/undo 闭包) */
@@ -183,6 +215,7 @@ export class UndoManager {
 
   /** 清空两个栈(例如应用启动重置 / 用户主动 clear) */
   clear(): void {
+    for (const op of [...this.stack, ...this.redoStack]) this.dispose(op);
     this.stack = [];
     this.redoStack = [];
   }

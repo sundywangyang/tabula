@@ -4,6 +4,7 @@
 import { promises as fs } from 'node:fs';
 import { join, basename } from 'node:path';
 import type { MoveOrCopyRequest, Result } from '@tabula/bridge';
+import { assertAbsent, samePath } from './path-safety';
 
 function mapError(err: unknown, path?: string): Result<never> {
   const e = err as NodeJS.ErrnoException;
@@ -24,14 +25,16 @@ export async function copy(req: MoveOrCopyRequest): Promise<Result<void>> {
       const dest = explicitDests[i] ?? join(req.destination, basename(src));
       // 守卫:如果 dest 与 src 完全相同,跳过(否则 fs.cp 抛 EINVAL)。
       // 这覆盖了同目录粘贴的边界情况。
-      if (dest === src) {
+      if (samePath(dest, src)) {
         // eslint-disable-next-line no-console
         console.error('[fs-copy] skipping (src==dest):', JSON.stringify(src));
         continue;
       }
       // eslint-disable-next-line no-console
       console.error('[fs-copy] copying', JSON.stringify(src), '->', JSON.stringify(dest));
-      await fs.cp(src, dest, { recursive: true, force: req.overwrite ?? false });
+      const overwrite = req.overwrites?.[i] ?? req.overwrite ?? false;
+      if (!overwrite) await assertAbsent(dest);
+      await fs.cp(src, dest, { recursive: true, force: overwrite, errorOnExist: !overwrite });
       // eslint-disable-next-line no-console
       console.error('[fs-copy] success:', dest);
     } catch (err) {

@@ -21,6 +21,7 @@ import type {
 } from '@tabula/bridge';
 import { useLayoutStore } from './layout-store';
 import { getCachedRootPath } from '../platform-cache';
+export { makeFolderTab } from './folder-tab';
 
 export interface BreadcrumbSegment {
   name: string;
@@ -716,6 +717,18 @@ export function groupEntries(entries: FsEntry[], mode: GroupByMode): GroupSectio
 // =================== Store ===================
 
 export const useFileStore = create<FileStore>((set, get) => {
+  let nextDirectoryRequest = 0;
+  const directoryRequests = new Map<string, number>();
+  const refreshAffected = async (sources: string[], destination: string) => {
+    const normalize = (path: string) => {
+      const normalized = path.replace(/[\\/]+/g, '/').replace(/\/$/, '');
+      return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
+    };
+    const directories = new Set([destination, ...sources.map(parentPath)].map(normalize));
+    await Promise.all(Object.entries(get().panes)
+      .filter(([, data]) => directories.has(normalize(data.currentPath)))
+      .map(([id]) => get().refresh(id)));
+  };
 
   return {
     // 视图(共享)
@@ -777,6 +790,8 @@ export const useFileStore = create<FileStore>((set, get) => {
     // ============ Pane 数据生命周期 ============
     ensurePane: async (paneId) => {
       if (!get().panes[paneId]) {
+        // Publish the shell before awaiting configuration, so concurrent loads share it.
+        set((s) => ({ panes: { ...s.panes, [paneId]: emptyPaneData() } }));
         // 尝试从持久化配置读 viewMode 默认值(没有则用 'details')
         let defaultView: ViewMode = 'details';
         try {
@@ -785,16 +800,16 @@ export const useFileStore = create<FileStore>((set, get) => {
         } catch {
           /* noop */
         }
-        set({
-          panes: {
-            ...get().panes,
-            [paneId]: { ...emptyPaneData(), viewMode: defaultView },
-          },
+        set((s) => {
+          const data = s.panes[paneId];
+          if (!data || data.viewMode !== 'details') return s;
+          return { panes: { ...s.panes, [paneId]: { ...data, viewMode: defaultView } } };
         });
       }
     },
 
     removePaneData: (paneId) => {
+      directoryRequests.delete(paneId);
       set((s) => {
         if (!(paneId in s.panes)) return s;
         const next = { ...s.panes };
@@ -805,6 +820,8 @@ export const useFileStore = create<FileStore>((set, get) => {
 
     // ============ 目录 ============
     loadDir: async (paneId, path) => {
+      const request = ++nextDirectoryRequest;
+      directoryRequests.set(paneId, request);
       // 无 active tab 时自动建一个 tab 再加载
       const layout = useLayoutStore.getState();
       const paneNode = findPaneInLayout(layout.rootLayout, paneId);
@@ -831,6 +848,7 @@ export const useFileStore = create<FileStore>((set, get) => {
             loading: true,
             error: null,
             currentPath: path,
+             entries: [],
             breadcrumb: pathToBreadcrumb(path),
             selectedPaths: new Set(),
             cursorPath: null,
@@ -841,7 +859,13 @@ export const useFileStore = create<FileStore>((set, get) => {
           },
         },
       }));
-      const result = await window.tabula.fs.listDir(path);
+      let result;
+      try {
+        result = await window.tabula.fs.listDir(path);
+      } catch (error) {
+        result = { ok: false as const, error: { message: String(error) } };
+      }
+      if (directoryRequests.get(paneId) !== request || get().panes[paneId]?.currentPath !== path) return;
       if (result.ok) {
         set((s) => ({
           panes: {
@@ -862,19 +886,27 @@ export const useFileStore = create<FileStore>((set, get) => {
     refresh: async (paneId) => {
       const data = get().panes[paneId];
       if (!data || !data.currentPath) return;
-      const result = await window.tabula.fs.listDir(data.currentPath);
+      const request = ++nextDirectoryRequest;
+      directoryRequests.set(paneId, request);
+      let result;
+      try {
+        result = await window.tabula.fs.listDir(data.currentPath);
+      } catch (error) {
+        result = { ok: false as const, error: { message: String(error) } };
+      }
+      if (directoryRequests.get(paneId) !== request || get().panes[paneId]?.currentPath !== data.currentPath) return;
       if (result.ok) {
         set((s) => ({
           panes: {
             ...s.panes,
-            [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), entries: result.data.entries, error: null, selectedPaths: new Set() },
+            [paneId]: { ...s.panes[paneId], entries: result.data.entries, loading: false, error: null, selectedPaths: new Set() },
           },
         }));
       } else {
         set((s) => ({
           panes: {
             ...s.panes,
-            [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), error: result.error.message },
+            [paneId]: { ...s.panes[paneId], loading: false, error: result.error.message },
           },
         }));
       }
@@ -1327,7 +1359,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       }
       set({ pathBarOpen: false, pathBarValue: '', pathBarError: null, pathBarCompletions: [] });
       if (pathBarTargetPaneId) {
-        await get().loadDir(pathBarTargetPaneId, target);
+        await useLayoutStore.getState().pane.navigate(pathBarTargetPaneId, target);
       }
     },
 
@@ -1393,17 +1425,7 @@ export const useFileStore = create<FileStore>((set, get) => {
         return;
       }
       const mode: 'copy' | 'move' = cb.mode === 'cut' ? 'move' : 'copy';
-      const result = await get().performBulk(cb.paths, destDir, mode, paneId);
-      if (result.ok) {
-        // 复制/移动完成后刷新目标 pane 列表
-        await get().loadDir(paneId, destDir);
-        // 若源 pane 与目标 pane 不同，刷新源 pane（move 时清剪贴板后可看到源目录变化）
-        const srcPaneId = cb.sourcePaneId;
-        if (srcPaneId && srcPaneId !== paneId) {
-          const srcPath = get().getPanePath(srcPaneId);
-          if (srcPath) await get().loadDir(srcPaneId, srcPath);
-        }
-      }
+      await get().performBulk(cb.paths, destDir, mode, paneId);
     },
 
     // ============ P3: 拖放 ============
@@ -1488,7 +1510,7 @@ export const useFileStore = create<FileStore>((set, get) => {
         if (!e) continue;
         if (e.isDirectory) {
           // 目录:在当前 pane 加载(P3 简化:不新开 tab;v2 可加 openInNewTab 选项)
-          await get().loadDir(paneId, e.path);
+          await useLayoutStore.getState().pane.navigate(paneId, e.path);
           break; // 一次只切一个(选中多目录只切第一个)
         } else {
           void window.tabula.fs.openPath(e.path);
@@ -1535,20 +1557,19 @@ export const useFileStore = create<FileStore>((set, get) => {
         pc.resolved.push({ source: head.sourcePath, dest: head.destPath, overwrite: true });
         pc.queue.shift();
       } else if (resolution === 'rename') {
-        // 受限于 fs.copy/move 现有 API(只能指定目标 dir,不能指定新文件名),
-        // v1 简化:rename 实际走"两步法"——先复制到 destDir(basename)后重命名。
-        // 但要避免覆盖现有同名文件,所以先做 fs.copy(overwrite=false),失败时
-        // 退化为"skip + 提示用户重命名后重试"。
-        // 为了保证可以重命名,先 fs.copy 到 destDir(假设 destDir 中没有同名;
-        // 但我们已知有冲突),所以这里我们先 fs.copy 到一个临时后缀名?
-        // 不行:我们没有 temp API。
-        // 简化:rename 等价于 skip + 提示(P3 v1 妥协)。
+        const name = newName?.trim() ?? '';
+        if (!name || name === '.' || name === '..' || /[\\/\0]/.test(name)) {
+          get().showToast('请输入有效的文件名', 'error');
+          return;
+        }
+        const dest = joinPath(head.destDir, name);
+        const reserved = [...pc.autoResolved, ...pc.resolved].some((op) => op.dest.toLowerCase() === dest.toLowerCase());
+        if (reserved || await window.tabula.fs.exists(dest)) {
+          get().showToast(`已存在同名项: ${name}`, 'error');
+          return;
+        }
+        pc.resolved.push({ source: head.sourcePath, dest, overwrite: false });
         pc.queue.shift();
-        get().showToast(
-          `「${head.sourceName}」:重命名选项暂用「跳过」处理。请粘贴后手动重命名。`,
-          'info',
-          3500,
-        );
       }
 
       // 没有更多冲突,执行批量
@@ -1568,32 +1589,20 @@ export const useFileStore = create<FileStore>((set, get) => {
         try {
           let success = 0;
           let firstError: string | null = null;
-          for (const op of allOps) {
-            if (op.dest === op.source) continue;
-            if (pc.mode === 'copy') {
-              const r = await window.tabula.fs.copy({
-                sources: [op.source],
-                destination: head.destDir,
-                // 透传 op.dest,避免主进程重新 join() 算出 src===dest 触发 EINVAL。
-                destinations: [op.dest],
-                overwrite: op.overwrite,
-              });
-              if (r.ok) success++;
-              else if (!firstError) firstError = r.error.message;
-            } else {
-              const r = await window.tabula.fs.move({
-                sources: [op.source],
-                destination: head.destDir,
-                destinations: [op.dest],
-              });
-              if (r.ok) success++;
-              else if (!firstError) firstError = r.error.message;
-            }
-          }
+          const operations = allOps.filter((op) => op.dest !== op.source);
+          const request = {
+            sources: operations.map((op) => op.source),
+            destination: pc.destinationDir,
+            destinations: operations.map((op) => op.dest),
+            overwrites: operations.map((op) => op.overwrite),
+          };
+          const result = await window.tabula.fs[pc.mode === 'copy' ? 'copy' : 'move'](request);
+          if (result.ok) success = operations.length;
+          else firstError = result.error.message;
           get().setProgress(null);
           if (pc.mode === 'move') {
             const cb = get().clipboard;
-            if (cb && cb.mode === 'cut') set({ clipboard: null });
+            if (!firstError && cb?.mode === 'cut' && cb.paths.every((path) => pc.sources.includes(path))) set({ clipboard: null });
           }
           if (firstError) {
             get().showToast(
@@ -1604,10 +1613,7 @@ export const useFileStore = create<FileStore>((set, get) => {
           } else {
             get().showToast(`已${verb} ${success} 项`, 'success', 2500);
           }
-          // 冲突全部解决后刷新目标 pane
-          if (pc.paneId) {
-            void get().loadDir(pc.paneId, pc.destinationDir);
-          }
+          await refreshAffected(pc.sources, pc.destinationDir);
         } catch (e) {
           get().setProgress(null);
           get().showToast(`${verb}失败: ${String(e)}`, 'error', 4000);
@@ -2036,28 +2042,16 @@ export const useFileStore = create<FileStore>((set, get) => {
       try {
         let success = 0;
         let firstError: string | null = null;
-        for (const op of autoResolved) {
-                   if (mode === 'copy') {
-            const r = await window.tabula.fs.copy({
-              sources: [op.source],
-              destination: destDir,
-              // 透传 op.dest:performBulk 可能把同目录的 src 重命名成 `xxx - 副本.jpg`。
-              // 主进程优先用 destinations[i],避免重新 join() 后 src===dest 触发 EINVAL。
-              destinations: [op.dest],
-              overwrite: op.overwrite,
-            });
-            if (r.ok) success++;
-            else if (!firstError) firstError = r.error.message;
-          } else {
-            const r = await window.tabula.fs.move({
-              sources: [op.source],
-              destination: destDir,
-              destinations: [op.dest],
-            });
-            if (r.ok) success++;
-            else if (!firstError) firstError = r.error.message;
-          }
-        }
+        const request = {
+          sources: autoResolved.map((op) => op.source),
+          destination: destDir,
+          // 透传 op.dest, including generated keep-both names. One batch creates one undo entry.
+          destinations: autoResolved.map((op) => op.dest),
+          overwrites: autoResolved.map((op) => op.overwrite),
+        };
+        const result = await window.tabula.fs[mode === 'copy' ? 'copy' : 'move'](request);
+        if (result.ok) success = autoResolved.length;
+        else firstError = result.error.message;
         get().setProgress(null);
         if (firstError) {
           get().showToast(`${verb}失败: ${firstError} (成功 ${success}/${autoResolved.length})`, 'error', 4000);
@@ -2066,12 +2060,9 @@ export const useFileStore = create<FileStore>((set, get) => {
           get().showToast(`已${verb} ${success} 项`, 'success', 2500);
           if (mode === 'move') {
             const cb = get().clipboard;
-            if (cb && cb.mode === 'cut') set({ clipboard: null });
+            if (cb?.mode === 'cut' && cb.paths.every((path) => sources.includes(path))) set({ clipboard: null });
           }
-          // 完成后刷新目标 pane（移动时源 pane 由 pasteToPane 层级处理）
-          if (paneId) {
-            void get().loadDir(paneId, destDir);
-          }
+          await refreshAffected(sources, destDir);
           return { ok: true, moved: success };
         }
       } catch (e) {
@@ -2307,22 +2298,6 @@ export const useFileStore = create<FileStore>((set, get) => {
     },
   };
 });
-
-/** 工具: 构造一个新的 folder tab */
-export function makeFolderTab(path: string, title?: string): import('@tabula/bridge').Tab {
-  const id = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const name = basename(path) || path;
-  return {
-    id,
-    type: 'folder',
-    path,
-    title: title ?? name,
-    pinned: false,
-    closable: true,
-    history: path ? [path] : [],
-    historyIndex: path ? 0 : -1,
-  };
-}
 
 /** 工具: 在 layout 树里查找 pane 节点 */
 function findPaneInLayout(

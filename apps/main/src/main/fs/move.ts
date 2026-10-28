@@ -6,6 +6,7 @@
 import { promises as fs } from 'node:fs';
 import { join, basename } from 'node:path';
 import type { MoveOrCopyRequest, Result } from '@tabula/bridge';
+import { assertAbsent, samePath } from './path-safety';
 
 function mapError(err: unknown, path?: string): Result<never> {
   const e = err as NodeJS.ErrnoException;
@@ -23,25 +24,28 @@ export async function move(req: MoveOrCopyRequest): Promise<Result<void>> {
     // 优先用显式 dest(透传渲染端可能生成的重命名);缺省时回退默认行为。
     const dest = explicitDests[i] ?? join(req.destination, basename(src));
     // 守卫:src===dest 时直接跳过(rename 自己到自己会抛,cp 也会 EINVAL)。
-    if (dest === src) {
+    if (samePath(dest, src)) {
       // eslint-disable-next-line no-console
       console.error('[fs-move] skipping (src==dest):', JSON.stringify(src));
       continue;
     }
-    let renamed = false;
     try {
-      await fs.rename(src, dest);
-      renamed = true;
-    } catch {
-      // rename 跨盘失败，降级到 copy + delete
-    }
-    if (!renamed) {
+      const overwrite = req.overwrites?.[i] ?? req.overwrite ?? false;
+      if (!overwrite) await assertAbsent(dest);
       try {
-        await fs.cp(src, dest, { recursive: true });
-        await fs.rm(src, { recursive: true, force: true });
+        await fs.rename(src, dest);
       } catch (err) {
-        return mapError(err, src);
+        // Permission errors and name conflicts must never turn into destructive copies.
+        if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+        await fs.cp(src, dest, {
+          recursive: true,
+          force: overwrite,
+          errorOnExist: !overwrite,
+        });
+        await fs.rm(src, { recursive: true, force: true });
       }
+    } catch (err) {
+      return mapError(err, src);
     }
   }
   return { ok: true, data: undefined };

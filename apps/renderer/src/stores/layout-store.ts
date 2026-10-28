@@ -30,7 +30,8 @@
  */
 import { create } from 'zustand';
 import type { LayoutNode, SplitDirection, Tab } from '@tabula/bridge';
-import { useFileStore, makeFolderTab } from './file-store';
+import { useFileStore } from './file-store';
+import { makeFolderTab } from './folder-tab';
 import { getCachedRootPath } from '../platform-cache';
 
 const PERSIST_KEY = 'layoutV1';
@@ -81,7 +82,7 @@ interface LayoutStore {
     closeActivePane(): void;
     goBack(paneId: string): void;
     goForward(paneId: string): void;
-    navigate(paneId: string, path: string): void; // 当前 active tab 跳路径
+    navigate(paneId: string, path: string): Promise<void>; // 当前 active tab 跳路径
     replaceTabPath(paneId: string, tabId: string, path: string): void;
     /**
      * 克隆 tab: 拷贝 source tab 全部字段, 生成新 id, 插入到 source tab 紧邻的下一个位置,
@@ -666,7 +667,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           return { ...p, tabs: newTabs };
         });
         setState({ rootLayout: newRoot });
-        void useFileStore.getState().loadDir(paneId, path);
+        return useFileStore.getState().loadDir(paneId, path);
       },
 
       replaceTabPath: (paneId, tabId, path) => {

@@ -161,4 +161,45 @@ describe('UndoManager (G012)', () => {
     expect(snap.undo).toHaveLength(0);
     expect(snap.redo).toHaveLength(0);
   });
+
+  it('keeps a failed undo on the original stack', async () => {
+    const mgr = new UndoManager();
+    const op = makeOp(async () => undefined, async () => { throw new Error('changed'); });
+    await mgr.execute(op);
+    await expect(mgr.undo()).rejects.toThrow('changed');
+    expect(mgr.getUndoSize()).toBe(1);
+    expect(mgr.getRedoSize()).toBe(0);
+  });
+
+  it('keeps a failed redo available for retry', async () => {
+    const mgr = new UndoManager();
+    let fail = false;
+    const op = makeOp(async () => { if (fail) throw new Error('blocked'); });
+    await mgr.execute(op); await mgr.undo(); fail = true;
+    await expect(mgr.redo()).rejects.toThrow('blocked');
+    expect(mgr.getRedoSize()).toBe(1);
+    expect(mgr.getUndoSize()).toBe(0);
+  });
+
+  it('serializes mutations and an undo requested while the mutation is still pending', async () => {
+    const mgr = new UndoManager();
+    const order: string[] = [];
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const execute = mgr.execute(makeOp(async () => { await pending; order.push('do'); }, async () => { order.push('undo'); }));
+    const undo = mgr.undo();
+    release(); await Promise.all([execute, undo]);
+    expect(order).toEqual(['do', 'undo']);
+    expect(mgr.getRedoSize()).toBe(1);
+  });
+
+  it('disposes discarded redo entries and waits for exit cleanup', async () => {
+    const mgr = new UndoManager();
+    const cleanup = vi.fn(async () => undefined);
+    const old = { ...makeOp(), dispose: cleanup };
+    await mgr.execute(old); await mgr.undo(); await mgr.execute(makeOp());
+    await mgr.disposeAll();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(mgr.getUndoSize()).toBe(0);
+  });
 });

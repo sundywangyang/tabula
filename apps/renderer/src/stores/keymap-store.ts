@@ -127,7 +127,7 @@ function isSameCombo(a: KeyCombo | null, b: KeyCombo | null): boolean {
   if (a === null && b === null) return true;
   if (a === null || b === null) return false;
   return (
-    a.key === b.key &&
+    a.key.toLowerCase() === b.key.toLowerCase() &&
     a.ctrl === b.ctrl &&
     a.alt === b.alt &&
     a.shift === b.shift &&

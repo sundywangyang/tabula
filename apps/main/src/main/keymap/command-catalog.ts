@@ -80,7 +80,23 @@ export function isReservedCombo(combo: KeyCombo | null): boolean {
  * 至少 10 个;本清单 18 个。
  */
 export const COMMAND_CATALOG: CommandSpec[] = [
+  {
+    id: 'command-palette.toggle', title: '命令面板', category: '视图',
+    defaultCombo: parseKeyCombo('Ctrl+Shift+P'), reserved: true,
+  },
+  {
+    id: 'file.undo', title: '撤销', category: '文件',
+    defaultCombo: parseKeyCombo('Ctrl+Z'), reserved: false,
+  },
+  {
+    id: 'file.redo', title: '重做', category: '文件',
+    defaultCombo: parseKeyCombo('Ctrl+Shift+Z'), reserved: false,
+  },
   // 文件
+  {
+    id: 'file.new-folder-quick', title: '新建文件夹（备用快捷键）', category: '文件',
+    defaultCombo: parseKeyCombo('Ctrl+N'), reserved: false,
+  },
   {
     id: 'file.refresh',
     title: '刷新当前目录',
@@ -372,6 +388,18 @@ export const COMMAND_CATALOG: CommandSpec[] = [
     reserved: false,
   },
   // 视图 / 搜索
+  {
+    id: 'search.global-recursive', title: '全局递归搜索', category: '视图',
+    defaultCombo: parseKeyCombo('Ctrl+Shift+F'), reserved: false,
+  },
+  {
+    id: 'pane.focus-up', title: '焦点窗格：上', category: '窗格',
+    defaultCombo: parseKeyCombo('Ctrl+Alt+ArrowUp'), reserved: false,
+  },
+  {
+    id: 'pane.focus-down', title: '焦点窗格：下', category: '窗格',
+    defaultCombo: parseKeyCombo('Ctrl+Alt+ArrowDown'), reserved: false,
+  },
   {
     id: 'search.global',
     title: '全局模糊搜索',

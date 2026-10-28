@@ -54,7 +54,7 @@ export function Shortcuts({ onChanged }: ShortcutsProps) {
 
   // 把 KeyboardEvent → KeyCombo
   const eventToCombo = useCallback((e: KeyboardEvent): KeyCombo | null => {
-    const mainKey = e.key.length === 1 ? e.key.toLowerCase() : e.key.toLowerCase();
+    const mainKey = e.key === ' ' ? 'space' : e.key.toLowerCase();
     // 修饰键自身不算主键
     if (['control', 'alt', 'shift', 'meta'].includes(mainKey)) return null;
     return {

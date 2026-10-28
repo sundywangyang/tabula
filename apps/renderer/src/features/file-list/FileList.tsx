@@ -252,7 +252,19 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           return;
         }
         // 外部文件只能 copy;move 外部文件 Electron 有安全限制
-        const paths = Array.from(files).map((f) => f.path);
+        let paths: string[];
+        try {
+          paths = Array.from(files).map((file) => window.tabula.fs.getPathForFile(file)).filter(Boolean);
+        } catch (error) {
+          endDrag();
+          showToast(`无法读取拖入文件: ${String(error)}`, 'error');
+          return;
+        }
+        if (paths.length === 0) {
+          endDrag();
+          showToast('拖入内容没有可访问的本地文件', 'warn');
+          return;
+        }
         endDrag();
         await performBulk(paths, currentPath, 'copy', paneId);
         return;
@@ -289,93 +301,10 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       const list = sortedEntries;
       if (list.length === 0) return;
 
-      const isMeta = e.ctrlKey || e.metaKey;
+      // Configurable commands are handled once by the window capture listener.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const path = e.key;
 
-      // Ctrl+C / Ctrl+X / Ctrl+V 由 App.tsx 全局 keydown 统一处理 — 不要在这里再处理,
-      // 否则会和 window-level listener 重复触发,导致:
-      // - 复制/剪切时 toast 弹 2 次
-      // - 粘贴时并发两次 performBulk,目标文件可能已被第一次创建 → 第二次失败
-      // Ctrl+A 全选是 file-list 局部动作(不影响外部),保留在这里。
-      // Ctrl+A 全选
-      if (isMeta && (path === 'a' || path === 'A')) {
-        e.preventDefault();
-        selectAll(paneId);
-        return;
-      }
-      // Esc 清空选择 / 关闭搜索栏
-      if (path === 'Escape') {
-        // 搜索栏打开时,Esc 优先由 SearchBar 处理;但 FileList 容器焦点
-        // 拿不到事件(因为 SearchBar 的 input 在事件冒泡前会 stopPropagation)。
-        // 这里再做一个兜底:如果有 selection,清空。
-        e.preventDefault();
-        if (selectedPaths.size > 0) clearSelection(paneId);
-        else closeSearch(paneId);
-        return;
-      }
-      // P4: Ctrl+F 打开当前目录搜索栏
-      if (isMeta && !e.shiftKey && !e.altKey && (path === 'f' || path === 'F')) {
-        e.preventDefault();
-        openSearch(paneId);
-        return;
-      }
-      // G006: Space 预览统一由 App.tsx 全局 keydown handler 处理
-      // (App.tsx:407-433)。这里不再处理,避免和全局 handler 抢同一个按键
-      // 导致「open 之后立即 close」的翻转,出现需要按 2 次 Space 才唤起预览的 bug。
-      // F2 重命名 — 仅在选中 1 项或光标 1 项时启用
-      if (path === 'F2') {
-        e.preventDefault();
-        const count = selectedPaths.size > 0 ? selectedPaths.size : (cursorPath ? 1 : 0);
-        if (count === 0) return;
-        if (count > 1) {
-          showToast('重命名仅支持单选(请先单选一项)', 'warn', 2000);
-          return;
-        }
-        const target = cursorPath ?? Array.from(selectedPaths)[0];
-        if (target) beginRename(paneId, target);
-        return;
-      }
-      // F5 刷新
-      if (path === 'F5') {
-        e.preventDefault();
-        void refresh(paneId);
-        return;
-      }
-      // Ctrl+Shift+N 新建文件夹
-      if (isMeta && e.shiftKey && !e.altKey && (path === 'n' || path === 'N')) {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent('tabula:new-folder', { detail: { paneId } }));
-        return;
-      }
-      // Delete / Shift+Delete (前者走回收站;后者真删,P3 简化为都走回收站)
-      if (path === 'Delete' || (e.shiftKey && (path === 'Delete' || path === 'Del'))) {
-        e.preventDefault();
-        if (selectedPaths.size === 0) return;
-        // 走全局 confirm 弹窗
-        window.dispatchEvent(
-          new CustomEvent('tabula:confirm-delete', {
-            detail: {
-              paneId,
-              count: selectedPaths.size,
-              paths: Array.from(selectedPaths),
-            },
-          }),
-        );
-        return;
-      }
-      // Enter 全部打开(多选时)
-      if (path === 'Enter') {
-        e.preventDefault();
-        if (selectedPaths.size > 1) {
-          void openSelected(paneId);
-          return;
-        }
-        const target = cursorPath ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
-        if (!target) return;
-        const entry = list.find((x) => x.path === target);
-        if (entry) onOpenEntry(entry);
-        return;
-      }
       // Home/End
       if (path === 'Home') {
         e.preventDefault();
@@ -405,7 +334,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         else if (path === 'ArrowLeft') {
           if (currentPath) {
             const parent = parentOf(currentPath);
-            if (parent) void loadDir(paneId, parent);
+            if (parent) void useLayoutStore.getState().pane.navigate(paneId, parent);
           }
         } else if (path === 'ArrowRight') {
           const target = cursorPath ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);

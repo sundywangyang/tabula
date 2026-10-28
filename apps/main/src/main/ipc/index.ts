@@ -4,9 +4,9 @@
  * 所有 ipcMain.handle 集中在这里,主进程 API 入口。
  */
 import { ipcMain, dialog, shell, app, clipboard, BrowserWindow, nativeImage } from 'electron';
-import { promises as fs } from 'node:fs';
 import { chmod } from 'node:fs/promises';
-import { join, basename } from 'node:path';
+import { rmdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
 import type {
   AppConfig,
@@ -19,6 +19,9 @@ import type {
 import { handleSetPermissions, handleCreateSymlink, handleChecksum, handleStartDrag, pickPlatformFallbackIcon } from './handlers';
 import type { WindowManager } from '../window/window-manager';
 import * as fsService from '../fs/filesystem';
+import { FileOperations } from '../fs/operations';
+import { readRtf } from '../fs/rtf';
+import { registerFileOperationHandlers } from './file-operations';
 import * as trashService from '../fs/trash';
 import * as dirSizeService from '../fs/dir-size';
 import { getThumbnail } from '../fs/thumbnail';
@@ -49,6 +52,21 @@ export interface IpcContext {
 }
 
 export function registerIpcHandlers(ctx: IpcContext) {
+  const historyDir = join(app.getPath('userData'), 'undo', `${process.pid}-${Date.now()}`);
+  const fileOperations = new FileOperations(historyDir, (path) => shell.trashItem(path));
+  // Finish queued mutations and remove history backups on normal exit. Failed recovery backups remain intact.
+  app.once('will-quit', (event) => {
+    event.preventDefault();
+    void fileOperations.history.disposeAll().finally(async () => {
+      await rmdir(historyDir).catch(() => undefined);
+      app.quit();
+    });
+  });
+  const notifyOtherWindows = (senderId: number) => {
+    for (const window of ctx.windowManager.getAllWindows()) {
+      if (!window.isDestroyed() && window.webContents.id !== senderId) window.webContents.send(IpcChannels.FS_CHANGED);
+    }
+  };
   // =================== App ===================
   ipcMain.handle(IpcChannels.APP_VERSION, () => app.getVersion());
   ipcMain.handle(IpcChannels.APP_READY, () => true);
@@ -81,58 +99,8 @@ export function registerIpcHandlers(ctx: IpcContext) {
   ipcMain.handle(IpcChannels.FS_READ_FILE, (_e, p: string, enc?: 'utf-8' | 'binary') =>
     fsService.readFile(p, enc),
   );
-  ipcMain.handle(IpcChannels.FS_WRITE_FILE, (_e, p: string, data: string | ArrayBuffer) =>
-    fsService.writeFile(p, data),
-  );
-  ipcMain.handle(IpcChannels.FS_DELETE, (_e, paths: string[], useTrash?: boolean) =>
-    fsService.deletePaths(paths, useTrash),
-  );
-  ipcMain.handle(IpcChannels.FS_RENAME, (_e, oldPath: string, newPath: string) =>
-    fsService.rename(oldPath, newPath),
-  );
-  ipcMain.handle(IpcChannels.FS_MOVE, (_e, req) => {
-    // eslint-disable-next-line no-console
-    console.error('[ipc] FS_MOVE req=', req);
-    return fsService.move(req);
-  });
-  ipcMain.handle(IpcChannels.FS_COPY, async (_e, req) => {
-    // Inline copy to avoid any req object mutation edge cases
-    const sources: string[] = req.sources;
-    const destination: string = req.destination;
-    const overwrite: boolean = req.overwrite ?? false;
-    // 显式 dest 数组(渲染端 paste 时若已生成 `- 副本` 重命名,会通过这里透传)
-    const explicitDests: ReadonlyArray<string | undefined> = req.destinations ?? [];
-    // eslint-disable-next-line no-console
-    console.error('[ipc-cp] sources=', sources, 'destination=', destination);
-    const skipped: string[] = [];
-    for (let i = 0; i < sources.length; i++) {
-      const src = sources[i];
-      // 优先用显式 dest;缺省时回退到「destination + basename(src)」,保持向后兼容。
-      // 守卫:如果计算出的 dest 与 src 完全相同,跳过(否则 fs.cp 抛 EINVAL)。
-      // 这覆盖了同目录粘贴的边界情况,以及未来任何绕过渲染端保护的调用方。
-      const dest = explicitDests[i] ?? join(destination, basename(src));
-      if (dest === src) {
-        // eslint-disable-next-line no-console
-        console.error('[ipc-cp] skipping (src==dest):', src);
-        skipped.push(src);
-        continue;
-      }
-      // eslint-disable-next-line no-console
-      console.error('[ipc-cp] copying', src, '->', dest);
-      try {
-        await fs.cp(src, dest, { recursive: true, force: overwrite });
-      } catch (err) {
-        const e = err as NodeJS.ErrnoException;
-        // eslint-disable-next-line no-console
-        console.error('[ipc-cp] ERROR:', e.code, e.message);
-        return { ok: false, error: { code: e.code ?? 'UNKNOWN', message: e.message, path: src } };
-      }
-    }
-    return { ok: true, data: undefined, skipped };
-  });
-  ipcMain.handle(IpcChannels.FS_MKDIR, (_e, p: string, name?: string) =>
-    fsService.mkdir(p, name),
-  );
+  ipcMain.handle(IpcChannels.FS_READ_RTF, (_e, p: string) => readRtf(p));
+  registerFileOperationHandlers(ipcMain.handle.bind(ipcMain), fileOperations);
   ipcMain.handle(IpcChannels.FS_EXISTS, (_e, p: string) => fsService.exists(p));
   ipcMain.handle(IpcChannels.FS_STAT, (_e, p: string) => fsService.stat(p));
 
@@ -457,9 +425,10 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // 弹栈 → 执行 op.undo() → 推到 redo 栈。
   // 空栈时返回 { ok: true, data: null }(渲染端 Ctrl+Z 没东西时静默 noop)。
   // op.undo() 抛错 → 包成 IO_ERROR Result。
-  ipcMain.handle(IpcChannels.UNDO_UNDO, async () => {
+  ipcMain.handle(IpcChannels.UNDO_UNDO, async (event) => {
     try {
       const op = await undoManager.undo();
+      if (op) notifyOtherWindows(event.sender.id);
       return {
         ok: true,
         data: op ? { id: op.id, label: op.label, timestamp: op.timestamp } : null,
@@ -469,9 +438,10 @@ export function registerIpcHandlers(ctx: IpcContext) {
       return { ok: false, error: { code: 'IO_ERROR', message: e.message } };
     }
   });
-  ipcMain.handle(IpcChannels.UNDO_REDO, async () => {
+  ipcMain.handle(IpcChannels.UNDO_REDO, async (event) => {
     try {
       const op = await undoManager.redo();
+      if (op) notifyOtherWindows(event.sender.id);
       return {
         ok: true,
         data: op ? { id: op.id, label: op.label, timestamp: op.timestamp } : null,

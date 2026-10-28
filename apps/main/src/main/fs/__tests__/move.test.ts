@@ -82,18 +82,18 @@ describe('fs.move — explicit destinations + src==dest 守卫', () => {
   });
 
   it('fs.rename 跨盘失败 → 降级到 fs.cp + fs.rm', async () => {
-    renameSpy.mockRejectedValueOnce(new Error('EXDEV: cross-device link not permitted'));
+    renameSpy.mockRejectedValueOnce(Object.assign(new Error('EXDEV: cross-device link not permitted'), { code: 'EXDEV' }));
     const res = (await move(req({ sources: ['/src/a.txt'] }))) as Result<void>;
     expect(res.ok).toBe(true);
     expect(renameSpy).toHaveBeenCalledTimes(1);
     expect(cpSpy).toHaveBeenCalledTimes(1);
     expect(rmSpy).toHaveBeenCalledTimes(1);
-    expect(cpSpy).toHaveBeenCalledWith('/src/a.txt', join('/dst', 'a.txt'), { recursive: true });
+    expect(cpSpy).toHaveBeenCalledWith('/src/a.txt', join('/dst', 'a.txt'), { recursive: true, force: false, errorOnExist: true });
     expect(rmSpy).toHaveBeenCalledWith('/src/a.txt', { recursive: true, force: true });
   });
 
   it('fs.cp 失败 → Result.error', async () => {
-    renameSpy.mockRejectedValueOnce(new Error('EXDEV'));
+    renameSpy.mockRejectedValueOnce(Object.assign(new Error('EXDEV'), { code: 'EXDEV' }));
     cpSpy.mockRejectedValueOnce(new Error('EACCES denied'));
     const res = (await move(req({ sources: ['/src/a.txt'] }))) as Result<void>;
     expect(res.ok).toBe(false);
@@ -106,7 +106,7 @@ describe('fs.move — explicit destinations + src==dest 守卫', () => {
   });
 
   it('fs.rm 失败 → Result.error', async () => {
-    renameSpy.mockRejectedValueOnce(new Error('EXDEV'));
+    renameSpy.mockRejectedValueOnce(Object.assign(new Error('EXDEV'), { code: 'EXDEV' }));
     rmSpy.mockRejectedValueOnce(new Error('EBUSY: resource busy'));
     const res = (await move(req({ sources: ['/src/a.txt'] }))) as Result<void>;
     expect(res.ok).toBe(false);

@@ -4,7 +4,7 @@
  * 通过 contextBridge 暴露白名单 API 给渲染进程。
  * 渲染进程通过 `window.tabula.xxx` 调用。
  */
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import { IpcChannels } from '@tabula/bridge';
 import type {
   ArchiveProgress,
@@ -142,9 +142,12 @@ const api: TabulaAPI = {
   fs: {
     listDir: (p) => ipcRenderer.invoke(IpcChannels.FS_LIST_DIR, p),
     readFile: (p, enc) => ipcRenderer.invoke(IpcChannels.FS_READ_FILE, p, enc),
+    readRtf: (p) => ipcRenderer.invoke(IpcChannels.FS_READ_RTF, p),
     writeFile: (p, data) => ipcRenderer.invoke(IpcChannels.FS_WRITE_FILE, p, data),
     delete: (paths, useTrash) => ipcRenderer.invoke(IpcChannels.FS_DELETE, paths, useTrash),
     rename: (oldPath, newPath) => ipcRenderer.invoke(IpcChannels.FS_RENAME, oldPath, newPath),
+    batchRename: (items) => ipcRenderer.invoke(IpcChannels.FS_BATCH_RENAME, items),
+    getPathForFile: (file) => webUtils.getPathForFile(file),
     move: (req) => ipcRenderer.invoke(IpcChannels.FS_MOVE, req),
     copy: (req) => ipcRenderer.invoke(IpcChannels.FS_COPY, req),
     mkdir: (p, name) => ipcRenderer.invoke(IpcChannels.FS_MKDIR, p, name),

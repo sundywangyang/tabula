@@ -94,7 +94,7 @@ export function ConflictDialog() {
           <button
             className="conflict-btn"
             onClick={() => void resolve('rename', renameValue)}
-            title="重命名(P3 v1:等同跳过,v1 限制)"
+            title="使用新名称保留两个文件"
           >
             重命名
           </button>

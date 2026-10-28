@@ -92,6 +92,11 @@ export function BatchRenameDialog({
       const oldName = names[i]!;
       const newName = find ? oldName.split(find).join(replace) : oldName;
       if (newName === oldName) continue;
+      if (!newName.trim() || newName === '.' || newName === '..' || /[\\/\0]/.test(newName)) {
+        setErrors([`${oldName}: 无效的新名称`]);
+        setRenaming(false);
+        return;
+      }
       const lastSep = Math.max(oldPath.lastIndexOf('\\'), oldPath.lastIndexOf('/'));
       const parent = oldPath.slice(0, lastSep + 1);
       tasks.push({ oldPath, oldName, newPath: parent + newName, newName });
@@ -130,35 +135,15 @@ export function BatchRenameDialog({
       return;
     }
 
-    // ============ 阶段 2:执行重命名 + 失败回滚 ============
-    const completed: { oldPath: string; newPath: string; oldName: string }[] = [];
-    const failed: string[] = [];
-
-    for (const t of tasks) {
-      const res = await window.tabula.fs.rename(t.oldPath, t.newPath);
-      if (res.ok) {
-        completed.push({ oldPath: t.oldPath, newPath: t.newPath, oldName: t.oldName });
-      } else {
-        failed.push(`${t.oldName}: ${res.error.message}`);
-        // 已有失败 → 回滚已完成的(顺序倒序)
-        for (let j = completed.length - 1; j >= 0; j--) {
-          const done = completed[j]!;
-          const rollback = await window.tabula.fs.rename(done.newPath, done.oldPath);
-          if (!rollback.ok) {
-            failed.push(`回滚失败 ${done.oldName}: ${rollback.error.message}`);
-          }
-        }
-        break;
-      }
-    }
-
-    setRenaming(false);
-
-    if (failed.length > 0) {
-      setErrors(failed);
-    } else {
-      onRenamed();
-      onClose();
+    // The main process stages all sources before committing final names and records one undo.
+    try {
+      const result = await window.tabula.fs.batchRename(tasks.map(({ oldPath, newPath }) => ({ oldPath, newPath })));
+      if (!result.ok) setErrors([result.error.message]);
+      else { onRenamed(); onClose(); }
+    } catch (error) {
+      setErrors([String(error)]);
+    } finally {
+      setRenaming(false);
     }
   };
 

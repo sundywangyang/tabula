@@ -138,9 +138,12 @@ export interface TabulaAPI {
   fs: {
     listDir(path: string): Promise<Result<ListDirResult>>;
     readFile(path: string, encoding?: 'utf-8' | 'binary'): Promise<Result<string | ArrayBuffer>>;
+    readRtf(path: string): Promise<Result<string>>;
     writeFile(path: string, data: string | ArrayBuffer): Promise<Result<void>>;
     delete(paths: string[], useTrash?: boolean): Promise<Result<void>>;
     rename(oldPath: string, newPath: string): Promise<Result<void>>;
+    batchRename(items: Array<{ oldPath: string; newPath: string }>): Promise<Result<void>>;
+    getPathForFile(file: File): string;
     move(req: MoveOrCopyRequest): Promise<Result<void>>;
     copy(req: MoveOrCopyRequest): Promise<Result<void>>;
     mkdir(path: string, name?: string): Promise<Result<string>>;
