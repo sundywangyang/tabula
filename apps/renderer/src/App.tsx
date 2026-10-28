@@ -347,7 +347,6 @@ export function App() {
       </div>
 
       <StatusBar
-        path={activePath}
         count={activeEntries.length}
         version={version}
         selectedCount={activeSelected?.size ?? 0}

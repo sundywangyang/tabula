@@ -1,7 +1,7 @@
 /**
  * 状态栏
  *
- * P1: 当前路径、选中数、排序方式、视图模式
+ * P1: 项目数、选中数、排序方式、视图模式
  * P2: 加 layout 提示(active pane index / total panes)
  * P3: 加 clipboard 状态(copy / cut 模式 + 计数)+ 进度提示
  * P4: 加搜索过滤提示 + 全局搜索快捷键提示(Ctrl+P)
@@ -27,7 +27,6 @@ const VIEW_LABELS = {
 };
 
 export function StatusBar({
-  path,
   count,
   version,
   selectedCount,
@@ -39,7 +38,6 @@ export function StatusBar({
   onToggleSidebar,
   onSettingsOpen,
 }: {
-  path: string;
   count: number;
   version: string;
   selectedCount: number;
@@ -75,8 +73,6 @@ export function StatusBar({
         >
           {sidebarVisible ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
         </button>
-        <span className="status-divider">·</span>
-        <span className="status-item" title={path}>📁 {path || '—'}</span>
         <span className="status-divider">·</span>
         <span className="status-item">
           {count} 项{selectedCount > 0 ? <strong className="status-selected"> · 已选 {selectedCount}</strong> : null}
@@ -147,8 +143,6 @@ export function StatusBar({
         >
           layout: [{activePaneIndex}] / [{paneCount}]
         </span>
-        <span className="status-divider">·</span>
-        <span className="status-item">Tabula v{version}</span>
         <span className="status-divider">·</span>
         <button
           className="status-icon-btn"
