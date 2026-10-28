@@ -195,10 +195,17 @@ const api: TabulaAPI = {
     undo: () => ipcRenderer.invoke(IpcChannels.UNDO_UNDO),
     redo: () => ipcRenderer.invoke(IpcChannels.UNDO_REDO),
     getUndoStack: () => ipcRenderer.invoke(IpcChannels.UNDO_GET_STACK),
-    // G018: 系统原生拖拽 — 同步 IPC,必须在 dragstart handler 调用。
-    // 异步 invoke 会跨 microtask,到达主进程时 OS drag 已结束 → Chromium 内部崩溃。
-    startDrag: (paths: string[]) =>
-      ipcRenderer.sendSync(IpcChannels.FS_START_DRAG, paths) as Result<void>,
+    startDrag: (paths: string[]) => new Promise<Result<void>>((resolve) => {
+      const requestId = `${Date.now()}-${Math.random()}`;
+      const onResult = (_event: IpcRendererEvent, id: string, result: Result<void>) => {
+        if (id !== requestId) return;
+        ipcRenderer.removeListener(IpcChannels.FS_START_DRAG_RESULT, onResult);
+        resolve(result);
+      };
+      ipcRenderer.on(IpcChannels.FS_START_DRAG_RESULT, onResult);
+      ipcRenderer.send(IpcChannels.FS_START_DRAG, requestId, paths);
+    }),
+    prepareDragIcon: (path: string) => ipcRenderer.send(IpcChannels.FS_PREPARE_DRAG_ICON, path),
   },
 
   tabs: {

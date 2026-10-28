@@ -31,6 +31,34 @@ describe('paste destinations', () => {
 
   it('skips moving an item into its own directory without changing the file', async () => {
     await useFileStore.getState().performBulk(['C:\\folder\\a.txt'], 'C:\\folder', 'move');
-    expect(mock.fs.move.mock.calls.every(([request]) => (request as { sources: string[] }).sources.length === 0)).toBe(true);
+    expect(mock.fs.move).not.toHaveBeenCalled();
+    expect(mock.fs.exists).not.toHaveBeenCalled();
+    expect(useFileStore.getState().pendingConflicts).toBeNull();
+  });
+
+  it('recognizes Windows paths with different slash direction and casing as the same file', async () => {
+    mock.fs.exists.mockResolvedValue(true);
+    const result = await useFileStore.getState().performBulk(['C:\\Folder\\a.txt'], 'c:/folder/', 'move');
+    expect(result).toEqual({ ok: true, moved: 0 });
+    expect(mock.fs.exists).not.toHaveBeenCalled();
+    expect(mock.fs.move).not.toHaveBeenCalled();
+    expect(useFileStore.getState().pendingConflicts).toBeNull();
+    expect(useFileStore.getState().toasts).toEqual([]);
+  });
+
+  it('does not ask about a name conflict when moving a folder onto itself', async () => {
+    mock.fs.exists.mockResolvedValue(true);
+    const result = await useFileStore.getState().performBulk(['C:\\Folder'], 'c:/folder/', 'move');
+    expect(result).toEqual({ ok: true, moved: 0 });
+    expect(mock.fs.exists).not.toHaveBeenCalled();
+    expect(mock.fs.move).not.toHaveBeenCalled();
+    expect(useFileStore.getState().pendingConflicts).toBeNull();
+  });
+
+  it('still reports an actual name conflict in another directory', async () => {
+    mock.fs.exists.mockResolvedValue(true);
+    await useFileStore.getState().performBulk(['C:\\source\\a.txt'], 'C:\\target', 'move');
+    expect(useFileStore.getState().pendingConflicts?.queue).toHaveLength(1);
+    expect(mock.fs.move).not.toHaveBeenCalled();
   });
 });

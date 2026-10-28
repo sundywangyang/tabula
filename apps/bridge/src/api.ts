@@ -229,17 +229,13 @@ export interface TabulaAPI {
     /**
      * G018: 启动一次系统原生拖拽操作，将选中路径交给外部 app。
      *
-     * **同步 IPC(sendSync)**:`webContents.startDrag()` 必须在 OS drag 生命周期内同步
-     * 执行;异步 invoke 会在 microtask 排队,主进程到达时 OS drag 已结束,导致 Chromium
-     * 内部崩溃(crashpad_client_win.cc not connected / exit 0x...)。这里用 sendSync
-     * 让主进程 e.sender.startDrag 仍在 OS drag handler 的同一 tick 内执行。
-     *
-     * - 必须在渲染端 DOM `ondragstart` handler 内调用。
+     * 必须在渲染端 DOM `ondragstart` handler 内立即调用，结果在系统拖拽返回后送达。
      * - 多项选择通过 files 参数发送，允许文件和目录。
-     * - icon 优先取 paths[0] 的 NativeImage(图片文件自带缩略图),非图片文件回退到
-     *   平台对应的 icon(.ico / .icns / .png)。
+     * - 图标优先使用 paths[0] 对应的系统文件图标，系统图标不可用时回退到应用图标。
      */
-    startDrag(paths: string[]): Result<void>;
+    startDrag(paths: string[]): Promise<Result<void>>;
+    /** Prepare the system icon before a drag begins. */
+    prepareDragIcon(path: string): void;
   };
 
   // 标签

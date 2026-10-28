@@ -299,24 +299,14 @@ export function TabBar({
     if (fileDragState && tab.path) {
       e.preventDefault();
       e.stopPropagation();
-      const effect: 'move' | 'copy' = e.ctrlKey || e.metaKey ? 'copy' : 'move';
+      const effect = 'move';
       e.dataTransfer.dropEffect = effect;
       setFileDragTarget(tab.path, 'tab', effect);
     }
   };
 
   const onTabDrop = (e: ReactDragEvent<HTMLDivElement>, tab: Tab, _index: number) => {
-    // tab 拖动走 Pointer Events 不进这里;这里只处理 P3 文件拖到 tab
-    if (fileDragState && tab.path) {
-      e.preventDefault();
-      e.stopPropagation();
-      const state = useFileStore.getState().dragState;
-      if (!state) return;
-      const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
-      void performBulk(state.paths, tab.path, mode, state.sourcePaneId);
-      endFileDrag();
-    }
-    // 文件拖放(P3)
+    // Tab repositioning uses pointer events; this handler is for file drops.
     e.preventDefault();
     e.stopPropagation();
     const state = useFileStore.getState().dragState;
@@ -324,8 +314,7 @@ export function TabBar({
       endFileDrag();
       return;
     }
-    const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
-    void performBulk(state.paths, tab.path, mode, state.sourcePaneId);
+    void performBulk(state.paths, tab.path, 'move', state.sourcePaneId);
     endFileDrag();
   };
 

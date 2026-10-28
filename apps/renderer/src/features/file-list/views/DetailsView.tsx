@@ -159,6 +159,7 @@ function DetailsRow({
     <div
       style={style}
       className={`file-list-row ${dropTarget ? 'file-drop-target' : ''} ${selected ? 'selected' : ''} ${cursor ? 'cursor' : ''}`}
+      title="普通拖动可拖出应用；按住 Alt 拖动到应用内移动"
       onClick={(e) => onClick(entry, e)}
       onDoubleClick={() => onDoubleClick(entry)}
       draggable={!renaming}
@@ -187,7 +188,7 @@ function DetailsRow({
             onCancel={onRenameCancel}
           />
         ) : (
-          <span className="row-name" title={entry.path}>
+          <span className="row-name" title={`${entry.path}\n普通拖动可拖出应用；按住 Alt 拖动到应用内移动`}>
             {displayName(entry, showExtensions)}
           </span>
         )}

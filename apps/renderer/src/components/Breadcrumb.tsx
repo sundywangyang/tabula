@@ -25,7 +25,7 @@ export function Breadcrumb({
     if (!dragState) return;
     e.preventDefault();
     e.stopPropagation();
-    const effect: 'move' | 'copy' = e.ctrlKey || e.metaKey ? 'copy' : 'move';
+    const effect = 'move';
     e.dataTransfer.dropEffect = effect;
     setDragTarget(targetPath, 'breadcrumb', effect);
   };
@@ -38,8 +38,7 @@ export function Breadcrumb({
       endDrag();
       return;
     }
-    const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
-    await performBulk(state.paths, targetPath, mode, state.sourcePaneId);
+    await performBulk(state.paths, targetPath, 'move', state.sourcePaneId);
     endDrag();
   };
 

@@ -89,6 +89,7 @@ export function GridView({
                   key={entry.path}
                   className={`grid-cell ${dropTargetPath === entry.path ? 'file-drop-target' : ''} ${selectedPaths.has(entry.path) ? 'selected' : ''} ${cursorPath === entry.path ? 'cursor' : ''
                     }`}
+                  title="普通拖动可拖出应用；按住 Alt 拖动到应用内移动"
                   onClick={(e) => onRowClick(entry, e)}
                   onDoubleClick={() => onDoubleClickGrid(onRowDoubleClick, entry)}
                   draggable={renameTarget !== entry.path}
@@ -117,7 +118,7 @@ export function GridView({
                       variant="grid"
                     />
                   ) : (
-                    <div className="grid-name" title={entry.path}>
+                    <div className="grid-name" title={`${entry.path}\n普通拖动可拖出应用；按住 Alt 拖动到应用内移动`}>
                       {displayName(entry, showExtensions)}
                     </div>
                   )}

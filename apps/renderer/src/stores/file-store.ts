@@ -16,7 +16,7 @@ import type { AppConfig } from '@tabula/bridge';
 import { useLayoutStore } from './layout-store';
 import type { FileStore, ViewMode, SortDir, SortField, ConflictItem } from './file/types';
 import { emptyPaneData } from './file/pane-data';
-import { pathToBreadcrumb, joinPath, parentPath, basename, findPaneInLayout } from './file/paths';
+import { pathToBreadcrumb, joinPath, parentPath, basename, findPaneInLayout, sameFilePath } from './file/paths';
 import { displayEntries } from './file/view-selectors';
 import { createSelectionSlice } from './file/selection-slice';
 import { createPreviewSlice } from './file/preview-slice';
@@ -874,15 +874,13 @@ export const useFileStore = create<FileStore>((set, get, store) => {
       const autoResolved: { source: string; dest: string; overwrite: boolean; }[] = [];
       for (const src of sources) {
         if (!src) continue;
+        if (mode === 'move' && sameFilePath(src, destDir)) continue;
         const srcName = basename(src);
         if (!srcName) {
           continue;
         }
         const dest = joinPath(destDir, srcName);
-        // 标准化:去掉末尾斜杠再比较(Windows src 有无斜杠不一致)
-        const normDest = dest.replace(/[\\/]+$/, '');
-        const normSrc = src.replace(/[\\/]+$/, '');
-        if (normDest === normSrc) {
+        if (sameFilePath(dest, src)) {
           // 同源同目标:move 直接跳过;copy 在同目录需生成新名(加 -copy)
           if (mode === 'move') {
             continue;
@@ -937,6 +935,9 @@ export const useFileStore = create<FileStore>((set, get, store) => {
         });
         return { ok: true, moved: 0 }; // 等待用户解决
       }
+      // Every item already resides in the destination: don't issue an empty
+      // move or present a conflict/success message for an operation that did nothing.
+      if (autoResolved.length === 0) return { ok: true, moved: 0 };
       // 无冲突,直接执行
       const verb = mode === 'copy' ? '复制' : '移动';
       get().setProgress({ operation: mode, count: autoResolved.length, message: `正在${verb} ${autoResolved.length} 项…` });

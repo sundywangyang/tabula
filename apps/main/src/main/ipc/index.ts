@@ -51,6 +51,7 @@ import * as tagsStore from '../store/tags-store';
 import { undoManager } from '../undo/undo-manager';
 import { recordActivity } from '../store/activity-store';
 import { folderIcons, migrateFolderIcons } from '../services/folder-icons';
+import { DragIconCache, fitDragIcon } from './drag-icon-cache';
 
 import type { IpcContext } from './context';
 import { registerArchiveHandlers } from './archive';
@@ -58,6 +59,7 @@ import { registerFileToolsHandlers, registerTagHandlers } from './file-tools';
 export type { IpcContext } from './context';
 
 export function registerIpcHandlers(ctx: IpcContext) {
+  const dragIcons = new DragIconCache(path => app.getFileIcon(path, { size: 'normal' }));
   const historyDir = join(app.getPath('userData'), 'undo', `${process.pid}-${Date.now()}`);
   const fileOperations = new FileOperations(historyDir, (path) => shell.trashItem(path), undoManager, {
     migrate: (mappings, copy) => { tagsStore.migrateTags(mappings, copy); migrateFolderIcons(mappings, copy); }, record: recordActivity,
@@ -215,19 +217,13 @@ export function registerIpcHandlers(ctx: IpcContext) {
     return getThumbnail(p);
   });
 
-  // =================== G018: 系统原生拖拽(同步 IPC)===================
-  // 把 paths[0] 作为真实文件交给 OS drag session(webContents.startDrag 一次只支持一个文件)。
-  //
-  // **必须用同步 IPC**:`webContents.startDrag()` 必须在 OS drag 生命周期内同步执行;
-  // 异步 invoke 在 microtask 排队,主进程到达时 OS drag 已结束,触发 Chromium 内部
-  // 崩溃(crashpad_client_win.cc not connected / 非 0 退出码)。
-  //
-  // 同步语义:渲染端 sendSync → 主进程 ipcMain.on → e.sender.startDrag() 同步执行,
-  // → e.returnValue = Result<void> 同步返回。整个 chain 都在 OS drag 生命周期内。
-  ipcMain.on(IpcChannels.FS_START_DRAG, (e, paths: string[]) => {
+  // Native dragging can run a nested OS event loop. Do not block the renderer
+  // with sendSync while it is handling a drag or receiving an internal drop.
+  ipcMain.on(IpcChannels.FS_PREPARE_DRAG_ICON, (_e, path: string) => { void dragIcons.prepare(path); });
+  ipcMain.on(IpcChannels.FS_START_DRAG, async (e, requestId: string, paths: string[]) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) {
-      e.returnValue = { ok: false, error: { code: 'UNKNOWN', message: 'No window' } };
+      e.reply(IpcChannels.FS_START_DRAG_RESULT, requestId, { ok: false, error: { code: 'UNKNOWN', message: 'No window' } });
       return;
     }
     // G018: 图标按平台选择 — macOS 不识别 .ico 会导致 nativeImage 为空 → startDrag 抛错。
@@ -235,12 +231,20 @@ export function registerIpcHandlers(ctx: IpcContext) {
     const iconBase = app.isPackaged
       ? join(process.resourcesPath, 'resources')
       : app.getAppPath();
-    const fallbackIconPath = pickPlatformFallbackIcon(iconBase);
-    e.returnValue = handleStartDrag(paths, {
+    const fallbackIconPath = pickPlatformFallbackIcon(iconBase, app.isPackaged);
+    const first = Array.isArray(paths) && typeof paths[0] === 'string' ? paths[0] : '';
+    const systemIcon = first ? await dragIcons.get(first) : null;
+    if (e.sender.isDestroyed()) return;
+    const fallbackIcon = nativeImage.createFromPath(fallbackIconPath ?? '');
+    const previewIcon = fallbackIcon.isEmpty() && first ? nativeImage.createFromPath(first) : fallbackIcon;
+    const icon = systemIcon && !systemIcon.isEmpty() ? systemIcon : previewIcon;
+    const result = handleStartDrag(paths, {
       startDrag: (item) => e.sender.startDrag(item),
       createImage: (p) => nativeImage.createFromPath(p),
       fallbackIconPath: fallbackIconPath ?? '',
+      dragIcon: icon.isEmpty() ? undefined : fitDragIcon(icon),
     });
+    if (!e.sender.isDestroyed()) e.reply(IpcChannels.FS_START_DRAG_RESULT, requestId, result);
   });
 
   // =================== Tabs (P0 桩) ===================

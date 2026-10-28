@@ -5,6 +5,7 @@
  * 包装,也可在 vitest 中直接传 mock chmod 测试。
  */
 import { chmod as realChmod, stat as realStat, symlink as realSymlink } from 'node:fs/promises';
+import type { NativeImage } from 'electron';
 import type { FsCreateSymlinkRequest, FsError, FsErrorCode, FsSetPermissionsRequest, Result } from '@tabula/bridge';
 const savedPermissions = new Map<string, number>();
 
@@ -169,7 +170,7 @@ export async function handleChecksum(
  * 与 Electron `webContents.startDrag({ file, icon })` 同形的注入点,便于单测。
  * 测试时传 mock,生产由 ipc/index.ts 包一层 `e.sender.startDrag`。
  */
-export type StartDragFn = (item: { file: string; files?: string[]; icon: string }) => void;
+export type StartDragFn = (item: { file: string; files?: string[]; icon: string | NativeImage }) => void;
 
 /**
  * `nativeImage.createFromPath(path).isEmpty()` 的最小替身,便于单测注入。
@@ -202,13 +203,7 @@ export function resolveDragIconPath(
  *
  * 将全部选中路径通过 Electron 的 files 参数交给系统，单项仍使用 file 参数。
  *
- * 必须在渲染端 DOM `ondragstart` handler 内**同步**调用;主进程这一侧 startDragFn
- * 仍处在 OS drag 生命周期内,目标 app(桌面 / VSCode / 微信 / 7-Zip)收到的是真实文件
- * 而非路径字符串。
- *
- * **必须是同步函数**(返回 `Result<void>` 而非 Promise):`ipcRenderer.sendSync` 通过
- * `Event.returnValue` 把结果走结构化克隆回渲染端,Promise 不可克隆会抛
- * "An object could not be cloned" 导致 app 卡死。
+ * 渲染端在 dragstart 内立即发起 IPC，目标应用收到真实文件而非路径字符串。
  */
 export function handleStartDrag(
   paths: string[],
@@ -216,6 +211,7 @@ export function handleStartDrag(
     startDrag: StartDragFn;
     createImage: CreateNativeImageFn;
     fallbackIconPath: string;
+    dragIcon?: NativeImage;
     statSync?: (p: string) => { isFile(): boolean; isDirectory(): boolean } | null;
   },
 ): Result<void> {
@@ -232,8 +228,8 @@ export function handleStartDrag(
     if (!st.isFile() && !st.isDirectory()) return { ok: false, error: { code: 'UNKNOWN', message: 'Unsupported file type', path } };
   }
   try {
-    const iconPath = resolveDragIconPath(firstFile, ctx.createImage, ctx.fallbackIconPath);
-    ctx.startDrag({ file: firstFile, ...(paths.length > 1 ? { files: [...new Set(paths)] } : {}), icon: iconPath });
+    const icon = ctx.dragIcon ?? resolveDragIconPath(firstFile, ctx.createImage, ctx.fallbackIconPath);
+    ctx.startDrag({ file: firstFile, ...(paths.length > 1 ? { files: [...new Set(paths)] } : {}), icon });
     return { ok: true, data: undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -270,12 +266,14 @@ function safeStatSync(
  * - macOS:   .icns(macOS 不识别 .ico → nativeImage.createFromPath 返回空 → startDrag 抛错)
  * - Linux:   .png(可能不存在 → 返回 null,调用方用空 image 兜底)
  */
-export function pickPlatformFallbackIcon(appRoot: string): string | null {
+export function pickPlatformFallbackIcon(appRoot: string, isPackaged = false): string | null {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require('node:fs') as typeof import('node:fs');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require('node:path') as typeof import('node:path');
-  const candidates: Record<string, string[]> = {
+  const candidates: Record<string, string[]> = isPackaged ? {
+    win32: ['Tabula.ico'], darwin: ['Tabula.icns'], linux: ['32.png', '16.png', 'icon.png'],
+  } : {
     win32: ['build-assets/icon/Tabula.ico'],
     darwin: ['build-assets/icon/Tabula.icns'],
     linux: ['build-assets/icon/png/16.png', 'build-assets/icon/png/32.png', 'build-assets/icon/png/256.png', 'build-assets/icon/Tabula.png'],

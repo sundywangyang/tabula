@@ -51,8 +51,10 @@ export const IpcChannels = {
   FS_CREATE_SYMLINK: 'fs:create-symlink',
   FS_CHECKSUM: 'fs:checksum',
   // G018: 启动一次系统原生拖拽(把文件作为文件而非路径文本拖出到外部 app)
-  // 必须在渲染端 ondragstart 同步调用;主进程 e.sender.startDrag 同步触达 OS。
+  // 渲染端在 dragstart 中立即发送请求，拖拽结束或失败后返回结果。
   FS_START_DRAG: 'fs:start-drag',
+  FS_START_DRAG_RESULT: 'fs:start-drag-result',
+  FS_PREPARE_DRAG_ICON: 'fs:prepare-drag-icon',
 
   // 标签
   TABS_OPEN: 'tabs:open',

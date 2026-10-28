@@ -1,4 +1,16 @@
 import type { BreadcrumbSegment } from './types';
+import { getCachedPlatform } from '../../platform-cache';
+
+/** Compare paths the same way Windows compares file names and separators. */
+export function sameFilePath(a: string, b: string): boolean {
+  if (!a || !b) return a === b;
+  const isWindows = getCachedPlatform() === 'windows' || /^[a-z]:[\\/]/i.test(a) || /^[a-z]:[\\/]/i.test(b) || a.startsWith('\\\\') || b.startsWith('\\\\');
+  const key = (path: string) => {
+    const normalized = (isWindows ? path.replace(/[\\/]+/g, '/') : path).replace(/\/+$/g, '') || '/';
+    return isWindows ? normalized.toLowerCase() : normalized;
+  };
+  return key(a) === key(b);
+}
 
 export function pathToBreadcrumb(p: string): BreadcrumbSegment[] {
   if (!p) return [];

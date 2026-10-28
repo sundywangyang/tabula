@@ -29,4 +29,21 @@ describe('preload contracts', () => {
     void api.fs.readRtf('C:\\a.rtf');
     expect(electron.ipcRenderer.invoke).toHaveBeenCalledWith(IpcChannels.FS_READ_RTF, 'C:\\a.rtf');
   });
+
+  it('starts a native drag without blocking and routes its matching result', async () => {
+    const pending = api.fs.startDrag(['C:\\a.txt', 'C:\\b.txt']);
+    const [channel, id, paths] = electron.ipcRenderer.send.mock.lastCall!;
+    expect(channel).toBe(IpcChannels.FS_START_DRAG);
+    expect(paths).toEqual(['C:\\a.txt', 'C:\\b.txt']);
+    const listener = [...electron.ipcRenderer.on.mock.calls].reverse().find(([name]) => name === IpcChannels.FS_START_DRAG_RESULT)![1];
+    listener({}, 'unrelated', { ok: false });
+    listener({}, id, { ok: true, data: undefined });
+    await expect(pending).resolves.toEqual({ ok: true, data: undefined });
+    expect(electron.ipcRenderer.removeListener).toHaveBeenCalledWith(IpcChannels.FS_START_DRAG_RESULT, listener);
+  });
+
+  it('requests the shell icon before dragging', () => {
+    api.fs.prepareDragIcon('C:\\a.txt');
+    expect(electron.ipcRenderer.send).toHaveBeenCalledWith(IpcChannels.FS_PREPARE_DRAG_ICON, 'C:\\a.txt');
+  });
 });

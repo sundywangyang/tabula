@@ -18,7 +18,7 @@ import {
 } from 'react';
 import type { FsEntry } from '@tabula/bridge';
 import { useFileStore } from '../../stores/file-store';
-import { parentPath as parentOf } from '../../stores/file/paths';
+import { parentPath as parentOf, sameFilePath } from '../../stores/file/paths';
 import { DetailsView } from './views/DetailsView';
 import { ListView } from './views/ListView';
 import { GridView } from './views/GridView';
@@ -152,49 +152,29 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   const handleRowDragStart = useCallback(
     (entry: FsEntry, e: ReactDragEvent<HTMLElement>) => {
       const selection = useFileStore.getState().panes[paneId]?.selectedPaths;
-      const paths = selection?.has(entry.path) ? Array.from(selection) : [entry.path];
+      const paths = selection?.has(entry.path) ? [entry.path, ...Array.from(selection).filter(path => path !== entry.path)] : [entry.path];
       if (!selection?.has(entry.path)) {
         selectOne(paneId, entry.path);
       }
       startDrag(paths, paneId);
-      e.dataTransfer.effectAllowed = 'all';
-      e.dataTransfer.setData(
-        'application/x-tabula-paths',
-        JSON.stringify({ paths, sourcePaneId: paneId }),
-      );
-    },
-    [paneId, selectOne, startDrag],
-  );
-
-  // Keep the HTML drag alive within the window. Hand off to the OS only when
-  // the pointer leaves the document, while still in the native drag event.
-  useEffect(() => {
-    let handedOff = false;
-    const onLeave = (e: DragEvent) => {
-      // Child elements can emit dragleave with no relatedTarget, too. Only the
-      // document boundary can trigger the native handoff.
-      if (e.target !== document && e.target !== document.documentElement) return;
-      if (e.relatedTarget || (e.clientX > 0 && e.clientY > 0 && e.clientX < window.innerWidth && e.clientY < window.innerHeight)) return;
-      const state = useFileStore.getState().dragState;
-      if (!state || state.sourcePaneId !== paneId || handedOff) return;
-      handedOff = true;
-      try {
-        const result = window.tabula.fs.startDrag(state.paths);
-        if (!result.ok) showToast(`无法拖出文件: ${result.error.message}`, 'error');
-      } catch (error) {
-        showToast(`无法拖出文件: ${String(error)}`, 'error');
-      } finally {
-        endDrag();
+      if (e.altKey) {
+        // Internal drag remains a browser drag so every in-app drop target can
+        // receive dragover/drop. Internal file drags only move.
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/x-tabula-paths', JSON.stringify({ paths, sourcePaneId: paneId }));
+        return;
       }
-    };
-    const onEnd = () => { handedOff = false; };
-    window.addEventListener('dragleave', onLeave);
-    window.addEventListener('dragend', onEnd);
-    return () => {
-      window.removeEventListener('dragleave', onLeave);
-      window.removeEventListener('dragend', onEnd);
-    };
-  }, [paneId, showToast, endDrag]);
+      // Electron needs the native drag to be started from this event, with the
+      // browser's text-only drag cancelled. Do not wait for the IPC response.
+      e.preventDefault();
+      void window.tabula.fs.startDrag(paths).then((result) => {
+        if (!result.ok) showToast(`无法拖出文件: ${result.error.message}`, 'error');
+      }).catch((error) => {
+        showToast(`无法拖出文件: ${String(error)}`, 'error');
+      }).finally(() => endDrag());
+    },
+    [paneId, selectOne, startDrag, showToast, endDrag],
+  );
 
   const dropDirectory = useCallback((target: EventTarget | null): string => {
     const element = target instanceof Element ? target.closest<HTMLElement>('[data-entry-path]') : null;
@@ -205,6 +185,14 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   const handleRowDragEnd = useCallback(() => {
     endDrag();
   }, [endDrag]);
+
+  // Load the shell icon before dragstart without doing work for every entry in
+  // large directories. Mouse down also covers a fast drag without prior hover.
+  const prepareDragIcon = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
+    const target = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-entry-path]') : null;
+    const path = target?.dataset.entryPath;
+    if (path) window.tabula.fs.prepareDragIcon(path);
+  }, []);
 
   // === P3: 拖放 — 容器作为 target(pane 内的 drop)===
   // 支持两类拖入:
@@ -220,9 +208,8 @@ export function FileList({ paneId, onOpenEntry }: Props) {
 
       e.preventDefault();
       e.stopPropagation();
-      // 外部文件默认 copy;内部拖拽走 Ctrl 切换
-      const effect: 'move' | 'copy' =
-        hasInternalDrag ? (e.ctrlKey || e.metaKey ? 'copy' : 'move') : 'copy';
+      // External files are copied; internal drags always move.
+      const effect: 'move' | 'copy' = hasInternalDrag ? 'move' : 'copy';
       e.dataTransfer.dropEffect = effect;
 
       if (hasInternalDrag) {
@@ -287,23 +274,22 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         endDrag();
         return;
       }
-      const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
       const sources = state.paths;
       // 检测:同 pane 同 dir 自拖 = 无操作
-      if (sources.includes(destination)) {
+      if (sources.some((p) => sameFilePath(p, destination))) {
         endDrag();
         showToast('无法拖放到选中的文件夹自身', 'warn');
         return;
       }
-      if (mode === 'move' && sources.every((p) => parentOf(p) === destination)) {
+      if (sources.every((p) => sameFilePath(parentOf(p), destination))) {
         endDrag();
         showToast('同目录拖动无操作', 'info', 1500);
         return;
       }
       endDrag();
-      await performBulk(sources, destination, mode, paneId);
+      await performBulk(sources, destination, 'move', paneId);
       // move 模式下刷新源 pane（可看到文件已被移走）
-      if (mode === 'move' && state.sourcePaneId && state.sourcePaneId !== paneId) {
+      if (state.sourcePaneId && state.sourcePaneId !== paneId) {
         const srcPane = useFileStore.getState().getPanePath(state.sourcePaneId);
         if (srcPane) void loadDir(state.sourcePaneId, srcPane);
       }
@@ -592,8 +578,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   // P3: 计算 drop 高亮样式(同 pane 同 dir 不高亮,提示无操作)
   const dropClass =
     dragState && dragState.targetKind === 'pane' && dragState.targetPath === currentPath
-      ? dragState.sourcePaneId === paneId &&
-        dragState.paths.every((p) => parentOf(p) === currentPath)
+      ? dragState.paths.every((p) => sameFilePath(parentOf(p), currentPath))
         ? 'file-list-dropping file-list-drop-noop'
         : 'file-list-dropping'
       : '';
@@ -604,6 +589,8 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       className={`file-list file-list-${viewMode} ${dropClass}`}
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      onMouseOverCapture={prepareDragIcon}
+      onMouseDownCapture={prepareDragIcon}
       onMouseDown={handleBlankAreaMouseDown}
       onDragOver={handleContainerDragOver}
       onDragLeave={handleContainerDragLeave}
