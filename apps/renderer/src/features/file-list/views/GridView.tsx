@@ -97,7 +97,7 @@ export function GridView({
                   onDragEnd={onRowDragEnd}
                   data-entry-path={entry.path}
                 >
-                  <FileThumb entry={entry} variant="grid" />
+                  <div className="grid-thumbnail"><FileThumb entry={entry} variant="grid" /></div>
                   {(() => {
                     const tags = getCachedTags(entry.path);
                     if (tags.length === 0) return null;

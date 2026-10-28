@@ -27,7 +27,7 @@ import { useLayoutStore } from '../../stores/layout-store';
 import { loadTagsForPath, subscribeTagsCache } from '../../components/context-menu/tags';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
-import { buildViewRows, entriesInBox } from './view-layout';
+import { buildViewRows, entriesInBox, gridColumnCount } from './view-layout';
 
 interface Props {
   paneId: string;
@@ -137,16 +137,15 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     const el = containerRef.current;
     if (!el) return;
     const update = () => {
-      const w = el.clientWidth;
-      const target = thumbnailSize + 46;
-      const cols = Math.max(3, Math.min(8, Math.floor((w - 24) / target)));
-      setGridCols(cols);
+      const w = viewMode === 'grid' ? (bodyRef.current?.clientWidth ?? el.clientWidth) : el.clientWidth;
+      setGridCols(gridColumnCount(w, thumbnailSize));
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
+    if (bodyRef.current && bodyRef.current !== el) ro.observe(bodyRef.current);
     return () => ro.disconnect();
-  }, [sortedEntries.length, viewMode, gridCols, thumbnailSize]);
+  }, [sortedEntries.length, viewMode, thumbnailSize]);
 
   // === P3: 拖放 — 行作为 source ===
   const handleRowDragStart = useCallback(
@@ -430,7 +429,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         right: Math.max(band.startX, band.curX) - rect.left + viewport.scrollLeft,
         top: Math.min(band.startY, band.curY) - rect.top + viewport.scrollTop,
         bottom: Math.max(band.startY, band.curY) - rect.top + viewport.scrollTop,
-      }, viewport.clientWidth || rect.width, viewMode === 'grid' ? gridCols : 1);
+      }, viewport.clientWidth || rect.width, viewMode === 'grid' ? gridCols : 1, viewMode === 'grid');
 
     },
     [viewMode, gridCols, groupBy, thumbnailSize],

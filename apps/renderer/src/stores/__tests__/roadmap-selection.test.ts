@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import '../layout-store';
 import { useFileStore } from '../file-store';
-import { buildViewRows, entriesInBox } from '../../features/file-list/view-layout';
+import { buildViewRows, entriesInBox, gridColumnCount } from '../../features/file-list/view-layout';
 import { installTabulaMock } from './setup';
 import type { FsEntry } from '@tabula/bridge';
 const entry = (name: string) => ({ name, path: '/files/' + name, ext: '.' + name.split('.').pop(), isDirectory: false, isFile: true, isSymlink: false, size: 1, mtime: 1, atime: 1, ctime: 1, birthtime: 1, mode: 0o644 } as FsEntry);
@@ -22,6 +22,15 @@ describe('grouped selection and type filtering', () => {
     const rows = buildViewRows(entries, 'type', 3, 176);
     expect(rows.map(row => row.top)).toEqual([0, 28, 204, 232]);
     expect(entriesInBox(rows, { left: 8, right: 100, top: 232, bottom: 400 }, 600, 3)).toEqual([entries[1].path]);
+  });
+  it('fits grid columns to narrow panes and hit tests the single-column padding', () => {
+    expect(gridColumnCount(100, 64)).toBe(1);
+    expect(gridColumnCount(240, 64)).toBe(2);
+    expect(gridColumnCount(1000, 64)).toBe(8);
+    expect(gridColumnCount(240, 160)).toBe(1);
+    const rows = buildViewRows([entries[0]], 'none', 1, 112);
+    expect(entriesInBox(rows, { left: 0, right: 7, top: 0, bottom: 112 }, 100, 1, true)).toEqual([]);
+    expect(entriesInBox(rows, { left: 8, right: 10, top: 0, bottom: 112 }, 100, 1, true)).toEqual([entries[0].path]);
   });
   it('filtering constrains all selection operations', () => {
     useFileStore.getState().setFileType('p', 'code'); useFileStore.getState().selectAll('p');

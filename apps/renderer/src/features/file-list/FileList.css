@@ -197,7 +197,7 @@
 
 .grid-row {
   display: grid;
-  grid-template-columns: repeat(var(--grid-cols, 4), 1fr);
+  grid-template-columns: repeat(var(--grid-cols, 4), minmax(0, 1fr));
   gap: 4px;
   padding: 0 8px;
 }
@@ -213,6 +213,7 @@
   cursor: default;
   text-align: center;
   min-height: 80px;
+  min-width: 0;
   position: relative;
   user-select: none;
 }
@@ -240,10 +241,21 @@
   line-height: 1;
 }
 
+.grid-thumbnail {
+  width: 100%;
+  height: var(--thumbnail-size, 64px);
+  flex: 0 0 var(--thumbnail-size, 64px);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* P7 v1: 真实图片缩略图(网格视图) */
 .grid-icon-thumb {
   width: var(--thumbnail-size, 64px);
   height: var(--thumbnail-size, 64px);
+  max-width: 100%;
   object-fit: cover;
   border-radius: 4px;
   background: var(--bg-elevated);
@@ -259,7 +271,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
+  min-width: 0;
   padding: 0 4px;
+}
+
+.row-tags-grid {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  max-width: calc(100% - 8px);
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 /* 重命名输入 */
