@@ -27,7 +27,6 @@ import {
   EyeOff,
   Type,
   Columns2,
-  Rows2,
   LayoutList,
   LayoutGrid,
   List,
@@ -494,7 +493,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
       <div className="toolbar-divider" />
 
-      {/* P2 v2: 分屏 — 左/右 / 上/下 */}
+      {/* 左右分屏 */}
       <div className="toolbar-group">
         <Tooltip label="左右分屏" shortcut="Ctrl+\\">
           <button
@@ -505,16 +504,6 @@ export function Toolbar({ paneId }: { paneId: string }) {
           >
             <Columns2 size={16} />
             <span className="toolbar-label">分屏</span>
-          </button>
-        </Tooltip>
-        <Tooltip label="上下分屏" shortcut="Ctrl+Shift+\\">
-          <button
-            className="toolbar-btn"
-            onClick={() => {
-              useLayoutStore.getState().pane.splitPane(paneId, 'vertical');
-            }}
-          >
-            <Rows2 size={16} />
           </button>
         </Tooltip>
       </div>
