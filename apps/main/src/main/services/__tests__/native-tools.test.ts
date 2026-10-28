@@ -2,17 +2,19 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-const { stores, openExternal } = vi.hoisted(() => ({ stores: new Map<string, Record<string, unknown>>(), openExternal: vi.fn(async () => {}) }));
-vi.mock('electron-store', () => ({ default: class {
-  state: Record<string, unknown>;
-  constructor(opts: { name: string; defaults?: Record<string, unknown> }) { if (!stores.has(opts.name)) stores.set(opts.name, structuredClone(opts.defaults ?? {})); this.state = stores.get(opts.name)!; }
-  get(key: string, fallback?: unknown) { return this.state[key] ?? fallback; }
-  set(key: string, value: unknown) { this.state[key] = value; }
-} }));
-vi.mock('electron', () => ({ shell: { openExternal }, nativeImage: { createFromPath: () => ({ isEmpty: () => false, resize() { return this; }, toPNG: () => Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1sAAAAASUVORK5CYII=', 'base64') }) } }));
 import { createLink, linkInfo, retargetLink } from '../links';
 import { setFolderIcon, folderIcons } from '../folder-icons';
 import { FileToolsService } from '../file-tools';
+const { stores, openExternal } = vi.hoisted(() => ({ stores: new Map<string, Record<string, unknown>>(), openExternal: vi.fn(async () => { }) }));
+vi.mock('electron-store', () => ({
+  default: class {
+    state: Record<string, unknown>;
+    constructor(opts: { name: string; defaults?: Record<string, unknown>; }) { if (!stores.has(opts.name)) stores.set(opts.name, structuredClone(opts.defaults ?? {})); this.state = stores.get(opts.name)!; }
+    get(key: string, fallback?: unknown) { return this.state[key] ?? fallback; }
+    set(key: string, value: unknown) { this.state[key] = value; }
+  }
+}));
+vi.mock('electron', () => ({ shell: { openExternal }, nativeImage: { createFromPath: () => ({ isEmpty: () => false, resize() { return this; }, toPNG: () => Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1sAAAAASUVORK5CYII=', 'base64') }) } }));
 let root: string;
 const parent = resolve('out/test-fixtures');
 beforeEach(async () => { await fs.mkdir(parent, { recursive: true }); root = await fs.mkdtemp(join(parent, 'native-tools-')); });
@@ -41,8 +43,30 @@ describe('native file tools', () => {
     expect(await fs.readFile(join(directory, 'desktop.ini'))).toEqual(original);
   });
   it('returns Result failures and opens the supported Windows default-app selection page', async () => {
-    const service = new FileToolsService(() => {});
+    const service = new FileToolsService(() => { });
     expect((await service.run('linkInfo', { path: join(root, 'missing') })).ok).toBe(false);
     if (process.platform === 'win32') { expect((await service.run('defaultApplication', { path: join(root, 'a.txt') })).ok).toBe(true); expect(openExternal).toHaveBeenCalledWith('ms-settings:defaultapps?fileExt=.txt'); }
+  });
+
+  it('keeps scan results, failures and cancellation behind the Result boundary', async () => {
+    const service = new FileToolsService(() => { });
+    const input = { root, jobId: 'scan', query: 'needle' };
+    const result = { items: [], warnings: ['unreadable file'], cancelled: false, truncated: true };
+    const search = vi.spyOn(service.scanner, 'search').mockResolvedValueOnce(result);
+    expect(await service.run('contentSearch', input)).toEqual({ ok: true, data: result });
+    expect(search).toHaveBeenCalledWith(input);
+    search.mockRejectedValueOnce(new Error('read failed'));
+    expect(await service.run('contentSearch', input)).toMatchObject({ ok: false, error: { message: 'read failed' } });
+    const cancel = vi.spyOn(service.scanner, 'cancel');
+    expect(await service.run('cancel', { jobId: 'scan' })).toEqual({ ok: true, data: undefined });
+    expect(cancel).toHaveBeenCalledWith('scan');
+  });
+
+  it('rejects unknown tool names including Object prototype properties', async () => {
+    const service = new FileToolsService(() => { });
+    for (const method of ['missing', 'toString', 'constructor']) {
+      const result = await service.run(method as keyof import('@tabula/bridge').ToolMethods, undefined as never);
+      expect(result).toMatchObject({ ok: false, error: { message: '未知文件工具' } });
+    }
   });
 });

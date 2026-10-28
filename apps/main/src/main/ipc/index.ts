@@ -1,7 +1,7 @@
 /**
  * IPC 路由注册
  *
- * 所有 ipcMain.handle 集中在这里,主进程 API 入口。
+ * 组合各领域的 IPC 注册，保持主进程 API 的统一入口。
  */
 import { ipcMain, dialog, shell, app, clipboard, BrowserWindow, nativeImage } from 'electron';
 import { chmod } from 'node:fs/promises';
@@ -16,8 +16,13 @@ import type {
   FsSetPermissionsRequest,
   UpdateStatus,
 } from '@tabula/bridge';
-import { handleSetPermissions, handleCreateSymlink, handleChecksum, handleStartDrag, pickPlatformFallbackIcon } from './handlers';
-import type { WindowManager } from '../window/window-manager';
+import {
+  handleSetPermissions,
+  handleCreateSymlink,
+  handleChecksum,
+  handleStartDrag,
+  pickPlatformFallbackIcon,
+} from './handlers';
 import * as fsService from '../fs/filesystem';
 import { FileOperations } from '../fs/operations';
 import { readRtf } from '../fs/rtf';
@@ -42,28 +47,23 @@ import {
 import { dispatchRunCommand } from '../keymap/command-dispatcher';
 import { getWindowProvider } from '../providers/window';
 import { getShellProvider } from '../providers/shell';
-import { archiveManager } from '../archive/archive-manager';
 import * as tagsStore from '../store/tags-store';
 import { undoManager } from '../undo/undo-manager';
 import { recordActivity } from '../store/activity-store';
-import { FileToolsService } from '../services/file-tools';
 import { folderIcons, migrateFolderIcons } from '../services/folder-icons';
-import { mapError, ok } from '../fs/result';
-import type { CompressRequest, ExtractRequest } from '@tabula/bridge';
 
-export interface IpcContext {
-  windowManager: WindowManager;
-}
+import type { IpcContext } from './context';
+import { registerArchiveHandlers } from './archive';
+import { registerFileToolsHandlers, registerTagHandlers } from './file-tools';
+export type { IpcContext } from './context';
 
 export function registerIpcHandlers(ctx: IpcContext) {
   const historyDir = join(app.getPath('userData'), 'undo', `${process.pid}-${Date.now()}`);
   const fileOperations = new FileOperations(historyDir, (path) => shell.trashItem(path), undoManager, {
     migrate: (mappings, copy) => { tagsStore.migrateTags(mappings, copy); migrateFolderIcons(mappings, copy); }, record: recordActivity,
   });
-  const tools = new FileToolsService(progress => {
-    for (const window of ctx.windowManager.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(IpcChannels.TOOLS_PROGRESS, progress);
-  });
-  ipcMain.handle(IpcChannels.TOOLS_RUN, (_event, method, input) => tools.run(method, input));
+  registerFileToolsHandlers(ctx);
+
   // Finish queued mutations and remove history backups on normal exit. Failed recovery backups remain intact.
   app.once('will-quit', (event) => {
     event.preventDefault();
@@ -98,18 +98,18 @@ export function registerIpcHandlers(ctx: IpcContext) {
 
   // =================== FS ===================
   ipcMain.handle(IpcChannels.FS_LIST_DIR, (_e, p: string) => {
-  // eslint-disable-next-line no-console
-  console.error('[ipc] FS_LIST_DIR path=', p);
-  return fsService.listDir(p).then((r) => {
-    if (r.ok) {
-      const icons = folderIcons(r.data.entries.filter(entry => entry.isDirectory).map(entry => entry.path));
-      for (const entry of r.data.entries) entry.customIcon = icons[entry.path];
-    }
     // eslint-disable-next-line no-console
-    console.error('[ipc] FS_LIST_DIR result ok=', r.ok, 'count=', r.ok ? r.data.entries.length : 'n/a');
-    return r;
+    console.error('[ipc] FS_LIST_DIR path=', p);
+    return fsService.listDir(p).then((r) => {
+      if (r.ok) {
+        const icons = folderIcons(r.data.entries.filter(entry => entry.isDirectory).map(entry => entry.path));
+        for (const entry of r.data.entries) entry.customIcon = icons[entry.path];
+      }
+      // eslint-disable-next-line no-console
+      console.error('[ipc] FS_LIST_DIR result ok=', r.ok, 'count=', r.ok ? r.data.entries.length : 'n/a');
+      return r;
+    });
   });
-});
   ipcMain.handle(IpcChannels.FS_READ_FILE, (_e, p: string, enc?: 'utf-8' | 'binary') =>
     fsService.readFile(p, enc),
   );
@@ -265,7 +265,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
     return win.id.toString();
   });
   // P2 v2: 拖出 tab 到新窗口
-  ipcMain.handle(IpcChannels.WIN_OPEN_WITH_TAB, (_e, req: { initialPath: string; title?: string }) => {
+  ipcMain.handle(IpcChannels.WIN_OPEN_WITH_TAB, (_e, req: { initialPath: string; title?: string; }) => {
     const win = ctx.windowManager.createMainWindow({ initialPath: req.initialPath });
     if (req.title) {
       win.setTitle(req.title);
@@ -372,7 +372,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
   ipcMain.handle(
     IpcChannels.LOG_GET_LINES,
-    async (_e, opts?: { source?: 'main' | 'renderer'; limit?: number }) => {
+    async (_e, opts?: { source?: 'main' | 'renderer'; limit?: number; }) => {
       const source = opts?.source ?? 'main';
       const limit = opts?.limit ?? 200;
       return readTail(source, limit);
@@ -404,37 +404,9 @@ export function registerIpcHandlers(ctx: IpcContext) {
     return getShellProvider().openTerminal(path);
   });
 
-  // =================== Archive (压缩 / 解压) ===================
-  ipcMain.handle(IpcChannels.ARCHIVE_LIST, async (_e, archivePath: string) => {
-    return archiveManager.list(archivePath);
-  });
-  ipcMain.handle(IpcChannels.ARCHIVE_COMPRESS, async (_e, req: CompressRequest) => {
-    return archiveManager.compress(req);
-  });
-  ipcMain.handle(IpcChannels.ARCHIVE_EXTRACT, async (_e, req: ExtractRequest) => {
-    return archiveManager.extract(req);
-  });
-  ipcMain.handle(IpcChannels.ARCHIVE_GET_JOB, async (_e, jobId: string) => {
-    return archiveManager.getJob(jobId);
-  });
-  ipcMain.handle(IpcChannels.ARCHIVE_CANCEL_JOB, async (_e, jobId: string) => {
-    return archiveManager.cancelJob(jobId);
-  });
-  // 注: ARCHIVE_JOB_UPDATE 推送由 archive-manager 在订阅 provider 时自动发到所有窗口,
-  // 不在这里 register handler(那是渲染端 subscribe 的 channel)
+  registerArchiveHandlers();
 
-  // =================== Tags (G008: 文件标记) ===================
-  const tagsResult = (operation: () => unknown) => { try { return ok(operation()); } catch (error) { return mapError(error); } };
-  ipcMain.handle(IpcChannels.TAGS_GET, (_e, path: string) => tagsResult(() => tagsStore.getTags(path)));
-  ipcMain.handle(IpcChannels.TAGS_SET, (_e, path: string, tags: string[]) => {
-    return tagsResult(() => tagsStore.setTags(path, tags));
-  });
-  ipcMain.handle(IpcChannels.TAGS_ADD, (_e, path: string, tag: string) => {
-    return tagsResult(() => tagsStore.addTag(path, tag));
-  });
-  ipcMain.handle(IpcChannels.TAGS_REMOVE, (_e, path: string, tag: string) => {
-    return tagsResult(() => tagsStore.removeTag(path, tag));
-  });
+  registerTagHandlers();
 
   // =================== Undo / Redo (G012) ===================
   // 弹栈 → 执行 op.undo() → 推到 redo 栈。
