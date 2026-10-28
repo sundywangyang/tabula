@@ -18,6 +18,7 @@ import { StatusBar } from './components/StatusBar';
 import { ToastHost } from './components/Toast';
 import { ConflictDialog } from './components/ConflictDialog';
 import { InputDialog } from './components/InputDialog';
+import { NewTabDialog } from './components/NewTabDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { PropertiesPanel } from './features/file-list/PropertiesPanel';
 import { BatchRenameDialog } from './features/file-list/BatchRenameDialog';
@@ -361,6 +362,7 @@ export function App() {
 
       {/* P3: 全局 dialog / toast */}
       <ToastHost />
+      <NewTabDialog />
       <ConflictDialog />
 
       {/* P3: 全局右键菜单(单例,挂在 App 顶层,从 data-pane-id 推断目标 pane) */}

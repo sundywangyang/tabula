@@ -34,6 +34,8 @@ export interface BatchRenameState {
 }
 
 export interface UiDialogsState {
+  newTabPaneId: string | null;
+  setNewTabPaneId: (paneId: string | null) => void;
   toolsDialog: { mode: 'content' | 'duplicates' | 'history' | 'network' | 'links' | 'icons' | 'associations'; paneId: string; path: string } | null;
   openTools: (mode: NonNullable<UiDialogsState['toolsDialog']>['mode'], paneId: string, path: string) => void;
   closeTools: () => void;
@@ -78,6 +80,8 @@ export interface UiDialogsState {
 }
 
 export const useUiDialogsStore = create<UiDialogsState>((set) => ({
+  newTabPaneId: null,
+  setNewTabPaneId: (paneId) => set({ newTabPaneId: paneId }),
   toolsDialog: null,
   openTools: (mode, paneId, path) => set({ toolsDialog: { mode, paneId, path } }),
   closeTools: () => set({ toolsDialog: null }),

@@ -18,12 +18,11 @@
  * 映射到现有 store 动作。
  */
 import type { LayoutNode, KeyCombo } from '@tabula/bridge';
-import { useFileStore, makeFolderTab } from './stores/file-store';
+import { useFileStore } from './stores/file-store';
 import { useLayoutStore } from './stores/layout-store';
 import { useThemeStore, type ThemeMode } from './stores/theme-store';
 import { useSettingsStore } from './stores/settings-store';
 import { useUiDialogsStore } from './stores/ui-dialogs-store';
-import { getCachedRootPath } from './platform-cache';
 import { toggleCommandPalette } from './features/command-palette/CommandPalette';
 
 /** 工具:取父路径(供 file.duplicate 用) */
@@ -37,18 +36,6 @@ function parentPath(p: string): string {
     return parent;
   }
   return '';
-}
-
-/** 渲染端默认 pane path(未 hydrate 时兜底) */
-function defaultPath(): string {
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-  let p: string;
-  try {
-    p = getCachedRootPath();
-  } catch {
-    p = '/';
-  }
-  return p;
 }
 
 /** 取当前 active pane(若不存在返回 null) — 仅返回 node */
@@ -321,8 +308,7 @@ export function runCommandById(commandId: string): boolean {
 
     // ============ 标签 ============
     case 'tab.new': {
-      const tab = makeFolderTab(defaultPath(), '新标签');
-      useLayoutStore.getState().pane.openTab(activePaneId, tab);
+      useUiDialogsStore.getState().setNewTabPaneId(activePaneId);
       return true;
     }
     case 'tab.close': {

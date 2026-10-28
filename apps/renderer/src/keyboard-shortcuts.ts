@@ -34,7 +34,7 @@ export function handleShortcutKeyDown(event: KeyboardEvent): void {
   // The open context menu owns Escape; let its handler close it without clearing selection.
   if (event.key === 'Escape' && document.querySelector('.context-menu')) return;
   const dialogs = useUiDialogsStore.getState();
-  if (dialogs.toolsDialog || dialogs.settingsOpen || dialogs.newFolderOpen || dialogs.newFileOpen || dialogs.confirmDeleteOpen
+  if (dialogs.newTabPaneId || dialogs.toolsDialog || dialogs.settingsOpen || dialogs.newFolderOpen || dialogs.newFileOpen || dialogs.confirmDeleteOpen
     || dialogs.confirmPermanentDeleteOpen || dialogs.batchRename.open || dialogs.propertiesPanel.open) return;
   const file = useFileStore.getState();
   if (file.pendingConflicts || file.globalSearch.open) return;

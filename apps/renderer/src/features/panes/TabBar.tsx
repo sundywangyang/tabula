@@ -26,8 +26,9 @@ import {
 } from 'react';
 import { Copy, Eye, Folder, Pin, X } from 'lucide-react';
 import type { LayoutNode, Tab } from '@tabula/bridge';
-import { useFileStore, makeFolderTab } from '../../stores/file-store';
+import { useFileStore } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
+import { useUiDialogsStore } from '../../stores/ui-dialogs-store';
 import { getCachedPlatform } from '../../platform-cache';
 import './TabBar.css';
 
@@ -424,10 +425,7 @@ export function TabBar({
       <button
         type="button"
         className="tab-add"
-        onClick={() => {
-          const tab = makeFolderTab('', '新标签');
-          useLayoutStore.getState().pane.openTab(paneId, tab);
-        }}
+        onClick={() => useUiDialogsStore.getState().setNewTabPaneId(paneId)}
         title="新建标签 (Ctrl+T)"
         aria-label="新建标签"
       >
