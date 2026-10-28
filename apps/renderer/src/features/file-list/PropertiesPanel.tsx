@@ -1,8 +1,5 @@
 /**
- * 属性详情面板 (P3)
- *
- * 侧边弹出面板，显示文件/文件夹的完整属性。
- * 从右侧滑入，宽度 320px。
+ * 属性模态对话框，显示文件/文件夹属性、权限及只读状态。
  *
  * G016: 文件夹大小计算改为后台异步。
  * - 点击「计算」 → invoke getDirSize, 立即拿到 jobId
@@ -12,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FsEntry } from '@tabula/bridge';
 import './PropertiesPanel.css';
+import { useModal } from '../../components/use-modal';
 
 export interface PropertiesPanelProps {
   paneId: string;
@@ -54,16 +52,12 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
   const [calcError, setCalcError] = useState<string | null>(null);
   const jobIdRef = useRef<string | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const calculationVersion = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  // Esc 关闭
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  useModal(panelRef, onClose);
+  const [mode, setMode] = useState(entry.mode);
+  const [permissionError, setPermissionError] = useState('');
+  useEffect(() => { void window.tabula.fs.stat(entry.path).then(result => { if (result.ok) setMode(result.data.mode); }); }, [entry.path]);
 
   // 聚焦面板
   useEffect(() => {
@@ -73,6 +67,7 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
   // 组件卸载:取消订阅 + 取消未完成 job
   useEffect(() => {
     return () => {
+      calculationVersion.current++;
       unsubRef.current?.();
       unsubRef.current = null;
       if (jobIdRef.current) {
@@ -86,37 +81,33 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
     if (!entry.isDirectory || calculating) return;
     setCalculating(true);
     setCalcError(null);
+    const version = ++calculationVersion.current;
 
+    let jobId: string | null = null;
+    const queued: import('@tabula/bridge').DirSizeProgress[] = [];
+    const accept = (p: import('@tabula/bridge').DirSizeProgress) => {
+      if (version !== calculationVersion.current) return;
+      if (!jobId) { queued.push(p); return; }
+      if (p.jobId !== jobId) return;
+      if (!p.done) { setDirSize({ size: p.totalBytes, processedEntries: p.processedEntries }); return; }
+      unsubRef.current?.(); unsubRef.current = null; jobIdRef.current = null;
+      setCalculating(false);
+      if (p.cancelled || p.error) { setDirSize(null); setCalcError(p.cancelled ? '已取消' : p.error ?? '统计失败'); }
+      else setDirSize({ size: p.totalBytes, processedEntries: p.processedEntries });
+    };
+    unsubRef.current = window.tabula.fs.onDirSizeProgress(accept);
     const startRes = await window.tabula.fs.getDirSize(entry.path);
+    if (version !== calculationVersion.current) { if (startRes.ok) void window.tabula.fs.cancelDirSize(startRes.data.jobId); return; }
     if (!startRes.ok) {
       setCalculating(false);
       setCalcError(startRes.error.message);
+      unsubRef.current?.(); unsubRef.current = null;
       return;
     }
-    const jobId = startRes.data.jobId;
+    jobId = startRes.data.jobId;
     jobIdRef.current = jobId;
 
-    const unsub = window.tabula.fs.onDirSizeProgress((p) => {
-      if (p.jobId !== jobId) return;
-      if (!p.done) {
-        // 中间进度:更新 processedEntries 即可,size 已包含在 totalBytes
-        setDirSize({ size: p.totalBytes, processedEntries: p.processedEntries });
-        return;
-      }
-      // 终态:取消订阅
-      unsub();
-      unsubRef.current = null;
-      jobIdRef.current = null;
-      setCalculating(false);
-      if (p.cancelled) {
-        setCalcError('已取消');
-      } else if (p.error) {
-        setCalcError(p.error);
-      } else {
-        setDirSize({ size: p.totalBytes, processedEntries: p.processedEntries });
-      }
-    });
-    unsubRef.current = unsub;
+    queued.forEach(accept);
   };
 
   const handleCancel = async () => {
@@ -125,7 +116,7 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
   };
 
   const handleOpenInExplorer = () => {
-    void window.tabula.fs.openPath(entry.path);
+    void window.tabula.fs.showInFolder(entry.path);
   };
 
   const icon = entry.isDirectory ? '📁' : entry.isSymlink ? '🔗' : '📄';
@@ -141,7 +132,8 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
         className="properties-panel"
         ref={panelRef}
         tabIndex={-1}
-        role="complementary"
+        role="dialog"
+        aria-modal="true"
         aria-label="属性详情"
       >
         {/* Header */}
@@ -162,6 +154,14 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
 
         {/* Info list */}
         <div className="properties-info">
+          <div className="properties-row"><span className="properties-label">权限</span><span className="properties-value">{(mode & 0o777).toString(8).padStart(3, '0')}</span></div>
+          <div className="properties-row"><span className="properties-label">只读</span><input aria-label="只读" type="checkbox" checked={(mode & 0o200) === 0} onChange={async event => {
+            setPermissionError('');
+            const result = await window.tabula.fs.setPermissions({ path: entry.path, readonly: event.target.checked });
+            if (!result.ok) { setPermissionError(result.error.message); return; }
+            const stat = await window.tabula.fs.stat(entry.path); if (stat.ok) setMode(stat.data.mode);
+          }} /></div>
+          {permissionError && <p role="alert">{permissionError}</p>}
           <div className="properties-row">
             <span className="properties-label">路径</span>
             <span className="properties-value properties-value-path" title={entry.path}>

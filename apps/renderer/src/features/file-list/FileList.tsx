@@ -24,6 +24,7 @@ import { useLayoutStore } from '../../stores/layout-store';
 import { getCachedTags, loadTagsForPath, subscribeTagsCache } from '../../components/ContextMenu';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
+import { buildViewRows, entriesInBox } from './view-layout';
 
 interface Props {
   paneId: string;
@@ -40,6 +41,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   const paneData = useFileStore((s) => s.panes[paneId]);
   const viewMode = paneData?.viewMode ?? 'details';
   const groupBy = paneData?.groupBy ?? 'none';
+  const thumbnailSize = useFileStore(s => s.thumbnailSize);
   const selectedPaths = paneData?.selectedPaths ?? new Set<string>();
   const cursorPath = paneData?.cursorPath ?? null;
   const renameTarget = paneData?.renameTarget ?? null;
@@ -90,7 +92,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   const sortedEntries = useMemo(
     () => getFilteredSortedEntries(paneId),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entries, sortBy, sortDir, showHidden, paneId],
+    [entries, sortBy, sortDir, showHidden, paneId, paneData?.searchQuery, paneData?.fileType, groupBy],
   );
 
   // G008: 订阅 tags cache 变化(异步 loadTagsForPath 返回后强制 re-render)
@@ -133,7 +135,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     if (!el) return;
     const update = () => {
       const w = el.clientWidth;
-      const target = 110; // 每格 ~110px
+      const target = thumbnailSize + 46;
       const cols = Math.max(3, Math.min(8, Math.floor((w - 24) / target)));
       setGridCols(cols);
     };
@@ -141,7 +143,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [sortedEntries.length, viewMode, gridCols]);
+  }, [sortedEntries.length, viewMode, gridCols, thumbnailSize]);
 
   // === P3: 拖放 — 行作为 source ===
   // 选择拖哪些:如果有 selected(>=1)就用 selected,否则拖光标所在项
@@ -153,7 +155,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
 
   const handleRowDragStart = useCallback(
     (entry: FsEntry, e: ReactDragEvent<HTMLElement>) => {
-      const paths = getDragPaths();
+      let paths = getDragPaths();
       if (paths.length === 0) {
         e.preventDefault();
         return;
@@ -161,6 +163,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       // 如果拖的行不在当前 selection 里,把它加入 selection
       if (!paths.includes(entry.path)) {
         selectOne(paneId, entry.path);
+        paths = [entry.path];
         startDrag([entry.path], paneId);
       } else {
         startDrag(paths, paneId);
@@ -419,81 +422,18 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   //  - 拖框动作命中 row 时,把该 row 加入 selection;释放时一次性 commit selectRect。
   const computeEntriesInRect = useCallback(
     (band: RubberBand, list: FsEntry[]): string[] => {
-      // 视图 body 的滚动容器作为坐标原点。
-      const body = bodyRef.current;
-      if (!body || list.length === 0) return [];
-      const bodyRect = body.getBoundingClientRect();
-      // body 内可见区域(滚动后)
-      const bodyLeft = bodyRect.left;
-      const bodyTop = bodyRect.top;
-      const scrollTop = body.scrollTop;
-      const scrollLeft = body.scrollLeft;
+      const viewport = bodyRef.current;
+      if (!viewport) return [];
+      const rect = viewport.getBoundingClientRect();
+      return entriesInBox(buildViewRows(list, groupBy, viewMode === 'grid' ? gridCols : 1, viewMode === 'grid' ? thumbnailSize + 48 : 28), {
+        left: Math.min(band.startX, band.curX) - rect.left + viewport.scrollLeft,
+        right: Math.max(band.startX, band.curX) - rect.left + viewport.scrollLeft,
+        top: Math.min(band.startY, band.curY) - rect.top + viewport.scrollTop,
+        bottom: Math.max(band.startY, band.curY) - rect.top + viewport.scrollTop,
+      }, viewport.clientWidth || rect.width, viewMode === 'grid' ? gridCols : 1);
 
-      // 归一化 band 坐标(让 start <= cur)。
-      const x1 = Math.min(band.startX, band.curX);
-      const x2 = Math.max(band.startX, band.curX);
-      const y1 = Math.min(band.startY, band.curY);
-      const y2 = Math.max(band.startY, band.curY);
-
-      // 转换到 body 内部坐标(相对 body 内容左上角,已考虑滚动)
-      const bandLeft = x1 - bodyLeft + scrollLeft;
-      const bandTop = y1 - bodyTop + scrollTop;
-      const bandRight = x2 - bodyLeft + scrollLeft;
-      const bandBottom = y2 - bodyTop + scrollTop;
-
-      // 行高:details / list 用 28px,grid 用 96px(对齐 virtualizer estimateSize)
-      const rowH = viewMode === 'grid' ? 96 : 28;
-      const out: string[] = [];
-
-      if (viewMode === 'grid') {
-        const cols = Math.max(1, gridCols);
-        const rowHeight = 96;
-        const cellHeight = rowHeight;
-        const cellGap = 4; // 与 CSS .grid-row gap 一致
-        const colWidth = Math.max(1, (bodyRect.width - 24) / cols);
-        const startRow = Math.max(0, Math.floor(bandTop / cellHeight));
-        const endRow = Math.min(
-          Math.ceil(list.length / cols) - 1,
-          Math.floor(bandBottom / cellHeight),
-        );
-        for (let r = startRow; r <= endRow; r++) {
-          for (let c = 0; c < cols; c++) {
-            const idx = r * cols + c;
-            if (idx >= list.length) break;
-            const cellLeft = c * (colWidth + cellGap);
-            const cellRight = cellLeft + colWidth;
-            const cellTop = r * cellHeight;
-            const cellBottom = cellTop + cellHeight;
-            // 相交判定(AABB 命中即选)
-            if (
-              cellRight >= bandLeft &&
-              cellLeft <= bandRight &&
-              cellBottom >= bandTop &&
-              cellTop <= bandBottom
-            ) {
-              out.push(list[idx]!.path);
-            }
-          }
-        }
-        // suppress unused rowH warning for grid
-        void rowH;
-      } else {
-        // details / list:固定行高 28px
-        const startIdx = Math.max(0, Math.floor(bandTop / rowH));
-        const endIdx = Math.min(list.length - 1, Math.floor(bandBottom / rowH));
-        // details 视图行宽为 body 整个宽度;没有列概念,所以只判定 Y 轴相交。
-        // 但为了和"穿过行即选中"的 Finder 行为一致,仍要求 band 与 row 有真实重叠。
-        for (let i = startIdx; i <= endIdx; i++) {
-          const rowTop = i * rowH;
-          const rowBottom = rowTop + rowH;
-          if (rowBottom >= bandTop && rowTop <= bandBottom) {
-            out.push(list[i]!.path);
-          }
-        }
-      }
-      return out;
     },
-    [viewMode, gridCols],
+    [viewMode, gridCols, groupBy, thumbnailSize],
   );
 
   // mousedown on the body (empty area between rows or below them)
@@ -502,7 +442,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       // 仅在左键 + 命中当前 body 元素(空白区域)时启动拖框。
       // 若点击命中 row / header / cell,这些元素自己处理,不进入拖框分支。
       if (e.button !== 0) return;
-      if (e.target !== e.currentTarget) return;
+      if ((e.target as HTMLElement).closest('[data-entry-path], .file-list-group-header')) return;
       // preventDefault 阻止默认文本选择。
       // 注意:不调 stopPropagation — 否则 mousedown 不会冒泡到 PaneView 的
       // onMouseDown,导致「点 body 自身空白」时 pane 无法聚焦,也无法让
@@ -742,6 +682,8 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       )}
       {viewMode === 'grid' && (
         <GridView
+          groupBy={groupBy}
+          thumbnailSize={thumbnailSize}
           entries={sortedEntries}
           cols={gridCols}
           showExtensions={showExtensions}
@@ -798,6 +740,7 @@ function FileThumb({ entry, variant }: { entry: FsEntry; variant: 'row' | 'grid'
   const className = variant === 'grid' ? 'grid-icon-thumb' : 'row-icon-thumb';
 
   if (entry.isDirectory) {
+    if (entry.customIcon) return <img className={className} src={entry.customIcon} alt="自定义文件夹图标" draggable={false} />;
     return <span className={variant === 'grid' ? 'grid-icon' : 'row-icon'}>
       <Folder size={14} className="file-icon-folder" />
     </span>;
@@ -1248,6 +1191,8 @@ function ListView({
 // =================== 网格视图 ====================
 
 function GridView({
+  groupBy,
+  thumbnailSize,
   entries,
   cols,
   showExtensions,
@@ -1267,6 +1212,8 @@ function GridView({
   onBodyMouseDown,
   rubberBand,
 }: {
+  groupBy: GroupByMode;
+  thumbnailSize: number;
   entries: FsEntry[];
   cols: number;
   showExtensions: boolean;
@@ -1287,13 +1234,14 @@ function GridView({
   rubberBand?: { startX: number; startY: number; curX: number; curY: number } | null;
 }) {
   const parentRef = useRef<HTMLDivElement | null>(null);
-  const rows = Math.ceil(entries.length / cols);
+  const rows = useMemo(() => buildViewRows(entries, groupBy, cols, thumbnailSize + 48), [entries, groupBy, cols, thumbnailSize]);
   const rowVirtualizer = useVirtualizer({
-    count: rows,
+    count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 96,
+    estimateSize: index => rows[index].height,
     overscan: 4,
   });
+  useEffect(() => { rowVirtualizer.measure(); }, [thumbnailSize, groupBy, cols, entries]);
 
   const overlayStyle = rubberBand
     ? computeOverlayStyle(parentRef.current, rubberBand)
@@ -1306,7 +1254,7 @@ function GridView({
         if (bodyRef) bodyRef.current = el;
       }}
       className="grid-view file-list-body file-list-body-virtual"
-      style={{ ['--grid-cols' as string]: String(cols) }}
+      style={{ ['--grid-cols' as string]: String(cols), ['--thumbnail-size' as string]: `${thumbnailSize}px` }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -1321,8 +1269,9 @@ function GridView({
         }}
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const start = virtualRow.index * cols;
-          const rowItems = entries.slice(start, start + cols);
+          const row = rows[virtualRow.index];
+          if (row.header) return <div className="file-list-group-header" key={`header-${row.header}`} style={{ position: 'absolute', transform: `translateY(${virtualRow.start}px)`, height: virtualRow.size, width: '100%' }}>{row.header}</div>;
+          const rowItems = row.entries;
           return (
             <div
               key={virtualRow.index}

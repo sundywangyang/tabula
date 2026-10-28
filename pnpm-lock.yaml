@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      pdfjs-dist:
+        specifier: ^4.0.189
+        version: 4.0.189
       '@tabula/bridge':
         specifier: workspace:*
         version: link:apps/bridge
@@ -86,6 +89,16 @@ importers:
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
+
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
+      pdfjs-dist:
+        specifier: ^4.0.189
+        version: 4.0.189
 
   apps/renderer:
     dependencies:

@@ -14,6 +14,8 @@
  * - `log:*`      P7 错误日志
  */
 export const IpcChannels = {
+  TOOLS_RUN: 'tools:run',
+  TOOLS_PROGRESS: 'tools:progress',
   // 文件系统
   FS_LIST_DIR: 'fs:list-dir',
   FS_CHANGED: 'fs:changed',

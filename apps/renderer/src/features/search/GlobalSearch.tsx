@@ -216,11 +216,12 @@ export function GlobalSearch() {
             <div
               key={hit.path}
               data-idx={gs.page * gs.pageSize + i}
-              className={`gs-row ${i === gs.selectedIndex ? 'gs-row-selected' : ''}`}
+              className={`gs-row ${gs.page * gs.pageSize + i === gs.selectedIndex ? 'gs-row-selected' : ''}`}
               onMouseEnter={() => setSelected(gs.page * gs.pageSize + i)}
               onClick={() => handleSelect(i)}
             >
               <span className="gs-row-icon">{hit.isDirectory ? '📁' : '📄'}</span>
+              <button aria-label={`定位 ${hit.name}`} onClick={event => { event.stopPropagation(); void useFileStore.getState().revealInPane(activePaneId, hit.path).then(close); }}>定位</button>
               <span className="gs-row-name" title={hit.name}>
                 <HighlightMatch name={hit.name} query={gs.query} />
               </span>

@@ -1,0 +1,76 @@
+import React, { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { useLayoutStore } from '../../../stores/layout-store';
+import { useFileStore } from '../../../stores/file-store';
+import { FileList } from '../FileList';
+import { PropertiesPanel } from '../PropertiesPanel';
+import { buildMenuItems } from '../../../components/ContextMenu';
+import { setCachedReadonly, getCachedReadonly } from '../../../components/readonly-cache';
+import { parseArchive } from '../../preview/PreviewPanel';
+import { encodeTar } from '@tabula/core';
+import { gzipSync, strToU8, zipSync } from 'fflate';
+import type { FsEntry, TabulaAPI, DirSizeProgress } from '@tabula/bridge';
+vi.mock('@tanstack/react-virtual', () => ({ useVirtualizer: (options: any) => ({ getTotalSize: () => options.count * 28, getVirtualItems: () => Array.from({ length: options.count }, (_, index) => ({ index, key: index, start: index * 28, size: options.estimateSize(index) })), scrollToIndex() {}, measure() {} }) }));
+vi.mock('../../../perf/use-file-list-perf', () => ({ useFileListPerfReport() {} }));
+const entry = (name: string, mode = 0o644): FsEntry => ({ name, path: 'C:/fixtures/' + name, mode, ext: '.txt', isDirectory: false, isFile: true, isSymlink: false, size: 5, mtime: 1, atime: 1, ctime: 1, birthtime: 1 });
+let root: Root; let container: HTMLDivElement; let bridge: any;
+beforeEach(() => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
+  bridge = { config: { set: vi.fn(async () => {}) }, tags: { get: vi.fn(async () => ({ ok: true, data: [] })) }, fs: { stat: vi.fn(async (path: string) => ({ ok: true, data: entry(path.split('/').pop()!) })), setPermissions: vi.fn(async () => ({ ok: true })), onDirSizeProgress: vi.fn(() => () => {}), cancelDirSize: vi.fn(async () => ({ ok: true })) } };
+  window.tabula = bridge as TabulaAPI;
+  useLayoutStore.setState({ activePaneId: 'p' });
+  useFileStore.setState({ panes: {}, sortBy: 'name', sortDir: 'asc', thumbnailSize: 64, toasts: [] });
+});
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+describe('roadmap interaction regressions', () => {
+  it('rubber-band selects both files under a group header through actual component mouse events', async () => {
+    const entries = [entry('a.txt'), entry('b.txt')];
+    useFileStore.setState({ panes: { p: { entries, currentPath: 'C:/fixtures', breadcrumb: [], loading: false, error: null, selectedPaths: new Set(), cursorPath: null, lastClickedPath: null, renameTarget: null, searchQuery: '', searchOpen: false, viewMode: 'details', groupBy: 'type' } } });
+    await act(async () => root.render(<FileList paneId="p" onOpenEntry={() => {}} />));
+    const body = container.querySelector('.file-list-body') as HTMLElement;
+    body.getBoundingClientRect = () => ({ x: 0, y: 0, top: 0, left: 0, bottom: 500, right: 600, width: 600, height: 500, toJSON() {} });
+    await act(async () => body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 500, clientY: 100 })));
+    await act(async () => window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 500, clientY: 36 })));
+    expect([...useFileStore.getState().panes.p.selectedPaths]).toEqual(entries.map(e => e.path));
+    await act(async () => useFileStore.getState().setSearchQuery('p', 'b.txt'));
+    expect(container.querySelectorAll('[data-entry-path]')).toHaveLength(1);
+  });
+  it('mixed selection locks every file and caches newly read permissions', async () => {
+    const a = entry('writable.txt'), b = entry('readonly.txt', 0o444); const modes = new Map([[a.path, a.mode], [b.path, b.mode]]);
+    bridge.fs.stat.mockImplementation(async (path: string) => ({ ok: true, data: { ...a, path, mode: modes.get(path) } }));
+    bridge.fs.setPermissions.mockImplementation(async (request: any) => { modes.set(request.path, request.readonly ? 0o444 : 0o644); return { ok: true }; });
+    setCachedReadonly(a.path, a.mode);
+    const items = buildMenuItems({ paneId: 'p', targetEntry: a, isEmptySpace: false, selectedPaths: new Set([a.path, b.path]), currentPath: 'C:/fixtures', clipboard: null, actions: useFileStore.getState() });
+    await items.find(item => item.label === '锁定')!.action!();
+    expect(bridge.fs.setPermissions.mock.calls.map(([request]: any) => request.readonly)).toEqual([true, true]);
+    expect(getCachedReadonly(a.path)).toBe(0o444); expect(getCachedReadonly(b.path)).toBe(0o444);
+  });
+  it('properties traps focus, exposes permissions and receives progress delivered before the job response', async () => {
+    let listener: (progress: DirSizeProgress) => void = () => {};
+    const directory = { ...entry('folder'), isDirectory: true, isFile: false };
+    bridge.fs.onDirSizeProgress.mockImplementation((fn: typeof listener) => { listener = fn; return () => {}; });
+    bridge.fs.getDirSize = vi.fn(async () => { listener({ jobId: 'fast', path: directory.path, totalBytes: 0, processedEntries: 0, done: true, cancelled: false }); return { ok: true, data: { jobId: 'fast' } }; });
+    await act(async () => root.render(<PropertiesPanel paneId="p" entry={directory} onClose={() => {}} />));
+    const panel = container.querySelector('[role=dialog]')!; expect(panel.getAttribute('aria-modal')).toBe('true'); expect(panel.textContent).toContain('权限');
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' })));
+    expect(panel.contains(document.activeElement)).toBe(true);
+    const calculate = [...container.querySelectorAll('button')].find(button => button.textContent === '计算')!;
+    await act(async () => calculate.click());
+    expect(container.textContent).toContain('0 B'); expect(container.textContent).toContain('重新计算'); expect(container.textContent).not.toContain('计算中…');
+    bridge.fs.showInFolder = vi.fn(async () => {});
+    const reveal = [...container.querySelectorAll('button')].find(button => button.textContent === '在文件资源管理器中打开')!;
+    await act(async () => reveal.click());
+    expect(bridge.fs.showInFolder).toHaveBeenCalledWith(directory.path);
+  });
+  it('previews ZIP, TAR and TGZ entries and text correctly', async () => {
+    const zip = zipSync({ 'hello.txt': strToU8('hello') });
+    expect(await parseArchive(zip.buffer as ArrayBuffer, '.zip')).toEqual([expect.objectContaining({ name: 'hello.txt', size: 5, preview: 'hello' })]);
+    const tar = encodeTar([{ name: '中文.txt', data: strToU8('内容'), directory: false }]);
+    const compressed = gzipSync(tar);
+    expect((await parseArchive(tar.buffer as ArrayBuffer, '.tar'))[0].preview).toBe('内容');
+    expect((await parseArchive(compressed.buffer as ArrayBuffer, '.tgz'))[0].name).toBe('中文.txt');
+  });
+});

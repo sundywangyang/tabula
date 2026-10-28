@@ -242,8 +242,8 @@
 
 /* P7 v1: 真实图片缩略图(网格视图) */
 .grid-icon-thumb {
-  width: 64px;
-  height: 64px;
+  width: var(--thumbnail-size, 64px);
+  height: var(--thumbnail-size, 64px);
   object-fit: cover;
   border-radius: 4px;
   background: var(--bg-elevated);

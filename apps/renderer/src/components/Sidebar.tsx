@@ -74,8 +74,10 @@ export function Sidebar({
       }
     };
     void load();
+    window.addEventListener('tabula:refresh-drives', load);
     return () => {
       cancelled = true;
+      window.removeEventListener('tabula:refresh-drives', load);
     };
   }, []);
 

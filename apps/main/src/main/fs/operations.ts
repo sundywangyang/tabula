@@ -8,6 +8,10 @@ import { copy } from './copy';
 import { move } from './move';
 import { assertAbsent, containsPath, fileError, pathExists, pathKey, samePath } from './path-safety';
 import { mapError, ok } from './result';
+export interface OperationHooks {
+  migrate?: (mappings: Array<{ source: string; destination: string }>, copy?: boolean) => void;
+  record?: (event: { operation: string; phase: 'do' | 'undo' | 'redo'; paths: string[]; destinations?: string[] }) => void;
+}
 
 function unwrap<T>(result: Result<T>): T {
   if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
@@ -45,12 +49,19 @@ export class FileOperations {
     private readonly backupRoot: string,
     private readonly trashItem: (path: string) => Promise<void>,
     readonly history: UndoManager = undoManager,
+    private readonly hooks: OperationHooks = {},
   ) {}
 
-  private async execute(label: string, action: () => Promise<void>, undo: () => Promise<void>, backup?: string): Promise<Result<void>> {
+  private async execute(label: string, action: () => Promise<void>, undo: () => Promise<void>, backup?: string, paths: string[] = [], destinations?: string[]): Promise<Result<void>> {
     try {
+      let first = true;
+      const record = (phase: 'do' | 'undo' | 'redo') => {
+        try { this.hooks.record?.({ operation: label, phase, paths, destinations }); } catch (error) { console.warn('操作历史写入失败', error); }
+      };
       await this.history.execute({
-        id: randomUUID(), label, timestamp: Date.now(), do: action, undo,
+        id: randomUUID(), label, timestamp: Date.now(),
+        do: async () => { await action(); record(first ? 'do' : 'redo'); first = false; },
+        undo: async () => { await undo(); record('undo'); },
         dispose: backup ? () => fs.rm(backup, { recursive: true, force: true }) : undefined,
       });
       return ok(undefined);
@@ -122,6 +133,7 @@ export class FileOperations {
           plan.done = true;
           plan.after = await fingerprint(plan.destination);
         }
+        this.hooks.migrate?.(plans.map(p => ({ source: p.source, destination: p.destination })), mode === 'copy');
       } catch (error) {
         const rollbackErrors: string[] = [];
         for (const plan of [...plans].reverse()) {
@@ -140,7 +152,8 @@ export class FileOperations {
         if (mode === 'move') await assertAbsent(plan.source);
       }
       for (const plan of [...plans].reverse()) await undoPlan(plan);
-    }, backup);
+      if (mode === 'move') this.hooks.migrate?.(plans.map(p => ({ source: p.destination, destination: p.source })));
+    }, backup, plans.map(p => p.source), plans.map(p => p.destination));
   }
 
   rename(oldPath: string, newPath: string): Promise<Result<void>> {
@@ -153,16 +166,19 @@ export class FileOperations {
     let signatures: Array<string | null> = [];
     return this.execute(`重命名 ${changes.length} 项`, async () => {
       unwrap(await batchRename(changes));
+      try { this.hooks.migrate?.(changes.map(p => ({ source: p.oldPath, destination: p.newPath }))); }
+      catch (error) { unwrap(await batchRename(changes.map(p => ({ oldPath: p.newPath, newPath: p.oldPath })))); throw error; }
       signatures = await Promise.all(changes.map((item) => fingerprint(item.newPath)));
     }, async () => {
       for (let index = 0; index < changes.length; index++) await assertUnchanged(changes[index].newPath, signatures[index]);
       unwrap(await batchRename(changes.map((item) => ({ oldPath: item.newPath, newPath: item.oldPath }))));
-    });
+      this.hooks.migrate?.(changes.map(p => ({ source: p.newPath, destination: p.oldPath })));
+    }, undefined, changes.map(p => p.oldPath), changes.map(p => p.newPath));
   }
 
   async mkdir(path: string, name?: string): Promise<Result<string>> {
     const target = name ? join(path, name) : path;
-    const result = await this.execute('新建文件夹', async () => { await fs.mkdir(target); }, async () => { await fs.rmdir(target); });
+    const result = await this.execute('新建文件夹', async () => { await fs.mkdir(target); }, async () => { await fs.rmdir(target); }, undefined, [target]);
     return result.ok ? ok(target) : result;
   }
 
@@ -189,7 +205,7 @@ export class FileOperations {
       await fs.unlink(path);
       if (saved) { await relocate(savedPath, path); saved = false; }
       before = await fingerprint(path);
-    }, backup);
+    }, backup, [path]);
   }
 
   async delete(paths: string[], useTrash = true): Promise<Result<void>> {
@@ -198,6 +214,7 @@ export class FileOperations {
       try {
         await this.history.enqueue(async () => {
           for (const path of paths) await fs.rm(path, { recursive: true });
+          this.hooks.record?.({ operation: '永久删除', phase: 'do', paths });
         });
         return ok(undefined);
       } catch (error) { return mapError(error); }
@@ -239,6 +256,6 @@ export class FileOperations {
         }
         plan.signature = await fingerprint(plan.path);
       }
-    }, backup);
+    }, backup, paths);
   }
 }

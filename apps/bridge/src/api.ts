@@ -52,18 +52,19 @@ import type {
 /** G008: tags API */
 export interface TagsApi {
   /** 取某路径的标签列表(无则返回空数组) */
-  get(path: string): Promise<string[]>;
+  get(path: string): Promise<Result<string[]>>;
   /** 覆盖设置某路径的标签列表 */
-  set(path: string, tags: string[]): Promise<void>;
+  set(path: string, tags: string[]): Promise<Result<void>>;
   /** 添加单个标签(重复忽略) */
-  add(path: string, tag: string): Promise<void>;
+  add(path: string, tag: string): Promise<Result<void>>;
   /** 移除单个标签 */
-  remove(path: string, tag: string): Promise<void>;
+  remove(path: string, tag: string): Promise<Result<void>>;
 }
 
 export type PlatformType = 'windows' | 'macos' | 'linux';
 
 export interface TabulaAPI {
+  tools: import('./tools').FileToolsApi;
   // 系统
   app: {
     version(): Promise<string>;
@@ -226,7 +227,7 @@ export interface TabulaAPI {
      */
     getUndoStack(): Promise<Result<UndoStackSnapshot>>;
     /**
-     * G018: 启动一次系统原生拖拽操作,把 paths[0] 作为真实文件拖出到外部 app。
+     * G018: 启动一次系统原生拖拽操作，将选中路径交给外部 app。
      *
      * **同步 IPC(sendSync)**:`webContents.startDrag()` 必须在 OS drag 生命周期内同步
      * 执行;异步 invoke 会在 microtask 排队,主进程到达时 OS drag 已结束,导致 Chromium
@@ -234,8 +235,7 @@ export interface TabulaAPI {
      * 让主进程 e.sender.startDrag 仍在 OS drag handler 的同一 tick 内执行。
      *
      * - 必须在渲染端 DOM `ondragstart` handler 内调用。
-     * - `webContents.startDrag` 一次只支持一个文件;多文件选择时仅第一个文件会被 OS
-     *   作为被拖项目接受(其它路径仍可被 Tabula 内部继续处理)。
+     * - 多项选择通过 files 参数发送，允许文件和目录。
      * - icon 优先取 paths[0] 的 NativeImage(图片文件自带缩略图),非图片文件回退到
      *   平台对应的 icon(.ico / .icns / .png)。
      */

@@ -6,6 +6,8 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import './BatchRenameDialog.css';
+import { defaultRenameRules, renameByRules, type RenameRules } from '@tabula/core/file-rules';
+import { useModal } from '../../components/use-modal';
 
 export interface BatchRenameDialogProps {
   paneId: string;
@@ -42,10 +44,14 @@ export function BatchRenameDialog({
   onClose,
   onRenamed,
 }: BatchRenameDialogProps) {
-  const [find, setFind] = useState('');
-  const [replace, setReplace] = useState('');
+  const [rules, setRules] = useState<RenameRules>({ ...defaultRenameRules });
+  const { find, replace } = rules;
+  const setFind = (find: string) => setRules(r => ({ ...r, find }));
+  const setReplace = (replace: string) => setRules(r => ({ ...r, replace }));
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModal(panelRef, onClose);
   const [preview, setPreview] = useState<RenamePreview[]>([]);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [renaming, setRenaming] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const inputFindRef = useRef<HTMLInputElement>(null);
@@ -68,7 +74,7 @@ export function BatchRenameDialog({
   useEffect(() => {
     if (showPreview) {
       const previews = names.map((name, i) => {
-        const newName = find ? name.split(find).join(replace) : name;
+        const newName = renameByRules(name, i, rules);
         return {
           oldName: name,
           newName,
@@ -78,10 +84,10 @@ export function BatchRenameDialog({
       });
       setPreview(previews);
     }
-  }, [find, replace, showPreview, names, paths]);
+  }, [rules, showPreview, names, paths]);
 
   const handleRename = async () => {
-    if (!find && !replace) return;
+    if (!Number.isSafeInteger(rules.start) || !Number.isSafeInteger(rules.step) || rules.step < 1 || rules.padding < 1 || rules.padding > 12) { setErrors(['请输入有效的起始编号、步长和 1–12 位补零宽度']); return; }
     setRenaming(true);
     setErrors([]);
 
@@ -90,7 +96,7 @@ export function BatchRenameDialog({
     for (let i = 0; i < paths.length; i++) {
       const oldPath = paths[i]!;
       const oldName = names[i]!;
-      const newName = find ? oldName.split(find).join(replace) : oldName;
+      const newName = renameByRules(oldName, i, rules);
       if (newName === oldName) continue;
       if (!newName.trim() || newName === '.' || newName === '..' || /[\\/\0]/.test(newName)) {
         setErrors([`${oldName}: 无效的新名称`]);
@@ -161,7 +167,7 @@ export function BatchRenameDialog({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="batch-rename-dialog" role="dialog" aria-modal="true">
+      <div ref={panelRef} tabIndex={-1} className="batch-rename-dialog" role="dialog" aria-modal="true" aria-label="批量重命名">
         {/* Header */}
         <div className="batch-rename-header">
           <span className="batch-rename-title">批量重命名</span>
@@ -170,6 +176,16 @@ export function BatchRenameDialog({
 
         {/* Rule inputs */}
         <div className="batch-rename-rules">
+          {(['prefix', 'suffix', 'template'] as const).map(key => <label className="batch-rename-rule-row" key={key}>
+            <span className="batch-rename-label">{{ prefix: '前缀', suffix: '后缀', template: '命名模板' }[key]}</span>
+            <input className="batch-rename-input" aria-label={{ prefix: '前缀', suffix: '后缀', template: '命名模板' }[key]} value={rules[key]} onChange={e => setRules(r => ({ ...r, [key]: e.target.value }))} />
+          </label>)}
+          <p>模板支持 {'{name}'} 文件名、{'{n}'} 编号、{'{ext}'} 扩展名；默认保留扩展名。</p>
+          {(['start', 'step', 'padding'] as const).map(key => <label className="batch-rename-rule-row" key={key}>
+            <span className="batch-rename-label">{{ start: '起始编号', step: '编号步长', padding: '补零位数' }[key]}</span>
+            <input className="batch-rename-input" type="number" aria-label={{ start: '起始编号', step: '编号步长', padding: '补零位数' }[key]} value={rules[key]} onChange={e => setRules(r => ({ ...r, [key]: Number(e.target.value) }))} />
+          </label>)}
+          <label>大小写 <select value={rules.caseMode} onChange={e => setRules(r => ({ ...r, caseMode: e.target.value as RenameRules['caseMode'] }))}><option value="keep">保留</option><option value="lower">小写</option><option value="upper">大写</option></select></label>
           <div className="batch-rename-rule-row">
             <label className="batch-rename-label">查找</label>
             <input
@@ -251,7 +267,7 @@ export function BatchRenameDialog({
           <button
             className="batch-rename-btn batch-rename-btn-primary"
             onClick={handleRename}
-            disabled={renaming || (!find && !replace)}
+            disabled={renaming}
           >
             {renaming ? '重命名中…' : `重命名${showPreview && changedCount > 0 ? ` (${changedCount})` : ''}`}
           </button>

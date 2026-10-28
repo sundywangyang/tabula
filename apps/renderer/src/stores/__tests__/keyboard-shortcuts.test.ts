@@ -107,6 +107,16 @@ describe('configured keyboard dispatch', () => {
     expect(useFileStore.getState().panes.p.searchOpen).toBe(true);
   });
 
+  it('lets an open context menu handle Escape while keeping the selected files', () => {
+    const menu = document.createElement('div'); menu.className = 'context-menu'; target.append(menu);
+    const closeMenu = vi.fn(() => menu.remove()); target.addEventListener('keydown', closeMenu, { once: true });
+    expect(press('Escape').defaultPrevented).toBe(false);
+    expect(closeMenu).toHaveBeenCalledOnce();
+    expect([...useFileStore.getState().panes.p.selectedPaths]).toEqual(['C:\\initial\\a.txt']);
+    press('Escape');
+    expect(useFileStore.getState().panes.p.selectedPaths.size).toBe(0);
+  });
+
   it('undo refreshes current directory data and reports failures', async () => {
     useKeymapStore.setState({ bindings: new Map([['file.undo', combo('z', { ctrl: true })]]) });
     mock.fs.undo.mockResolvedValueOnce({ ok: true, data: { id: '1', label: '复制', timestamp: 1 } });

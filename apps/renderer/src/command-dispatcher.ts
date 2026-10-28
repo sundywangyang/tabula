@@ -133,6 +133,12 @@ export function runCommandById(commandId: string): boolean {
     file.showToast(msg, kind, ms);
 
   switch (commandId) {
+    case 'tools.content': case 'tools.duplicates': case 'tools.history': case 'tools.network': case 'tools.links': case 'tools.icons': case 'tools.associations': {
+      const data = file.panes[activePaneId];
+      const mode = commandId.slice(6) as NonNullable<ReturnType<typeof useUiDialogsStore.getState>['toolsDialog']>['mode'];
+      dialogs.openTools(mode, activePaneId, ['content', 'duplicates', 'history', 'network'].includes(mode) ? data?.currentPath ?? '' : data?.selectedPaths.size === 1 ? [...data.selectedPaths][0] : data?.currentPath ?? '');
+      return true;
+    }
     case 'command-palette.toggle': {
       toggleCommandPalette();
       return true;
@@ -301,12 +307,12 @@ export function runCommandById(commandId: string): boolean {
       const data = file.panes[activePaneId];
       const selected = Array.from(data?.selectedPaths ?? []);
       if (selected.length === 0) {
-        showToast('请先选中一个 .zip 文件', 'warn');
+        showToast('请先选中 ZIP、TAR 或 TGZ 归档', 'warn');
         return true;
       }
       const archive = selected[0];
-      if (!/\.zip(x)?$/i.test(archive)) {
-        showToast('请选中一个 .zip 文件', 'warn');
+      if (!/\.(zipx?|tar|tgz|tar\.gz)$/i.test(archive)) {
+        showToast('请选中 ZIP、TAR 或 TGZ 归档', 'warn');
         return true;
       }
       void file.startExtract(archive, undefined, activePaneId);

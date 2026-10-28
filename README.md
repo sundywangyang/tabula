@@ -22,12 +22,15 @@
 - `Ctrl/⌘` 切换拖动为 copy,默认 move
 - 粘贴遇同名时弹**冲突解决**对话框(覆盖 / 跳过 / 重命名)
 - **批量重命名**对话框(统一前缀 / 后缀 / 替换 / 编号)
+- **压缩 / 解压** ZIP、TAR、TGZ，支持任务进度和取消
+- 标签随重命名 / 移动迁移，核心文件操作支持撤销 / 重做
 - 系统**剪贴板**:copy 与 cut 模式区分
 - 系统**回收站**:macOS Finder / Windows 回收站 / Linux gio
 
 ### 🔍 搜索
 - **命令面板**(`Cmd/Ctrl + Shift + P`):模糊匹配所有命令 + 路径
 - **全局搜索**(`Cmd/Ctrl + Shift + F`):跨目录递归搜索,带文件类型过滤
+- 工具栏 **文件工具 → 全文内容搜索 / 查找重复文件**，支持扫描进度、取消和结果定位
 - **历史记录**:最近访问过的路径
 - **书签 / 收藏**:固定常用目录
 
@@ -41,7 +44,7 @@
 | 🎵 音频 | `.mp3 .wav .ogg .flac` |
 | 📕 PDF | `.pdf` |
 | 🔤 字体 | `.ttf .otf .woff .woff2` |
-| 📦 压缩包 | `.zip .tar .gz .tgz .bz2 .7z` |
+| 📦 压缩包 | `.zip .tar .gz .tgz`（`.tar.gz` 按 TGZ 处理） |
 | 📝 Word | `.docx` |
 | 📊 Excel | `.xlsx .xlsm .xlsb` |
 | 🎞 PowerPoint | `.pptx` |
@@ -58,6 +61,12 @@
 - **List** — 紧凑行 + 排序
 - **Details** — 多列(名称 / 大小 / 修改时间 / 类型)
 - **Grid** — 缩略图视图
+- 类型 / 日期 / 大小分组，当前目录类型筛选，设置中调整缩略图尺寸
+
+### 🧰 文件工具
+- 文件操作历史时间线、软 / 硬链接查看与管理、自定义文件夹图标
+- Windows SMB / NFS 映射及系统默认应用设置入口
+- 逐项实现与验证范围见 [Feature Roadmap](docs/feature-roadmap.md)
 
 ### 🪟 窗口管理
 - macOS / Windows / Linux 各自原生窗口行为

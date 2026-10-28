@@ -2,7 +2,7 @@
  * G018: system drag-out (webContents.startDrag) 单测
  *
  * 覆盖:
- * - 多文件 paths → startDrag 用 paths[0] 作为 file(first-file-only 行为)
+ * - 多文件 paths → startDrag 用 files 发送全部选中路径
  * - 非图片文件(nativeIcon.isEmpty()=true)→ 用 fallback Icon path
  * - 图片文件(nativeIcon.isEmpty()=false)→ 用 first file 自身作为 icon
  * - startDrag throws → Result.error (IO_ERROR, message 透传)
@@ -58,6 +58,7 @@ describe('handleStartDrag (G018)', () => {
     // webContents.startDrag 只支持单文件,使用 paths[0]
     expect(startDrag).toHaveBeenCalledWith({
       file: '/data/a.png',
+      files: ['/data/a.png', '/data/b.txt', '/data/c.txt'],
       icon: '/fake/build-assets/icon/Tabula.ico',
     });
   });
@@ -168,21 +169,17 @@ describe('handleStartDrag (G018)', () => {
     expect(startDrag).not.toHaveBeenCalled();
   });
 
-  it('first 是目录 → Result.error "directories not supported", 不调 startDrag', async () => {
+  it('directories can participate in a native drag session', async () => {
     const startDrag = vi.fn();
-    const createImage = vi.fn();
+    const createImage = vi.fn(() => ({ isEmpty: () => true }));
     const ctx = makeCtx({
       startDrag,
       createImage,
       statSync: vi.fn(() => ({ isFile: () => false, isDirectory: () => true })),
     });
     const res = (await handleStartDrag(['/data/some-folder'], ctx)) as Result<void>;
-    expect(res.ok).toBe(false);
-    if (!res.ok) {
-      expect((res.error as FsError).code).toBe('UNKNOWN');
-      expect((res.error as FsError).message).toMatch(/directories not supported/);
-    }
-    expect(startDrag).not.toHaveBeenCalled();
+    expect(res.ok).toBe(true);
+    expect(startDrag).toHaveBeenCalledWith({ file: '/data/some-folder', icon: ctx.fallbackIconPath });
   });
 
   it('statSync 抛错 → 视为文件不存在(ENOENT)', async () => {

@@ -9,13 +9,14 @@
  * - 在 4 个 SortField(name/size/mtime/type)上行为一致
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import './setup';
+import { installTabulaMock } from './setup';
 // 必须先 import layout-store:file-store → layout-store 构成循环;
 // layout-store 又 import { makeFolderTab } from file-store 来初始化 store 树。
 import '../layout-store';
 import { useFileStore, type SortField, type SortDir } from '../file-store';
 
 beforeEach(() => {
+  installTabulaMock();
   // 重置全局 sortBy/sortDir 到初始默认值,避免其它 test 残留
   useFileStore.setState({ sortBy: 'name', sortDir: 'asc' });
 });

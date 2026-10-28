@@ -8,3 +8,5 @@
 export * from './fs/path';
 export * from './mime';
 export * from './id';
+export * from './file-rules';
+export * from './tar';

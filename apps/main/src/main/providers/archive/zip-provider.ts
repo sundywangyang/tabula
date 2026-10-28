@@ -13,9 +13,8 @@
  *           TB 级暂未支持(留给 v2 流式 streaming)。
  */
 import { randomUUID } from 'node:crypto';
-import { promises as fs, createReadStream, createWriteStream } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
-import { pipeline } from 'node:stream/promises';
 import { zip, unzip, Unzip } from 'fflate';
 import type {
   ArchiveError,
@@ -36,7 +35,6 @@ export function isArchivePath(p: string): boolean {
   const ext = p.slice(p.lastIndexOf('.')).toLowerCase();
   return SUPPORTED_EXT.has(ext);
 }
-
 /** 错误构造助手: 让所有 error 路径走同一条出口 */
 function err(code: ArchiveErrorCode, message: string, path?: string): ArchiveError {
   return { code, message, ...(path ? { path } : {}) };
@@ -636,8 +634,3 @@ export class ZipArchiveProvider implements ArchiveProvider {
     this.jobs.clear();
   }
 }
-
-// 移除 unused 警告(保留 streaming 工具以备 v2)
-void createReadStream;
-void createWriteStream;
-void pipeline;

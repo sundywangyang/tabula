@@ -180,7 +180,7 @@ describe('G016: dir-size 后台异步 + 取消', () => {
     const id = startDirSize(nonexistent);
     const done = await waitForDone(id);
     expect(done.done).toBe(true);
-    // 路径不存在时 readdir 抛错被 walk 内部 catch,正常广播 done(没有 entries)
+    expect(done.error).toBeTruthy();
     expect(done.cancelled).toBe(false);
     expect(done.processedEntries).toBe(0);
     expect(done.totalBytes).toBe(0);
@@ -194,6 +194,7 @@ describe('G016: dir-size 后台异步 + 取消', () => {
     expect(done.done).toBe(true);
     expect(done.totalBytes).toBe(0);
     expect(done.processedEntries).toBe(0);
+    expect(done.error).toBeUndefined();
   });
 
   it('onDirSizeProgress 返回 unsub 函数,unsub 后不再收到事件', async () => {

@@ -21,6 +21,8 @@ import type {
 } from '@tabula/bridge';
 import { useLayoutStore } from './layout-store';
 import { getCachedRootPath } from '../platform-cache';
+import { matchesCategory } from '@tabula/core/file-rules';
+import type { FileTypeCategory } from '@tabula/bridge';
 export { makeFolderTab } from './folder-tab';
 
 export interface BreadcrumbSegment {
@@ -112,6 +114,7 @@ export interface PendingConflicts {
 
 /** 单个 pane 持有的文件系统数据(独立于 layout 结构) */
 export interface PaneFileData {
+  fileType?: FileTypeCategory;
   currentPath: string;
   breadcrumb: BreadcrumbSegment[];
   entries: FsEntry[];
@@ -150,6 +153,7 @@ function emptyPaneData(): PaneFileData {
     searchOpen: false,
     viewMode: 'details',
     groupBy: 'none',
+    fileType: 'all',
   };
 }
 
@@ -236,6 +240,10 @@ export function isThumbnailable(ext: string): boolean {
 }
 
 interface FileStore {
+  thumbnailSize: number;
+  setThumbnailSize: (size: number) => void;
+  setFileType: (paneId: string, type: FileTypeCategory) => void;
+  revealInPane: (paneId: string, path: string) => Promise<void>;
   // ===== 共享视图设置(全局)=====
   sortBy: SortField;
   sortDir: SortDir;
@@ -376,7 +384,7 @@ interface FileStore {
    * 然后调主进程压缩,订阅进度通过 toast 显示。
    * 失败返回错误信息(已通过 toast 提示)。
    */
-  startCompress: (sources: string[], sourcePaneId?: string) => Promise<{ ok: boolean; error?: string }>;
+  startCompress: (sources: string[], sourcePaneId?: string, format?: 'zip' | 'tar' | 'tgz') => Promise<{ ok: boolean; error?: string }>;
   /**
    * 启动解压任务。弹目录选择框让用户选解压目标,
    * 然后调主进程解压,订阅进度通过 toast 显示。
@@ -562,9 +570,10 @@ function compareEntries(a: FsEntry, b: FsEntry, field: SortField, dir: SortDir):
 
 function computeFilteredSorted(
   entries: FsEntry[],
-  opts: { sortBy: SortField; sortDir: SortDir; showHidden: boolean; searchQuery?: string },
+  opts: { sortBy: SortField; sortDir: SortDir; showHidden: boolean; searchQuery?: string; fileType?: FileTypeCategory },
 ): FsEntry[] {
   let list = entries;
+  if (opts.fileType && opts.fileType !== 'all') list = list.filter(entry => matchesCategory(entry, opts.fileType));
   if (!opts.showHidden) {
     list = list.filter((e) => !e.name.startsWith('.'));
   }
@@ -714,6 +723,10 @@ export function groupEntries(entries: FsEntry[], mode: GroupByMode): GroupSectio
   return sections;
 }
 
+function displayEntries(data: PaneFileData, opts: { sortBy: SortField; sortDir: SortDir; showHidden: boolean }): FsEntry[] {
+  return groupEntries(computeFilteredSorted(data.entries, { ...opts, searchQuery: data.searchQuery, fileType: data.fileType }), data.groupBy ?? 'none').flatMap(section => section.entries);
+}
+
 // =================== Store ===================
 
 export const useFileStore = create<FileStore>((set, get) => {
@@ -733,6 +746,18 @@ export const useFileStore = create<FileStore>((set, get) => {
   return {
     // 视图(共享)
     sortBy: 'name',
+    thumbnailSize: 64,
+    setThumbnailSize: (value) => { const size = Math.max(40, Math.min(160, Math.round(value))); set({ thumbnailSize: size }); void persistConfig('thumbnailSize', size); },
+    setFileType: (paneId, fileType) => set(s => ({ panes: { ...s.panes, [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), fileType, selectedPaths: new Set(), cursorPath: null } } })),
+    revealInPane: async (paneId, path) => {
+      const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+      if (slash < 0) return;
+      const parent = slash === 0 ? path.slice(0, 1) : /^[a-z]:$/i.test(path.slice(0, slash)) ? path.slice(0, slash + 1) : path.slice(0, slash);
+      await useLayoutStore.getState().pane.navigate(paneId, parent);
+      set(s => ({ panes: { ...s.panes, [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), searchQuery: '', fileType: 'all' } }, ...(path.slice(slash + 1).startsWith('.') ? { showHidden: true } : {}) }));
+      get().selectOne(paneId, path);
+      useLayoutStore.getState().pane.focusPane(paneId);
+    },
     sortDir: 'asc',
     showHidden: false,
     showExtensions: true,
@@ -968,6 +993,7 @@ export const useFileStore = create<FileStore>((set, get) => {
           sortDir: (all.sortDir !== undefined ? all.sortDir : 'asc') as SortDir,
           showHidden: all.showHidden ?? false,
           showExtensions: all.showExtensions ?? true,
+          thumbnailSize: Math.max(40, Math.min(160, all.thumbnailSize ?? 64)),
         });
       } catch (e) {
         console.warn('[file-store] hydrate failed', e);
@@ -1003,7 +1029,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       if (!data) return;
       const { entries, lastClickedPath } = data;
       const { sortBy, sortDir, showHidden } = get();
-      const list = computeFilteredSorted(entries, { sortBy, sortDir, showHidden, searchQuery: data.searchQuery });
+      const list = displayEntries(data, { sortBy, sortDir, showHidden });
       const endIdx = list.findIndex((e) => e.path === path);
       let startIdx = 0;
       if (lastClickedPath) {
@@ -1044,7 +1070,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       const data = get().panes[paneId];
       if (!data) return;
       const { sortBy, sortDir, showHidden } = get();
-      const list = computeFilteredSorted(data.entries, { sortBy, sortDir, showHidden, searchQuery: data.searchQuery });
+      const list = displayEntries(data, { sortBy, sortDir, showHidden });
       set((s) => ({
         panes: {
           ...s.panes,
@@ -1058,7 +1084,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       const data = get().panes[paneId];
       if (!data) return;
       const { sortBy, sortDir, showHidden } = get();
-      const list = computeFilteredSorted(data.entries, { sortBy, sortDir, showHidden, searchQuery: data.searchQuery });
+      const list = displayEntries(data, { sortBy, sortDir, showHidden });
       const inverted = new Set<string>();
       for (const e of list) {
         if (!data.selectedPaths.has(e.path)) inverted.add(e.path);
@@ -1114,7 +1140,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       const data = get().panes[paneId];
       if (!data) return;
       const { sortBy, sortDir, showHidden } = get();
-      const list = computeFilteredSorted(data.entries, { sortBy, sortDir, showHidden, searchQuery: data.searchQuery });
+      const list = displayEntries(data, { sortBy, sortDir, showHidden });
       if (list.length === 0) return;
       let idx = data.cursorPath ? list.findIndex((e) => e.path === data.cursorPath) : -1;
       if (idx < 0) {
@@ -1139,7 +1165,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       const data = get().panes[paneId];
       if (!data) return;
       const { sortBy, sortDir, showHidden } = get();
-      const list = computeFilteredSorted(data.entries, { sortBy, sortDir, showHidden, searchQuery: data.searchQuery });
+      const list = displayEntries(data, { sortBy, sortDir, showHidden });
       if (list.length === 0) return;
       const target = edge === 'start' ? list[0]! : list[list.length - 1]!;
       set((s) => ({
@@ -1368,7 +1394,7 @@ export const useFileStore = create<FileStore>((set, get) => {
       const data = get().panes[paneId];
       if (!data) return [];
       const { sortBy, sortDir, showHidden } = get();
-      return computeFilteredSorted(data.entries, { sortBy, sortDir, showHidden, searchQuery: data.searchQuery });
+      return displayEntries(data, { sortBy, sortDir, showHidden });
     },
 
     // ============ P3: 工具 - 取 pane 路径 ============
@@ -2126,7 +2152,7 @@ export const useFileStore = create<FileStore>((set, get) => {
     },
 
     // ============ Archive (压缩 / 解压) ============
-    startCompress: async (sources: string[], sourcePaneId?: string) => {
+    startCompress: async (sources: string[], sourcePaneId?: string, format = 'zip') => {
       if (!sources || sources.length === 0) {
         get().showToast('未选中任何项', 'warn');
         return { ok: false, error: '未选中任何项' };
@@ -2135,11 +2161,12 @@ export const useFileStore = create<FileStore>((set, get) => {
       // 单选 → 源文件名.zip; 多选 → "N 项.zip"
       const defaultName =
         sources.length === 1
-          ? (sources[0].split(/[\\/]/).filter(Boolean).pop() ?? 'archive') + '.zip'
-          : `${sources.length} 项.zip`;
+          ? (sources[0].split(/[\\/]/).filter(Boolean).pop() ?? 'archive') + '.' + format
+          : `${sources.length} 项.${format}`;
       // 取第一个源文件的目录作为输出目录
       const firstDir = sources[0].split(/[\\/]/).slice(0, -1).join('/');
-      const destination = firstDir + '/' + defaultName;
+      const destination = await window.tabula.fs.saveDialog({ title: '保存归档', defaultPath: firstDir + '/' + defaultName, filters: [{ name: format.toUpperCase() + ' 归档', extensions: [format] }] });
+      if (!destination) return { ok: false, error: '已取消' };
 
       const req: CompressRequest = { sources, destination, sourcePaneId };
       const result = await window.tabula.archive.compress(req);

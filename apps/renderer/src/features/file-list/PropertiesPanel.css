@@ -3,22 +3,25 @@
   position: fixed;
   inset: 0;
   z-index: 5000;
-  pointer-events: none;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .properties-panel {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 320px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  width: min(520px, calc(100vw - 32px));
+  border-radius: 12px;
   background: var(--bg-elevated);
   border-left: 1px solid var(--border-strong);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  animation: properties-slide-in 0.15s ease-out;
   outline: none;
 }
 

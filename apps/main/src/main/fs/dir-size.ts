@@ -77,7 +77,7 @@ export function startDirSize(rootPath: string): string {
         broadcast(toProgress(job, { done: true }));
       }
     } catch (e) {
-      // walk 内部已 try/catch 吞掉单文件错误,这里通常不会触发;保险起见广播 error
+      // 读取失败明确广播 error，避免把不可读目录显示为空目录。
       if (!job.cancelled) {
         broadcast(
           toProgress(job, {
@@ -129,9 +129,8 @@ async function walk(job: DirSizeJob, p: string): Promise<void> {
   let entries;
   try {
     entries = await readdir(p, { withFileTypes: true });
-  } catch {
-    // 单目录不可读,跳过(权限不足 / 链接死循环等)
-    return;
+  } catch (error) {
+    throw new Error(`无法读取目录 ${p}: ${(error as Error).message}`);
   }
 
   for (const e of entries) {
@@ -144,8 +143,8 @@ async function walk(job: DirSizeJob, p: string): Promise<void> {
       try {
         const s = await stat(child);
         job.totalBytes += s.size;
-      } catch {
-        // 单文件不可读,跳过
+      } catch (error) {
+        throw new Error(`无法读取文件 ${child}: ${(error as Error).message}`);
       }
       job.processedEntries += 1;
       if (job.processedEntries % PROGRESS_INTERVAL === 0) {

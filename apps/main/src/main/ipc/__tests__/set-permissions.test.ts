@@ -9,14 +9,22 @@
  * - 入参校验:空 path / 非 boolean readonly → Result.error
  */
 import { describe, expect, it, vi } from 'vitest';
-import { handleSetPermissions } from '../handlers';
+import { handleSetPermissions as actualSetPermissions } from '../handlers';
 import type { FsError, FsSetPermissionsRequest, Result } from '@tabula/bridge';
 
 function makeReq(overrides: Partial<FsSetPermissionsRequest> = {}): FsSetPermissionsRequest {
   return { path: '/tmp/file.txt', readonly: true, ...overrides };
 }
+const handleSetPermissions = (request: FsSetPermissionsRequest, chmod: Parameters<typeof actualSetPermissions>[1]) => actualSetPermissions(request, chmod, async () => ({ mode: 0o644 }));
 
 describe('handleSetPermissions (G010)', () => {
+  it('preserves execute/group bits and restores the original writable permissions', async () => {
+    const chmod = vi.fn().mockResolvedValue(undefined);
+    await actualSetPermissions({ path: '/test/executable', readonly: true }, chmod, async () => ({ mode: 0o775 }));
+    expect(chmod).toHaveBeenLastCalledWith('/test/executable', 0o555);
+    await actualSetPermissions({ path: '/test/executable', readonly: false }, chmod, async () => ({ mode: 0o555 }));
+    expect(chmod).toHaveBeenLastCalledWith('/test/executable', 0o775);
+  });
   it('readonly=true → chmod called with 0o444', async () => {
     const chmod = vi.fn().mockResolvedValue(undefined);
     const res = (await handleSetPermissions(makeReq({ readonly: true }), chmod)) as Result<void>;

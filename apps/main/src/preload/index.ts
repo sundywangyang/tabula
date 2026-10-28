@@ -39,6 +39,14 @@ function makeEvents() {
 const PERF_PUSH_CHANNELS: readonly string[] = [IpcChannels.PERF_MEMORY_SAMPLE];
 
 const api: TabulaAPI = {
+  tools: {
+    run: (method, input) => ipcRenderer.invoke(IpcChannels.TOOLS_RUN, method, input),
+    onProgress: (listener) => {
+      const wrapped = (_event: IpcRendererEvent, progress: import('@tabula/bridge').ToolProgress) => listener(progress);
+      ipcRenderer.on(IpcChannels.TOOLS_PROGRESS, wrapped);
+      return () => ipcRenderer.removeListener(IpcChannels.TOOLS_PROGRESS, wrapped);
+    },
+  },
   app: {
     version: () => ipcRenderer.invoke(IpcChannels.APP_VERSION),
     ready: () => ipcRenderer.invoke(IpcChannels.APP_READY),

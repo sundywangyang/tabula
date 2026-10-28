@@ -80,6 +80,7 @@ export function isReservedCombo(combo: KeyCombo | null): boolean {
  * 至少 10 个;本清单 18 个。
  */
 export const COMMAND_CATALOG: CommandSpec[] = [
+  ...Object.entries({ content: '全文内容搜索', duplicates: '查找重复文件', history: '文件历史时间线', network: '连接服务器', links: '链接管理', icons: '文件夹图标', associations: '默认应用管理' }).map(([mode, title]) => ({ id: `tools.${mode}`, title, category: '文件工具', defaultCombo: null, reserved: false })),
   {
     id: 'command-palette.toggle', title: '命令面板', category: '视图',
     defaultCombo: parseKeyCombo('Ctrl+Shift+P'), reserved: true,

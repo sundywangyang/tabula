@@ -34,6 +34,7 @@
     "vitest": "3.2.4"
   },
   "dependencies": {
+    "pdfjs-dist": "^4.0.189",
     "@tabula/bridge": "workspace:*",
     "@tabula/core": "workspace:*",
     "@tabula/ext-api": "workspace:*",

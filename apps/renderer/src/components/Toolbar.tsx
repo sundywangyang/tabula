@@ -37,6 +37,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { useFileStore, type ViewMode, type GroupByMode } from '../stores/file-store';
+import { useUiDialogsStore } from '../stores/ui-dialogs-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
 import { Tooltip } from './Tooltip';
@@ -71,6 +72,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
   // 数据切片（值类型，不创建新引用）
   const viewMode = useFileStore((s) => s.panes[paneId]?.viewMode ?? 'details');
   const groupBy = useFileStore((s) => s.panes[paneId]?.groupBy ?? 'none');
+  const fileType = useFileStore(s => s.panes[paneId]?.fileType ?? 'all');
   const showHidden = useFileStore((s) => s.showHidden);
   const showExtensions = useFileStore((s) => s.showExtensions);
   const currentPath = useFileStore((s) => s.panes[paneId]?.currentPath ?? EMPTY_PATH);
@@ -469,6 +471,15 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       {/* G007: 分组切换 (none → type → date → size → none 循环) */}
+      <select aria-label="按文件类型筛选" value={fileType} onChange={e => useFileStore.getState().setFileType(paneId, e.target.value as import('@tabula/bridge').FileTypeCategory)}>
+        {Object.entries({ all: '全部类型', folder: '文件夹', image: '图片', document: '文档', code: '代码', archive: '压缩包', audio: '音频', video: '视频' }).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+      </select>
+      <select aria-label="文件工具" value="" onChange={e => {
+        const mode = e.target.value as NonNullable<ReturnType<typeof useUiDialogsStore.getState>['toolsDialog']>['mode'];
+        if (mode) useUiDialogsStore.getState().openTools(mode, paneId, ['content', 'duplicates', 'history', 'network'].includes(mode) ? currentPath : selectedPaths.size === 1 ? [...selectedPaths][0] : currentPath);
+      }}>
+        <option value="">文件工具</option><option value="content">全文内容搜索</option><option value="duplicates">查找重复文件</option><option value="history">文件历史时间线</option><option value="network">连接服务器</option><option value="links">链接管理</option><option value="icons">文件夹图标</option><option value="associations">默认应用</option>
+      </select>
       <div className="toolbar-group">
         <Tooltip label={`分组: ${groupByLabel(groupBy)}`}>
           <button

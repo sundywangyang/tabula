@@ -18,6 +18,7 @@ import 'highlight.js/styles/atom-one-dark.css';
 import { useFileStore } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
 import './PreviewPanel.css';
+import { decodeTar } from '@tabula/core/tar';
 
 // 阈值:文本/代码/MD 超过此大小截断到 100 行
 const TEXT_TRUNCATE_BYTES = 1024 * 1024; // 1MB
@@ -1134,36 +1135,29 @@ const TEXT_PREVIEW_EXTS = new Set([
 ]);
 
 /**
- * 解析 zip: fflate 的 unzipSync 返回 { [name]: Unzipped }
- * 解析 tar: fflate 的 unzipTarSync 接受 Uint8Array 返回 { [name]: Unzipped }
- *   (fflate 把 tar 当 zip-without-compression 处理, 复用同一 API)
- * 解析 gz: fflate 自身不直接解压, 但 .tar.gz = .tgz 可走 tar 路径 (流式).
- *   单 .gz 文件 (非 tar 容器) 仅显示 "file size + extracted" 占位.
+ * ZIP 使用 fflate；TAR 使用独立 TAR 解析器；TGZ 先解 gzip 再解析 TAR。
+ * 单文件 gzip 展示解压后的大小及短文本预览。
  */
-async function parseArchive(ab: ArrayBuffer, ext: string): Promise<ArchiveEntry[]> {
-  const { unzipSync, strFromU8 } = await import('fflate');
-  // tar/tgz 复用 unzip 接口 (fflate 设计)
+export async function parseArchive(ab: ArrayBuffer, ext: string): Promise<ArchiveEntry[]> {
+  const { unzipSync, strFromU8, gunzipSync } = await import('fflate');
+  if (['.7z', '.rar', '.bz2'].includes(ext)) throw new Error('当前不支持此归档格式');
+  if (ext === '.tar' || ext === '.tgz' || ext === '.gz') {
+    const bytes = ext === '.tar' ? new Uint8Array(ab) : gunzipSync(new Uint8Array(ab));
+    if (ext === '.gz' && !(bytes.length >= 512 && new TextDecoder().decode(bytes.subarray(257, 262)) === 'ustar')) return [{ name: nameFromGz(ab), size: bytes.length, isDir: false, preview: bytes.length < 8192 ? strFromU8(bytes) : null }];
+    return decodeTar(bytes).map(file => ({ name: file.name, size: file.data.length, isDir: file.directory, preview: !file.directory && file.data.length < 8192 && TEXT_PREVIEW_EXTS.has('.' + file.name.split('.').pop()?.toLowerCase()) ? strFromU8(file.data) : null }));
+  }
   const raw = new Uint8Array(ab);
-  let unzipped: Record<string, { name: string; data?: Uint8Array }> = {};
+  let unzipped: Record<string, Uint8Array> = {};
   try {
-    if (ext === '.gz' && !ext.includes('tar')) {
-      // 单 .gz 不是容器, 只显示 1 个 entry
-      return [{ name: nameFromGz(ab), size: ab.byteLength, isDir: false, preview: null }];
-    }
-    // zip / tar / tgz 都走 unzipSync
-    if (ext === '.7z' || ext === '.rar') {
-      unzipped = {}; // fflate 不支持 7z/rar
-    } else {
-      unzipped = unzipSync(raw) as unknown as Record<string, { name: string; data?: Uint8Array }>;
-    }
+    unzipped = unzipSync(raw);
   } catch (err) {
     throw new Error(`压缩包解析失败: ${(err as Error).message}`);
   }
 
   const entries: ArchiveEntry[] = [];
   for (const [name, val] of Object.entries(unzipped)) {
-    const isDir = name.endsWith('/') || val.name.endsWith('/');
-    const data = val.data;
+    const isDir = name.endsWith('/');
+    const data = val;
     const size = data ? data.byteLength : 0;
     let preview: string | null = null;
     if (data && !isDir && size < 8 * 1024) {
@@ -1189,7 +1183,8 @@ function nameFromGz(ab: ArrayBuffer): string {
   // 从 .gz 头取原文件名 (RFC 1952 FNAME 字段)
   const bytes = new Uint8Array(ab);
   let i = 10; // 跳过 GZ magic(2) + method(1) + flags(1) + mtime(4) + xfl(1) + os(1)
-  if (bytes.length > i + 2 && (bytes[3] & 0x04)) { // FNAME flag
+  if (bytes[3] & 0x04) { if (bytes.length < 12) return 'decompressed.bin'; i += 2 + bytes[10] + (bytes[11] << 8); }
+  if (bytes.length > i && (bytes[3] & 0x08)) {
     const start = i;
     while (i < bytes.length && bytes[i] !== 0) i++;
     return new TextDecoder().decode(bytes.slice(start, i)) || 'decompressed.bin';

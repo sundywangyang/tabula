@@ -45,8 +45,7 @@ export default defineConfig({
     },
     // PDF.js (pdfjs-dist) 用了顶层 await, electron-vite 当前的 target
     // (chrome87/es2020) 不支持顶层 await, 报错 "Top-level await is not available".
-    // 排除 PDF.js 不进 main bundle (main 进程不直接 require 它, 只有 renderer
-    // 用 dynamic import). 同时 optimizeDeps.exclude 避免 vite 预构建.
+    // PDF.js 保持外部 ESM，由内容搜索动态导入；避免可选 canvas 依赖进入主进程包。
     ssr: {
       noExternal: [],
       external: ['pdfjs-dist'],
@@ -62,7 +61,11 @@ export default defineConfig({
       rollupOptions: {
         // Prevent @tabula/* workspace packages from being externalized —
         // they are TypeScript source and must be bundled so esbuild processes them
-        external: [],
+        external: [/^pdfjs-dist(?:\/|$)/],
+        // Keep CommonJS helpers in the entry bundle. Bundled conf clears the entry's
+        // require cache; a lazy chunk importing helpers from that entry would run
+        // Electron initialization again. Native external PDF.js imports stay lazy.
+        output: { inlineDynamicImports: true },
       },
     },
   },

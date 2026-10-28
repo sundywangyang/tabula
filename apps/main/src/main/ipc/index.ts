@@ -45,6 +45,10 @@ import { getShellProvider } from '../providers/shell';
 import { archiveManager } from '../archive/archive-manager';
 import * as tagsStore from '../store/tags-store';
 import { undoManager } from '../undo/undo-manager';
+import { recordActivity } from '../store/activity-store';
+import { FileToolsService } from '../services/file-tools';
+import { folderIcons, migrateFolderIcons } from '../services/folder-icons';
+import { mapError, ok } from '../fs/result';
 import type { CompressRequest, ExtractRequest } from '@tabula/bridge';
 
 export interface IpcContext {
@@ -53,7 +57,13 @@ export interface IpcContext {
 
 export function registerIpcHandlers(ctx: IpcContext) {
   const historyDir = join(app.getPath('userData'), 'undo', `${process.pid}-${Date.now()}`);
-  const fileOperations = new FileOperations(historyDir, (path) => shell.trashItem(path));
+  const fileOperations = new FileOperations(historyDir, (path) => shell.trashItem(path), undoManager, {
+    migrate: (mappings, copy) => { tagsStore.migrateTags(mappings, copy); migrateFolderIcons(mappings, copy); }, record: recordActivity,
+  });
+  const tools = new FileToolsService(progress => {
+    for (const window of ctx.windowManager.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(IpcChannels.TOOLS_PROGRESS, progress);
+  });
+  ipcMain.handle(IpcChannels.TOOLS_RUN, (_event, method, input) => tools.run(method, input));
   // Finish queued mutations and remove history backups on normal exit. Failed recovery backups remain intact.
   app.once('will-quit', (event) => {
     event.preventDefault();
@@ -91,6 +101,10 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // eslint-disable-next-line no-console
   console.error('[ipc] FS_LIST_DIR path=', p);
   return fsService.listDir(p).then((r) => {
+    if (r.ok) {
+      const icons = folderIcons(r.data.entries.filter(entry => entry.isDirectory).map(entry => entry.path));
+      for (const entry of r.data.entries) entry.customIcon = icons[entry.path];
+    }
     // eslint-disable-next-line no-console
     console.error('[ipc] FS_LIST_DIR result ok=', r.ok, 'count=', r.ok ? r.data.entries.length : 'n/a');
     return r;
@@ -410,15 +424,16 @@ export function registerIpcHandlers(ctx: IpcContext) {
   // 不在这里 register handler(那是渲染端 subscribe 的 channel)
 
   // =================== Tags (G008: 文件标记) ===================
-  ipcMain.handle(IpcChannels.TAGS_GET, (_e, path: string) => tagsStore.getTags(path));
+  const tagsResult = (operation: () => unknown) => { try { return ok(operation()); } catch (error) { return mapError(error); } };
+  ipcMain.handle(IpcChannels.TAGS_GET, (_e, path: string) => tagsResult(() => tagsStore.getTags(path)));
   ipcMain.handle(IpcChannels.TAGS_SET, (_e, path: string, tags: string[]) => {
-    tagsStore.setTags(path, tags);
+    return tagsResult(() => tagsStore.setTags(path, tags));
   });
   ipcMain.handle(IpcChannels.TAGS_ADD, (_e, path: string, tag: string) => {
-    tagsStore.addTag(path, tag);
+    return tagsResult(() => tagsStore.addTag(path, tag));
   });
   ipcMain.handle(IpcChannels.TAGS_REMOVE, (_e, path: string, tag: string) => {
-    tagsStore.removeTag(path, tag);
+    return tagsResult(() => tagsStore.removeTag(path, tag));
   });
 
   // =================== Undo / Redo (G012) ===================

@@ -6,6 +6,7 @@
  */
 import { chmod as realChmod, stat as realStat, symlink as realSymlink } from 'node:fs/promises';
 import type { FsCreateSymlinkRequest, FsError, FsErrorCode, FsSetPermissionsRequest, Result } from '@tabula/bridge';
+const savedPermissions = new Map<string, number>();
 
 /** 与 `node:fs/promises` 的 chmod 同形,便于注入 mock */
 export type ChmodFn = (
@@ -35,6 +36,7 @@ export type SymlinkFn = (
 export async function handleSetPermissions(
   req: FsSetPermissionsRequest,
   chmod: ChmodFn = realChmod,
+  stat: (path: string) => Promise<{ mode: number }> = realStat,
 ): Promise<Result<void>> {
   try {
     if (!req || typeof req.path !== 'string' || req.path.length === 0) {
@@ -43,7 +45,11 @@ export async function handleSetPermissions(
     if (typeof req.readonly !== 'boolean') {
       return { ok: false, error: { code: 'UNKNOWN' as FsErrorCode, message: 'invalid readonly flag' } };
     }
-    await chmod(req.path, req.readonly ? 0o444 : 0o644);
+    const current = (await stat(req.path)).mode & 0o7777;
+    if (req.readonly && (current & 0o222)) savedPermissions.set(req.path, current);
+    const mode = req.readonly ? current & ~0o222 : savedPermissions.get(req.path) ?? (current | 0o200);
+    await chmod(req.path, mode);
+    if (!req.readonly) savedPermissions.delete(req.path);
     return { ok: true, data: undefined };
   } catch (e) {
     const err = e as NodeJS.ErrnoException;
@@ -163,7 +169,7 @@ export async function handleChecksum(
  * 与 Electron `webContents.startDrag({ file, icon })` 同形的注入点,便于单测。
  * 测试时传 mock,生产由 ipc/index.ts 包一层 `e.sender.startDrag`。
  */
-export type StartDragFn = (item: { file: string; icon: string }) => void;
+export type StartDragFn = (item: { file: string; files?: string[]; icon: string }) => void;
 
 /**
  * `nativeImage.createFromPath(path).isEmpty()` 的最小替身,便于单测注入。
@@ -194,8 +200,7 @@ export function resolveDragIconPath(
 /**
  * G018: 启动一次系统原生拖拽。
  *
- * 把 paths[0] 作为真实文件交给 OS drag session。webContents.startDrag 一次只支持
- * 一个文件 — 多文件选择时仅第一个文件会被 OS 作为被拖项目接受。
+ * 将全部选中路径通过 Electron 的 files 参数交给系统，单项仍使用 file 参数。
  *
  * 必须在渲染端 DOM `ondragstart` handler 内**同步**调用;主进程这一侧 startDragFn
  * 仍处在 OS drag 生命周期内,目标 app(桌面 / VSCode / 微信 / 7-Zip)收到的是真实文件
@@ -220,17 +225,15 @@ export function handleStartDrag(
   const firstFile = paths[0]!;
   // 防御:文件不存在时直接 reject,避免 electron 内部抛错
   const statFn = ctx.statSync ?? defaultStatSync;
-  const st = safeStatSync(statFn, firstFile);
-  if (!st) {
-    return { ok: false, error: { code: 'ENOENT', message: `Source file not found: ${firstFile}`, path: firstFile } };
+  for (const path of paths) {
+    if (typeof path !== 'string' || !path) return { ok: false, error: { code: 'UNKNOWN', message: 'Invalid drag path' } };
+    const st = safeStatSync(statFn, path);
+    if (!st) return { ok: false, error: { code: 'ENOENT', message: `Source file not found: ${path}`, path } };
+    if (!st.isFile() && !st.isDirectory()) return { ok: false, error: { code: 'UNKNOWN', message: 'Unsupported file type', path } };
   }
-  if (!st.isFile()) {
-    // 目录走 OS 原生拖拽会触发不一样行为(Windows 资源管理器会遍历目录),统一 reject
-    return { ok: false, error: { code: 'UNKNOWN', message: 'Only files can be dragged out (directories not supported)', path: firstFile } };
-  }
-  const iconPath = resolveDragIconPath(firstFile, ctx.createImage, ctx.fallbackIconPath);
   try {
-    ctx.startDrag({ file: firstFile, icon: iconPath });
+    const iconPath = resolveDragIconPath(firstFile, ctx.createImage, ctx.fallbackIconPath);
+    ctx.startDrag({ file: firstFile, ...(paths.length > 1 ? { files: [...new Set(paths)] } : {}), icon: iconPath });
     return { ok: true, data: undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

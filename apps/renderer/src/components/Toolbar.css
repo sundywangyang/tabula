@@ -239,3 +239,4 @@
     padding: 0 4px;
   }
 }
+.toolbar select { max-width: 150px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg-primary); background: var(--bg-elevated); padding: 6px; font-size: 12px; }

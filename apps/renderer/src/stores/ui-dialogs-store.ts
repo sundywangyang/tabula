@@ -34,6 +34,9 @@ export interface BatchRenameState {
 }
 
 export interface UiDialogsState {
+  toolsDialog: { mode: 'content' | 'duplicates' | 'history' | 'network' | 'links' | 'icons' | 'associations'; paneId: string; path: string } | null;
+  openTools: (mode: NonNullable<UiDialogsState['toolsDialog']>['mode'], paneId: string, path: string) => void;
+  closeTools: () => void;
   /** 新建文件夹对话框 */
   newFolderOpen: boolean;
   /** 触发该 dialog 的目标 pane(若 null,后续用 active pane) */
@@ -75,6 +78,9 @@ export interface UiDialogsState {
 }
 
 export const useUiDialogsStore = create<UiDialogsState>((set) => ({
+  toolsDialog: null,
+  openTools: (mode, paneId, path) => set({ toolsDialog: { mode, paneId, path } }),
+  closeTools: () => set({ toolsDialog: null }),
   newFolderOpen: false,
   newFolderTargetPane: null,
   newFileOpen: false,

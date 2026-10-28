@@ -21,6 +21,7 @@ import { InputDialog } from './components/InputDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { PropertiesPanel } from './features/file-list/PropertiesPanel';
 import { BatchRenameDialog } from './features/file-list/BatchRenameDialog';
+const FileToolsDialog = lazy(() => import('./features/tools/FileToolsDialog').then(module => ({ default: module.FileToolsDialog })));
 import { ContextMenu } from './components/ContextMenu';
 import { ExtensionPanelView } from './components/ExtensionPanelView';
 import { CommandPalette } from './features/command-palette/CommandPalette';
@@ -87,6 +88,8 @@ export function App() {
 
   // P3: 属性面板
   const propertiesPanel = useUiDialogsStore((s) => s.propertiesPanel);
+  const toolsDialog = useUiDialogsStore(s => s.toolsDialog);
+  const closeTools = useUiDialogsStore(s => s.closeTools);
   const closePropertiesPanel = useUiDialogsStore((s) => s.closePropertiesPanel);
 
   // P3: 批量重命名
@@ -458,6 +461,7 @@ export function App() {
       )}
 
       {/* P3: 属性详情面板 */}
+      {toolsDialog && <Suspense fallback={null}><FileToolsDialog dialog={toolsDialog} onClose={closeTools} /></Suspense>}
       {propertiesPanel.open && propertiesPanel.entry && (
         <PropertiesPanel
           paneId={propertiesPanel.paneId!}

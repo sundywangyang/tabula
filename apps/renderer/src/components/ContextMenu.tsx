@@ -124,7 +124,8 @@ export function subscribeTagsCache(fn: () => void): () => void {
 
 /** 给路径添加 tag(IPC + 写缓存) */
 async function addTagForPath(path: string, tag: string): Promise<void> {
-  await window.tabula.tags.add(path, tag);
+  const result = await window.tabula.tags.add(path, tag);
+  if (!result.ok) { useFileStore.getState().showToast(result.error.message, 'error'); return; }
   const cur = tagsCache.get(path) ?? [];
   if (!cur.includes(tag)) {
     tagsCache.set(path, [...cur, tag]);
@@ -134,7 +135,8 @@ async function addTagForPath(path: string, tag: string): Promise<void> {
 
 /** 给路径移除 tag(IPC + 写缓存) */
 async function removeTagForPath(path: string, tag: string): Promise<void> {
-  await window.tabula.tags.remove(path, tag);
+  const result = await window.tabula.tags.remove(path, tag);
+  if (!result.ok) { useFileStore.getState().showToast(result.error.message, 'error'); return; }
   const cur = tagsCache.get(path) ?? [];
   tagsCache.set(path, cur.filter((t) => t !== tag));
   tagsCacheListeners.forEach((fn) => fn());
@@ -142,13 +144,14 @@ async function removeTagForPath(path: string, tag: string): Promise<void> {
 
 /** 主进程拉一次 path 的 tags(并写缓存) */
 export async function loadTagsForPath(path: string): Promise<string[]> {
-  const tags = await window.tabula.tags.get(path);
-  tagsCache.set(path, tags);
-  return tags;
+  const result = await window.tabula.tags.get(path);
+  if (!result.ok) return getCachedTags(path);
+  setCachedTags(path, result.data);
+  return result.data;
 }
 
 /** buildMenuItems 提到组件外面:纯函数 + 闭包传参,避免 hooks 顺序问题 */
-function buildMenuItems(args: {
+export function buildMenuItems(args: {
   paneId: string;
   targetEntry: FsEntry | null;
   isEmptySpace: boolean;
@@ -497,20 +500,21 @@ function buildMenuItems(args: {
           hideGlobalMenu();
         },
       });
-      const hasZip = Array.from(selectedPaths).some((p) => /\.zip(x)?$/i.test(p));
+      for (const format of ['tar', 'tgz'] as const) archiveSubmenu.push({ label: `压缩为 ${format.toUpperCase()}…`, icon: '🗜', action: () => { void useFileStore.getState().startCompress([...selectedPaths], paneId, format); hideGlobalMenu(); } });
+      const hasZip = Array.from(selectedPaths).some((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
       if (hasZip && targetEntry && !targetEntry.isDirectory) {
         archiveSubmenu.push({
           label: '解压到…',
           icon: '📦',
           action: () => {
-            const zipPath = Array.from(selectedPaths).find((p) => /\.zip(x)?$/i.test(p));
+            const zipPath = Array.from(selectedPaths).find((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
             if (zipPath) {
               void useFileStore.getState().startExtract(zipPath, undefined, paneId);
             }
             hideGlobalMenu();
           },
         });
-        const extractHereZipPath = Array.from(selectedPaths).find((p) => /\.zip(x)?$/i.test(p));
+        const extractHereZipPath = Array.from(selectedPaths).find((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
         if (extractHereZipPath && currentPath) {
           archiveSubmenu.push({
             label: '解压到此处',
@@ -642,11 +646,11 @@ function buildMenuItems(args: {
               failed++;
               continue;
             }
-            const currentIsReadonly = isReadOnly(statRes.data.mode);
-            const nextReadonly = !currentIsReadonly;
+            const nextReadonly = anyWritable;
             const r = await window.tabula.fs.setPermissions({ path: p, readonly: nextReadonly });
             if (r.ok) {
-              setCachedReadonly(p, statRes.data.mode);
+              const updated = await window.tabula.fs.stat(p);
+              if (updated.ok) setCachedReadonly(p, updated.data.mode);
               succeeded++;
             } else {
               failed++;

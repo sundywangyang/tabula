@@ -6,6 +6,7 @@
 // =================== 文件系统 ===================
 
 export interface FsEntry {
+  customIcon?: string;
   name: string;
   path: string;
   isDirectory: boolean;
@@ -33,7 +34,7 @@ export interface ListDirResult {
   total: number;
 }
 
-/** G010: 设置文件只读/可写 权限(Windows: ReadOnly bit;Unix: 0o444/0o644) */
+/** G010: 设置只读/可写状态，保留其他权限位。 */
 export interface FsSetPermissionsRequest {
   path: string;
   readonly: boolean;
@@ -362,6 +363,7 @@ export interface KeybindingContribution {
 // =================== 配置 ===================
 
 export interface AppConfig {
+  thumbnailSize?: number;
   theme: 'light' | 'dark' | 'system';
   accentColor?: string;
   language: 'zh-CN' | 'en-US' | string;
@@ -651,7 +653,7 @@ export interface UndoStackSnapshot {
 // =================== Archive (压缩 / 解压) ===================
 
 /** 当前支持的归档格式 (v1: 仅 zip) */
-export type ArchiveFormat = 'zip';
+export type ArchiveFormat = 'zip' | 'tar' | 'tgz';
 
 /** 归档中的一个 entry */
 export interface ArchiveEntry {

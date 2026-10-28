@@ -131,6 +131,7 @@ interface SettingsProps {
 }
 
 export function Settings({ onClose }: SettingsProps) {
+  const thumbnailSize = useFileStore(s => s.thumbnailSize);
   // 标签页 (P7 v1)
   const [activeTab, setActiveTab] = useState<TabId>('appearance');
 
@@ -268,6 +269,7 @@ export function Settings({ onClose }: SettingsProps) {
 
             {activeTab === 'filelist' && (
               <SettingsSection title="文件列表">
+                <label className="settings-select-row">缩略图尺寸：{thumbnailSize}px <input aria-label="缩略图尺寸" type="range" min="40" max="160" step="8" value={thumbnailSize} onChange={event => useFileStore.getState().setThumbnailSize(Number(event.target.value))} /></label>
                 <Toggle
                   label="显示隐藏文件"
                   description="显示以 . 开头的文件"
