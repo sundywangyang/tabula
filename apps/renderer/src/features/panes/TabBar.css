@@ -117,6 +117,14 @@
   filter: saturate(0.7);
 }
 
+.tab-chip.tab-dragging * {
+  pointer-events: none;
+}
+
+.tab-bar.tab-drop-empty {
+  box-shadow: inset 3px 0 var(--accent);
+}
+
 /* Step 1: Pointer Events 拖动中(active 状态由 TabBar.tsx 内联 style 控制) */
 .tab-chip.is-dragging-active {
   opacity: 0.5; /* 拖动时半透明 */
@@ -188,12 +196,6 @@
     opacity: 1;
     transform: scaleY(1);
   }
-}
-
-/* active 时不要 drop indicator */
-.tab-chip.tab-active.drop-before::after,
-.tab-chip.tab-active.drop-after::after {
-  display: none;
 }
 
 .tab-icon {

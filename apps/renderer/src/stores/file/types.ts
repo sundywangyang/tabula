@@ -248,6 +248,7 @@ export interface FileStore {
   // ============ Per-pane: 目录 ============
   ensurePane: (paneId: string) => Promise<void>;
   removePaneData: (paneId: string) => void;
+  clearPaneDirectory: (paneId: string) => void;
   loadDir: (paneId: string, path: string) => Promise<void>;
   refresh: (paneId: string) => Promise<void>;
 

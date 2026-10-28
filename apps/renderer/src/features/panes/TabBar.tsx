@@ -115,8 +115,10 @@ export function TabBar({
   // 拖动期间禁止 close(关闭按钮禁用 + 中键忽略)
   const isTabDragging = tabDrag !== null;
 
+  const suppressClick = useRef(false);
   const onClickTab = (tab: Tab, e: ReactMouseEvent) => {
     e.stopPropagation();
+    if (suppressClick.current) { suppressClick.current = false; return; }
     focusPane(paneId);
     activateTab(paneId, tab.id);
   };
@@ -179,6 +181,24 @@ export function TabBar({
   effectFnsRef.current = { tabDragStart, tabDragEnd, setDropTarget, moveTab };
 
   useEffect(() => {
+    const targetAt = (x: number, y: number) => {
+      const element = document.elementFromPoint(x, y);
+      const bar = element?.closest<HTMLElement>('.tab-bar[data-tab-bar-pane-id]');
+      const paneId = bar?.dataset.tabBarPaneId;
+      if (!bar || !paneId) return null;
+      const chips = [...bar.querySelectorAll<HTMLElement>('[data-tab-index]')]
+        .filter(chip => !chip.classList.contains('is-dragging-active'));
+      for (const chip of chips) {
+        const rect = chip.getBoundingClientRect();
+        if (x < rect.left + rect.width / 2) {
+          return { paneId, index: Number(chip.dataset.tabIndex), side: 'left' as const };
+        }
+      }
+      const last = chips[chips.length - 1];
+      return last
+        ? { paneId, index: Number(last.dataset.tabIndex), side: 'right' as const }
+        : { paneId, index: 0, side: 'left' as const };
+    };
     const onMove = (e: PointerEvent) => {
       const d = pointerDragRef.current;
       if (!d) return;
@@ -192,21 +212,7 @@ export function TabBar({
       }
       // 让被拖的 tab 跟着光标水平移动(中心对齐)
       setDragOffsetX(dx);
-      // 找光标下的 tab chip (用 data-tab-index 标识)
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const chip = el?.closest<HTMLElement>('[data-tab-index]');
-      if (chip) {
-        const targetIndex = Number(chip.dataset.tabIndex);
-        const targetPaneId = chip.dataset.paneId;
-        if (targetPaneId && !isNaN(targetIndex)) {
-          const rect = chip.getBoundingClientRect();
-          const midX = rect.left + rect.width / 2;
-          const side: 'left' | 'right' = e.clientX < midX ? 'left' : 'right';
-          effectFnsRef.current.setDropTarget({ paneId: targetPaneId, index: targetIndex, side });
-        }
-      } else {
-        effectFnsRef.current.setDropTarget(null);
-      }
+      effectFnsRef.current.setDropTarget(targetAt(e.clientX, e.clientY));
     };
     const onUp = (e: PointerEvent) => {
       const d = pointerDragRef.current;
@@ -214,33 +220,16 @@ export function TabBar({
         pointerDragRef.current = null;
         return;
       }
-      // 决定 drop 目标: 优先精准(落点 chip), fallback 到 last-known-good tabDrag.dropTarget
-      // (鼠标可能滑到 tab-bar 空白处或 pane 边缘), 都没有则拖回原位
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const chip = el?.closest<HTMLElement>('[data-tab-index]');
-      let targetPaneId: string | undefined;
-      let toIndex = d.index;
-      if (chip) {
-        targetPaneId = chip.dataset.paneId;
-        const targetIndex = Number(chip.dataset.tabIndex);
-        const rect = chip.getBoundingClientRect();
-        const midX = rect.left + rect.width / 2;
-        const before = e.clientX < midX;
-        toIndex = before ? targetIndex : targetIndex + 1;
-      } else {
-        const dt = useLayoutStore.getState().tabDrag?.dropTarget;
-        if (dt) {
-          targetPaneId = dt.paneId;
-          toIndex = dt.side === 'left' ? dt.index : dt.index + 1;
-        } else {
-          targetPaneId = d.paneId; // 拖回原位
-        }
-      }
+      const target = targetAt(e.clientX, e.clientY);
+      const targetPaneId = target?.paneId;
+      const toIndex = target ? target.index + (target.side === 'right' ? 1 : 0) : d.index;
       // 跨 pane → store 内部自动 focusPane(toPaneId) + loadDir, 同 pane 走 reorder
       if (targetPaneId && (targetPaneId !== d.paneId || toIndex !== d.index)) {
         effectFnsRef.current.moveTab(d.paneId, d.tabId, targetPaneId, toIndex);
       }
       pointerDragRef.current = null;
+      suppressClick.current = true;
+      setTimeout(() => { suppressClick.current = false; }, 0);
       effectFnsRef.current.tabDragEnd();
       effectFnsRef.current.setDropTarget(null);
       setDragOffsetX(0);
@@ -344,7 +333,8 @@ export function TabBar({
 
   return (
     <div
-      className={`tab-bar ${IS_MAC ? 'is-mac' : ''}`}
+      className={`tab-bar ${IS_MAC ? 'is-mac' : ''} ${tabDrag?.dropTarget?.paneId === paneId && pane.tabs.length === 0 ? 'tab-drop-empty' : ''}`}
+      data-tab-bar-pane-id={paneId}
       onClick={handleClick}
     >
       {pane.tabs.map((tab, index) => {

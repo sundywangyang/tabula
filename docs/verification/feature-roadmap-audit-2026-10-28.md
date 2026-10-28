@@ -1,6 +1,6 @@
 # Feature Roadmap 完成度核查（2026-10-28）
 
-> 本报告保留修复前状态；后续修复与最终验证见[修复与验证报告](feature-roadmap-implementation-2026-10-28.md)。
+> 历史核查记录，代码基线 `62d917d`。本报告保留修复前状态、统计与复现；后续功能修复见[实施与验证报告](feature-roadmap-implementation-2026-10-28.md)，全项目当前状态见[真实进度核查](project-progress-audit-2026-10-28.md)，后续待办见[项目路线图](../feature-roadmap.md)。下文的历史状态不替代最新进度。
 
 核查对象：本地 `docs/feature-roadmap.md`，按原文顺序逐项检查。
 

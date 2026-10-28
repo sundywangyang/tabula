@@ -1,9 +1,13 @@
 # Tabula
 
-> 现代化的多标签 + 分屏窗格文件管理器,带 VS Code 风格插件系统。  
-> 跨平台:macOS / Windows / Linux。
+> 多标签 + 分屏窗格文件管理器，包含试验性插件宿主。
+> 当前以 Windows 本机验证为主，包含 macOS / Linux 适配代码与打包配置。
 
-![macOS](https://img.shields.io/badge/macOS-supported-blue) ![Windows](https://img.shields.io/badge/Windows-supported-blue) ![Linux](https://img.shields.io/badge/Linux-supported-blue) ![license](https://img.shields.io/badge/license-AGPL--3.0-lightgrey)
+![license](https://img.shields.io/badge/license-AGPL--3.0-lightgrey)
+
+当前进度基线：`0.1.0 / d76f7c8`（2026-10-28）。42 个测试文件、370 项测试、类型检查和正式构建已重新通过；当前提交尚未完成安装包、macOS / Linux 和外部系统服务验收。完整状态及已确认缺口见[真实进度核查](docs/verification/project-progress-audit-2026-10-28.md)。
+
+产品、交互、架构、数据和后续演进见[项目设计文档](docs/design.md)。
 
 ---
 
@@ -24,18 +28,18 @@
 - **批量重命名**对话框(统一前缀 / 后缀 / 替换 / 编号)
 - **压缩 / 解压** ZIP、TAR、TGZ，支持任务进度和取消
 - 标签随重命名 / 移动迁移，核心文件操作支持撤销 / 重做
-- 系统**剪贴板**:copy 与 cut 模式区分
+- **应用内复制 / 剪切 / 粘贴**：窗口内保存文件操作状态，系统剪贴板写入路径文本；尚未接通资源管理器的原生文件剪贴板格式
 - 系统**回收站**:macOS Finder / Windows 回收站 / Linux gio
 
 ### 🔍 搜索
-- **命令面板**(`Cmd/Ctrl + Shift + P`):模糊匹配所有命令 + 路径
+- **命令面板**(`Cmd/Ctrl + Shift + P`):模糊匹配内置命令；路径通过地址栏输入
 - **全局搜索**(`Cmd/Ctrl + Shift + F`):跨目录递归搜索,带文件类型过滤
 - 工具栏 **文件工具 → 全文内容搜索 / 查找重复文件**，支持扫描进度、取消和结果定位
 - **历史记录**:最近访问过的路径
 - **书签 / 收藏**:固定常用目录
 
 ### 🖼 文件预览
-覆盖 95+ 扩展名,大文件全部按需加载:
+包含以下格式的预览入口。预览按类型设定大小上限；文档、媒体、归档等先读取整个文件，文本超过阈值时截断显示。扩展名识别不等同于所有编码都能解码，音视频播放取决于 Electron 的解码能力。
 
 | 类别 | 格式 |
 |------|------|
@@ -53,7 +57,7 @@
 | 💻 代码 | `.ts .tsx .js .py .go .rs .java .c .cpp ...` |
 | 📃 文本 | `.txt .log .csv .env ...` |
 
-不支持的格式给**转换提示**:`.doc` / RAW 相机格式(`.cr2 .cr3 .nef .arw .dng .rw2 .orf`) / Adobe(`.psd .ai`) / `.heic .heif` / `.flac .ape .midi` / `.sketch` 等,提示用什么工具转成可预览的格式。
+不支持的格式给**转换提示**:`.doc` / RAW 相机格式(`.cr2 .cr3 .nef .arw .dng .rw2 .orf`) / Adobe(`.psd .ai`) / `.heic .heif` / `.ape .midi` / `.sketch` 等,提示用什么工具转成可预览的格式。
 
 无扩展名文件也能识别:`Dockerfile` / `Makefile` / `README` / `LICENSE` / dotfile 等。
 
@@ -69,9 +73,9 @@
 - 逐项实现与验证范围见 [Feature Roadmap](docs/feature-roadmap.md)
 
 ### 🪟 窗口管理
-- macOS / Windows / Linux 各自原生窗口行为
+- macOS / Windows / Linux 窗口 Provider 适配；本轮运行核验为 Windows
 - macOS 风格:Dock 图标 + 标题栏 traffic light 占位
-- 多窗口:每个窗口独立状态
+- 多窗口：各自持有运行时布局，持久化仍共用 `layoutV1`，尚未提供逐窗口独立会话恢复
 - 单实例锁:第二次启动聚焦已有窗口
 
 ### 🎨 主题
@@ -84,17 +88,17 @@
 - `Cmd/Ctrl + T` 新标签 / `Cmd/Ctrl + W` 关标签 / `Cmd/Ctrl + L` 地址栏
 - `Cmd/Ctrl + C/V/X` 复制 / 粘贴 / 剪切
 - `F2` 重命名 / `Delete` 删除(移入回收站) / `F5` 刷新
-- 可由扩展注册新快捷键
+- 设置中可修改内置命令快捷键；扩展快捷键贡献尚未接入此命令目录
 
-### 🧩 插件扩展系统
-- VS Code 风格的扩展机制
-- 沙箱化运行环境,扩展无法直接访问系统
-- 生命周期:`onStartup` / `onCommand:xxx` / `onFileSystem:xxx`
-- 贡献点:命令 / 配置 / 视图
+### 🧩 插件扩展系统（部分实现）
+- 插件发现、独立 Node 子进程、启动激活、命令调用及示例统计面板已接通
+- 扩展拥有 Node 文件系统访问能力，当前没有插件权限隔离
+- `onStartup` 已接通；`onCommand:xxx` / `onFileSystem:xxx` 的自动激活尚未接通
+- 已确认禁用后重新启用不能恢复命令；命令面板 / 快捷键贡献、配置和预览器等集成仍待补齐
 
 
 ### 🚀 启动体验
-- **Splash 屏**:显示启动进度,不会卡死
+- **Splash 屏**：显示启动进度，并设超时关闭；包含日志与性能采样入口，尚未建立性能基准验收
 
 ---
 
@@ -118,11 +122,11 @@ pnpm package:dir  # 输出未打包目录(本地快速验证)
 
 ## 🔌 扩展开发
 
-每个扩展是一个带 `extension.json` 的目录:
+当前加载器读取扩展目录中的 `package.json`，通过 `name` 识别扩展，入口使用 CommonJS。API 由 `activate(context)` 注入；包导出的同名 API 仍是占位实现。
 
 ```json
 {
-  "id": "my-extension",
+  "name": "my-extension",
   "version": "0.1.0",
   "main": "./dist/extension.js",
   "activationEvents": ["onStartup"],
@@ -135,15 +139,14 @@ pnpm package:dir  # 输出未打包目录(本地快速验证)
 ```
 
 ```ts
-// dist/extension.js
-export function activate(context) {
-  context.subscriptions.push(
-    context.commands.registerCommand('myExt.sayHello', () => {
-      context.window.showMessage('Hello from extension!');
-    })
-  );
-}
-export function deactivate() {}
+// dist/extension.js（CommonJS）
+exports.activate = function (context) {
+  context.commands.registerCommand('myExt.sayHello', () => {
+    console.log('Hello from extension!');
+    return 'Hello from extension!';
+  });
+};
+exports.deactivate = function () {};
 ```
 
 ---
@@ -152,16 +155,16 @@ export function deactivate() {}
 
 | Phase | 目标 | 状态 |
 |-------|------|------|
-| P0 | 脚手架 | ✅ |
-| P1 | 核心浏览 | ✅ |
-| P2 | 标签 + 窗格 | ✅ |
-| P3 | 文件操作 | ✅ |
-| P4 | 搜索 + 预览 | ✅ |
-| P5 | 主题 / 快捷键 / 命令面板 | ✅ |
-| P6 | 扩展系统 | ✅ |
-| P7 | Splash / 性能 / 错误日志 | ✅ |
-| P8 | 打包(macOS / Windows / Linux) | ✅ |
-| P9 | 文档站 + 社区扩展市场 | 🚧 |
+| P0 | 脚手架 | 已实现，类型检查与正式构建通过 |
+| P1 | 核心浏览 | 主体已实现，Windows 本机验证 |
+| P2 | 标签 + 窗格 | 主体已实现；桥接 tabs / panes 仍为占位，持久化未按窗口隔离 |
+| P3 | 文件操作 | 核心操作及进程内撤销已接通；原生文件剪贴板与外部拖拽验收待完成 |
+| P4 | 搜索 + 预览 | 有界内容扫描、重复文件及多格式预览已实现；不含索引 / OCR / 流式大文件预览 |
+| P5 | 主题 / 快捷键 / 命令面板 | 内置流程已接通；命令面板无路径搜索，扩展贡献待接入 |
+| P6 | 扩展系统 | 部分实现；存在已复现的激活与重新启用问题，尚无权限隔离 |
+| P7 | Splash / 性能 / 错误日志 | 启动屏、日志与采样已实现；性能基准和更新发布链路未验收 |
+| P8 | 打包(macOS / Windows / Linux) | 三平台配置与旧 Windows 产物存在；当前提交重包 / 安装、签名及跨平台验收待完成 |
+| P9 | 文档站 + 社区扩展市场 | 未交付 |
 
 
 

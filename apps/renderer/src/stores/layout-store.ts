@@ -809,13 +809,22 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         // 焦点切到目标 pane(同 pane 时不切)
         setState({ rootLayout: finalRoot, activePaneId: toPaneId });
 
+        // 源窗格即使失去焦点也要显示新的活动标签，而不是保留被移走的目录。
+        if (fromPane.activeTabId === fromTabId) {
+          const nextTab = sourceWithout.tabs.find(t => t.id === sourceWithout.activeTabId);
+          if (nextTab?.path && nextTab.path !== 'trash:///') void useFileStore.getState().loadDir(fromPaneId, nextTab.path);
+          else useFileStore.getState().clearPaneDirectory(fromPaneId);
+        }
+
         // 目标 pane 新激活的 tab.path 触发 file-store.loadDir
         const inserted = targetTabs.find((t) => t.id === fromTabId);
-        if (inserted?.path) {
+        if (inserted?.path && inserted.path !== 'trash:///') {
           // 跨 pane 时,目标 pane 未必在 file-store 注册(虽然 splitPane 会 ensure)
           // 防御性 ensure 一下
           useFileStore.getState().ensurePane(toPaneId);
           void useFileStore.getState().loadDir(toPaneId, inserted.path);
+        } else {
+          useFileStore.getState().clearPaneDirectory(toPaneId);
         }
       },
 

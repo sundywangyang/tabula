@@ -181,6 +181,15 @@ export const useFileStore = create<FileStore>((set, get, store) => {
       });
     },
 
+    clearPaneDirectory: (paneId) => {
+      directoryRequests.delete(paneId);
+      set((s) => {
+        const data = s.panes[paneId];
+        if (!data) return s;
+        return { panes: { ...s.panes, [paneId]: { ...emptyPaneData(), viewMode: data.viewMode, groupBy: data.groupBy, fileType: data.fileType } } };
+      });
+    },
+
     // ============ 目录 ============
     loadDir: async (paneId, path) => {
       const request = ++nextDirectoryRequest;
