@@ -337,8 +337,19 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         const data = all[PERSIST_KEY] as PersistedLayout | undefined;
         if (data && data.rootLayout && data.activePaneId) {
           // P2 v2: 老持久化数据的 split 节点没有 id,这里回填,避免 setSplitSizes 找不到节点
-          const rootLayout = ensureSplitIds(data.rootLayout);
+          let rootLayout = ensureSplitIds(data.rootLayout);
+          // Upgrade a previously saved single fallback tab from its old fixed
+          // label to the folder name, preserving all other tab properties.
+          let renamedFallback = false;
+          if (rootLayout.type === 'pane' && rootLayout.tabs.length === 1) {
+            const tab = rootLayout.tabs[0];
+            if (tab.type === 'folder' && tab.path === defaultPath() && tab.title === '主页' && tab.closable && !tab.pinned) {
+              rootLayout = { ...rootLayout, tabs: [{ ...tab, title: makeFolderTab(tab.path).title }] };
+              renamedFallback = true;
+            }
+          }
           set({ rootLayout, activePaneId: data.activePaneId, hydrated: true });
+          if (renamedFallback) schedulePersist();
         } else {
           set({ hydrated: true });
         }
@@ -423,7 +434,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           const finalPane = finalPaneId ? findPane(finalRoot, finalPaneId) : null;
           if (finalPaneId && finalPane?.type === 'pane' && finalPane.tabs.length === 0) {
             const path = defaultPath();
-            const fallback = makeFolderTab(path, '主页');
+            const fallback = makeFolderTab(path);
             setState({
               rootLayout: mapPane(finalRoot, finalPaneId, (p) => ({ ...p, tabs: [fallback], activeTabId: fallback.id })),
               activePaneId: finalPaneId,

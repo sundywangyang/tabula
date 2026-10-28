@@ -6,6 +6,7 @@ import { TabBar } from '../TabBar';
 import { runCommandById } from '../../../command-dispatcher';
 import { useFileStore } from '../../../stores/file-store';
 import { useLayoutStore } from '../../../stores/layout-store';
+import { initPlatformCache } from '../../../platform-cache';
 import { deferred, listing, seedFiles } from '../../../stores/__tests__/file-fixtures';
 
 const tab = (id: string, path = `C:\\${id}`): Tab => ({ id, type: 'folder', title: id, path, pinned: false, closable: true, history: [path], historyIndex: 0 });
@@ -49,14 +50,42 @@ describe('closing the last tab', () => {
     const current = onlyPane();
     expect(current.tabs).toHaveLength(1);
     expect(current.activeTabId).not.toBe(oldId);
-    expect(current.tabs[0]).toMatchObject({ path: 'C:\\', title: '主页', history: ['C:\\'], historyIndex: 0 });
+    expect(current.tabs[0]).toMatchObject({ path: 'C:\\', title: 'C:', history: ['C:\\'], historyIndex: 0 });
     expect(current.activeTabId).toBe(current.tabs[0].id);
     expect(mock.fs.listDir).toHaveBeenCalledWith('C:\\');
     expect(useFileStore.getState().panes.p.currentPath).toBe('C:\\');
     expect(useFileStore.getState().panes.p.breadcrumb[0].path).toBe('C:\\');
-    expect(container.textContent).toContain('主页');
+    expect(container.textContent).toContain('C:');
     await act(async () => useLayoutStore.getState().persistImmediate());
     expect(mock.config.set).toHaveBeenCalledWith('layoutV1', expect.objectContaining({ rootLayout: current }));
+  });
+
+  it('shows the default folder name on the tab when the path is C:\\Users', async () => {
+    mock.platform.defaultRootPath.mockResolvedValue('C:\\Users');
+    await initPlatformCache();
+    await act(async () => { await startSingle([tab('old')]); root.render(<SingleBar />); });
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="关闭标签"]')!.click());
+    expect(onlyPane().tabs[0]).toMatchObject({ path: 'C:\\Users', title: 'Users' });
+    expect(container.textContent).toContain('Users');
+    expect(useFileStore.getState().panes.p.currentPath).toBe('C:\\Users');
+  });
+
+  it('updates an old saved fallback title without changing its tab identity or history', async () => {
+    mock.platform.defaultRootPath.mockResolvedValue('C:\\Users');
+    await initPlatformCache();
+    const saved = { ...tab('saved', 'C:\\Users'), title: '主页' };
+    mock.config.all.mockResolvedValue({ layoutV1: { rootLayout: pane('p', [saved]), activePaneId: 'p' } });
+    await act(async () => useLayoutStore.getState().hydrateFromConfig());
+    expect(onlyPane().tabs[0]).toEqual({ ...saved, title: 'Users' });
+    await act(async () => useLayoutStore.getState().persistImmediate());
+    expect(mock.config.set).toHaveBeenCalledWith('layoutV1', expect.objectContaining({ rootLayout: onlyPane() }));
+  });
+
+  it('keeps an unrelated saved tab named 主页 unchanged', async () => {
+    const saved = { ...tab('saved', 'C:\\elsewhere'), title: '主页' };
+    mock.config.all.mockResolvedValue({ layoutV1: { rootLayout: pane('p', [saved]), activePaneId: 'p' } });
+    await act(async () => useLayoutStore.getState().hydrateFromConfig());
+    expect(onlyPane().tabs[0]).toEqual(saved);
   });
 
   it('uses the same fallback for the close-tab command', async () => {
