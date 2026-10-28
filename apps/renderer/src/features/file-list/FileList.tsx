@@ -149,53 +149,58 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   }, [sortedEntries.length, viewMode, gridCols, thumbnailSize]);
 
   // === P3: 拖放 — 行作为 source ===
-  // 选择拖哪些:如果有 selected(>=1)就用 selected,否则拖光标所在项
-  const getDragPaths = useCallback((): string[] => {
-    if (selectedPaths.size > 0) return Array.from(selectedPaths);
-    if (cursorPath) return [cursorPath];
-    return [];
-  }, [selectedPaths, cursorPath]);
-
   const handleRowDragStart = useCallback(
     (entry: FsEntry, e: ReactDragEvent<HTMLElement>) => {
-      let paths = getDragPaths();
-      if (paths.length === 0) {
-        e.preventDefault();
-        return;
-      }
-      // 如果拖的行不在当前 selection 里,把它加入 selection
-      if (!paths.includes(entry.path)) {
+      const selection = useFileStore.getState().panes[paneId]?.selectedPaths;
+      const paths = selection?.has(entry.path) ? Array.from(selection) : [entry.path];
+      if (!selection?.has(entry.path)) {
         selectOne(paneId, entry.path);
-        paths = [entry.path];
-        startDrag([entry.path], paneId);
-      } else {
-        startDrag(paths, paneId);
       }
-      // G018: 系统原生拖拽 — 同步 IPC(sendSync)。webContents.startDrag() 必须在
-      // OS drag 生命周期内同步执行,异步 invoke 会跨 microtask → Chromium 内部崩溃
-      // (crashpad_client_win.cc not connected + 非 0 退出码)。
+      startDrag(paths, paneId);
       e.dataTransfer.effectAllowed = 'all';
-      // 内部拖拽仍用自定义 mime(同 pane 内的 drop 用);不再写 text/plain,避免外部
-      // app 把它当文本接收。
       e.dataTransfer.setData(
         'application/x-tabula-paths',
         JSON.stringify({ paths, sourcePaneId: paneId }),
       );
-      // 同步调用 — sendSync 阻塞直到主进程 e.sender.startDrag 执行完毕,期间一直
-      // 在 OS drag 生命周期内。失败时给用户提示(目录 / 文件不存在 / 平台图标缺失)
-      try {
-        const res = window.tabula.fs.startDrag(paths);
-        if (!res.ok) {
-          // eslint-disable-next-line no-console
-          console.warn('[drag] startDrag failed:', res.error);
-        }
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn('[drag] startDrag threw:', err);
-      }
     },
-    [getDragPaths, paneId, selectOne, startDrag],
+    [paneId, selectOne, startDrag],
   );
+
+  // Keep the HTML drag alive within the window. Hand off to the OS only when
+  // the pointer leaves the document, while still in the native drag event.
+  useEffect(() => {
+    let handedOff = false;
+    const onLeave = (e: DragEvent) => {
+      // Child elements can emit dragleave with no relatedTarget, too. Only the
+      // document boundary can trigger the native handoff.
+      if (e.target !== document && e.target !== document.documentElement) return;
+      if (e.relatedTarget || (e.clientX > 0 && e.clientY > 0 && e.clientX < window.innerWidth && e.clientY < window.innerHeight)) return;
+      const state = useFileStore.getState().dragState;
+      if (!state || state.sourcePaneId !== paneId || handedOff) return;
+      handedOff = true;
+      try {
+        const result = window.tabula.fs.startDrag(state.paths);
+        if (!result.ok) showToast(`无法拖出文件: ${result.error.message}`, 'error');
+      } catch (error) {
+        showToast(`无法拖出文件: ${String(error)}`, 'error');
+      } finally {
+        endDrag();
+      }
+    };
+    const onEnd = () => { handedOff = false; };
+    window.addEventListener('dragleave', onLeave);
+    window.addEventListener('dragend', onEnd);
+    return () => {
+      window.removeEventListener('dragleave', onLeave);
+      window.removeEventListener('dragend', onEnd);
+    };
+  }, [paneId, showToast, endDrag]);
+
+  const dropDirectory = useCallback((target: EventTarget | null): string => {
+    const element = target instanceof Element ? target.closest<HTMLElement>('[data-entry-path]') : null;
+    const entry = entries.find((item) => item.path === element?.dataset.entryPath);
+    return entry?.isDirectory ? entry.path : currentPath;
+  }, [entries, currentPath]);
 
   const handleRowDragEnd = useCallback(() => {
     endDrag();
@@ -221,10 +226,10 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       e.dataTransfer.dropEffect = effect;
 
       if (hasInternalDrag) {
-        setDragTarget(currentPath, 'pane', effect);
+        setDragTarget(dropDirectory(e.target), 'pane', effect);
       }
     },
-    [dragState, currentPath, setDragTarget],
+    [dragState, dropDirectory, setDragTarget],
   );
 
   const handleContainerDragLeave = useCallback(
@@ -249,9 +254,10 @@ export function FileList({ paneId, onOpenEntry }: Props) {
 
       const state = useFileStore.getState().dragState;
       const isExternal = isExternalDrop(e);
+      const destination = dropDirectory(e.target);
 
       // ===== 外部文件拖入(Windows Explorer 等) =====
-      if (isExternal && currentPath) {
+      if (isExternal && destination) {
         const files = e.dataTransfer.files;
         if (files.length === 0) {
           endDrag();
@@ -272,32 +278,37 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           return;
         }
         endDrag();
-        await performBulk(paths, currentPath, 'copy', paneId);
+        await performBulk(paths, destination, 'copy', paneId);
         return;
       }
 
       // ===== Tabula 内部拖拽 =====
-      if (!state || !currentPath) {
+      if (!state || !destination) {
         endDrag();
         return;
       }
       const mode: 'copy' | 'move' = state.effect === 'copy' ? 'copy' : 'move';
       const sources = state.paths;
       // 检测:同 pane 同 dir 自拖 = 无操作
-      if (state.sourcePaneId === paneId && sources.every((p) => parentOf(p) === currentPath)) {
+      if (sources.includes(destination)) {
+        endDrag();
+        showToast('无法拖放到选中的文件夹自身', 'warn');
+        return;
+      }
+      if (mode === 'move' && sources.every((p) => parentOf(p) === destination)) {
         endDrag();
         showToast('同目录拖动无操作', 'info', 1500);
         return;
       }
-      await performBulk(sources, currentPath, mode, paneId);
       endDrag();
+      await performBulk(sources, destination, mode, paneId);
       // move 模式下刷新源 pane（可看到文件已被移走）
       if (mode === 'move' && state.sourcePaneId && state.sourcePaneId !== paneId) {
         const srcPane = useFileStore.getState().getPanePath(state.sourcePaneId);
         if (srcPane) void loadDir(state.sourcePaneId, srcPane);
       }
     },
-    [currentPath, paneId, performBulk, endDrag, showToast, loadDir],
+    [dropDirectory, dragState, paneId, performBulk, endDrag, showToast, loadDir],
   );
 
   // === 键盘导航(组件级)===
@@ -480,7 +491,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       if (e.button !== 0) return;
       const target = e.target as HTMLElement;
       // 点到了 row 内部 / column header → 不是空白,跳过
-      if (target.closest('.file-list-row')) return;
+      if (target.closest('[data-entry-path]')) return;
       if (target.closest('.file-list-header')) return;
       // 显式聚焦当前 pane — 不依赖 PaneView onMouseDown 冒泡
       if (useLayoutStore.getState().activePaneId !== paneId) {
@@ -647,6 +658,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           selectedPaths={selectedPaths}
           cursorPath={cursorPath}
           renameTarget={renameTarget}
+          dropTargetPath={dragState?.targetKind === 'pane' ? dragState.targetPath : null}
           onRowClick={handleRowClick}
           onRowDoubleClick={handleRowDoubleClick}
           onRenameSubmit={(oldPath, newName) => renameEntry(paneId, oldPath, newName)}
@@ -669,6 +681,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           selectedPaths={selectedPaths}
           cursorPath={cursorPath}
           renameTarget={renameTarget}
+          dropTargetPath={dragState?.targetKind === 'pane' ? dragState.targetPath : null}
           onRowClick={handleRowClick}
           onRowDoubleClick={handleRowDoubleClick}
           onRenameSubmit={(oldPath, newName) => renameEntry(paneId, oldPath, newName)}
@@ -693,6 +706,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
           selectedPaths={selectedPaths}
           cursorPath={cursorPath}
           renameTarget={renameTarget}
+          dropTargetPath={dragState?.targetKind === 'pane' ? dragState.targetPath : null}
           onRowClick={handleRowClick}
           onRowDoubleClick={handleRowDoubleClick}
           onRenameSubmit={(oldPath, newName) => renameEntry(paneId, oldPath, newName)}

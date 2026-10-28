@@ -14,6 +14,7 @@ export function ListView({
   selectedPaths,
   cursorPath,
   renameTarget,
+  dropTargetPath,
   onRowClick,
   onRowDoubleClick,
   onRenameSubmit,
@@ -96,7 +97,7 @@ export function ListView({
                 transform: `translateY(${virtualRow.start}px)`,
                 height: `${virtualRow.size}px`,
               }}
-              className={`file-list-row row-list ${selectedPaths.has(entry.path) ? 'selected' : ''} ${cursorPath === entry.path ? 'cursor' : ''
+              className={`file-list-row row-list ${dropTargetPath === entry.path ? 'file-drop-target' : ''} ${selectedPaths.has(entry.path) ? 'selected' : ''} ${cursorPath === entry.path ? 'cursor' : ''
                 }`}
               onClick={(e) => onRowClick(entry, e)}
               onDoubleClick={() => onRowDoubleClick(entry)}

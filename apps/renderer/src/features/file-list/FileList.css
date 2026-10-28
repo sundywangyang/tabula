@@ -335,6 +335,11 @@
 }
 
 /* ===== P3: 拖放 highlight — 全区域 overlay ===== */
+.file-list .file-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: rgba(99, 102, 241, 0.16);
+}
 /*
  * 拖放时覆盖整个 file-list 区域(包含所有行),
  * 让用户在任意位置都能看到可放置的视觉反馈,

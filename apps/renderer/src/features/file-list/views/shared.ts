@@ -18,6 +18,7 @@ export interface FileViewProps {
   selectedPaths: Set<string>;
   cursorPath: string | null;
   renameTarget: string | null;
+  dropTargetPath?: string | null;
   onRowClick: (entry: FsEntry, e: ReactMouseEvent<HTMLDivElement>) => void;
   onRowDoubleClick: (entry: FsEntry) => void;
   onRenameSubmit: (oldPath: string, newName: string) => Promise<{ ok: boolean; error?: string; }>;

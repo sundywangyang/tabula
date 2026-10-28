@@ -18,6 +18,7 @@ export function GridView({
   selectedPaths,
   cursorPath,
   renameTarget,
+  dropTargetPath,
   onRowClick,
   onRowDoubleClick,
   onRenameSubmit,
@@ -86,7 +87,7 @@ export function GridView({
               {rowItems.map((entry) => (
                 <div
                   key={entry.path}
-                  className={`grid-cell ${selectedPaths.has(entry.path) ? 'selected' : ''} ${cursorPath === entry.path ? 'cursor' : ''
+                  className={`grid-cell ${dropTargetPath === entry.path ? 'file-drop-target' : ''} ${selectedPaths.has(entry.path) ? 'selected' : ''} ${cursorPath === entry.path ? 'cursor' : ''
                     }`}
                   onClick={(e) => onRowClick(entry, e)}
                   onDoubleClick={() => onDoubleClickGrid(onRowDoubleClick, entry)}

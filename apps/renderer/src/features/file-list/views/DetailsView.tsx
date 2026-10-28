@@ -21,6 +21,7 @@ export function DetailsView({
   selectedPaths,
   cursorPath,
   renameTarget,
+  dropTargetPath,
   onRowClick,
   onRowDoubleClick,
   onRenameSubmit,
@@ -108,6 +109,7 @@ export function DetailsView({
               selected={selectedPaths.has(row.entry.path)}
               cursor={cursorPath === row.entry.path}
               renaming={renameTarget === row.entry.path}
+              dropTarget={dropTargetPath === row.entry.path}
               onClick={onRowClick}
               onDoubleClick={onRowDoubleClick}
               onRenameSubmit={onRenameSubmit}
@@ -129,6 +131,7 @@ interface RowProps {
   selected: boolean;
   cursor: boolean;
   renaming: boolean;
+  dropTarget: boolean;
   onClick: (entry: FsEntry, e: ReactMouseEvent<HTMLDivElement>) => void;
   onDoubleClick: (entry: FsEntry) => void;
   onRenameSubmit: (oldPath: string, newName: string) => Promise<{ ok: boolean; error?: string; }>;
@@ -144,6 +147,7 @@ function DetailsRow({
   selected,
   cursor,
   renaming,
+  dropTarget,
   onClick,
   onDoubleClick,
   onRenameSubmit,
@@ -154,7 +158,7 @@ function DetailsRow({
   return (
     <div
       style={style}
-      className={`file-list-row ${selected ? 'selected' : ''} ${cursor ? 'cursor' : ''}`}
+      className={`file-list-row ${dropTarget ? 'file-drop-target' : ''} ${selected ? 'selected' : ''} ${cursor ? 'cursor' : ''}`}
       onClick={(e) => onClick(entry, e)}
       onDoubleClick={() => onDoubleClick(entry)}
       draggable={!renaming}
