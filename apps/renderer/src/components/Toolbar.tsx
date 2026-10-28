@@ -39,6 +39,9 @@ import { useFileStore, type ViewMode, type GroupByMode } from '../stores/file-st
 import { useUiDialogsStore } from '../stores/ui-dialogs-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
+import { useKeymapStore } from '../stores/keymap-store';
+import { getCachedPlatform } from '../platform-cache';
+import { shortcutLabel } from '../shortcut-label';
 import { Tooltip } from './Tooltip';
 import type { Tab } from '@tabula/bridge';
 import './Toolbar.css';
@@ -68,6 +71,8 @@ function getTabHistory(tab: Tab): string[] {
 }
 
 export function Toolbar({ paneId }: { paneId: string }) {
+  const bindings = useKeymapStore((s) => s.bindings);
+  const shortcut = (...ids: string[]) => ids.map((id) => shortcutLabel(bindings.get(id), getCachedPlatform())).filter(Boolean).join(' / ') || '无快捷键';
   // 数据切片（值类型，不创建新引用）
   const viewMode = useFileStore((s) => s.panes[paneId]?.viewMode ?? 'details');
   const groupBy = useFileStore((s) => s.panes[paneId]?.groupBy ?? 'none');
@@ -282,7 +287,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
     <div className="toolbar" data-no-context-menu onContextMenu={handleScrollContainerContextMenu}>
       {/* 左滚动按钮 */}
       {scrollState.left && (
-        <button className="toolbar-scroll-btn toolbar-scroll-left" onClick={() => scrollBy(-80)} aria-label="向左滚动">
+        <button className="toolbar-scroll-btn toolbar-scroll-left" onClick={() => scrollBy(-80)} aria-label="向左滚动" title="向左滚动（无快捷键）">
           <ChevronLeft size={14} />
         </button>
       )}
@@ -295,7 +300,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       >
       {/* 前进/后退按钮组 */}
       <div className="toolbar-group">
-        <Tooltip label="后退" shortcut="Alt+←">
+        <Tooltip label="后退" shortcut="无快捷键">
           <button
             className={`toolbar-btn toolbar-nav ${canGoBack ? '' : 'disabled'}`}
             onClick={handleGoBack}
@@ -306,7 +311,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <ArrowLeft size={16} />
           </button>
         </Tooltip>
-        <Tooltip label="前进" shortcut="Alt+→">
+        <Tooltip label="前进" shortcut="无快捷键">
           <button
             className={`toolbar-btn toolbar-nav ${canGoForward ? '' : 'disabled'}`}
             onClick={handleGoForward}
@@ -337,7 +342,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        <Tooltip label="新建文件夹" shortcut="右键 = 新建文件">
+        <Tooltip label="新建文件夹（右键新建文件）" shortcut={shortcut('file.new-folder', 'file.new-folder-quick')}>
           <button
             className="toolbar-btn toolbar-new"
             onClick={handleNewFolder}
@@ -350,7 +355,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <span className="toolbar-label">新建</span>
           </button>
         </Tooltip>
-        <Tooltip label="在当前目录打开终端">
+        <Tooltip label="在当前目录打开终端" shortcut="无快捷键">
           <button
             className="toolbar-btn"
             onClick={() => { void handleOpenShell(); }}
@@ -366,7 +371,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
       {/* P3: 文件操作按钮 */}
       <div className="toolbar-group">
-        <Tooltip label="复制" shortcut="Ctrl+C">
+        <Tooltip label="复制" shortcut={shortcut('file.copy')}>
           <button
             className="toolbar-btn"
             onClick={handleCopy}
@@ -376,7 +381,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <span className="toolbar-label">复制</span>
           </button>
         </Tooltip>
-        <Tooltip label="剪切" shortcut="Ctrl+X">
+        <Tooltip label="剪切" shortcut={shortcut('file.cut')}>
           <button
             className="toolbar-btn"
             onClick={handleCut}
@@ -386,7 +391,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <span className="toolbar-label">剪切</span>
           </button>
         </Tooltip>
-        <Tooltip label="粘贴" shortcut="Ctrl+V">
+        <Tooltip label="粘贴" shortcut={shortcut('file.paste')}>
           <button
             className="toolbar-btn"
             onClick={handlePaste}
@@ -396,7 +401,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <span className="toolbar-label">粘贴</span>
           </button>
         </Tooltip>
-        <Tooltip label="复制路径">
+        <Tooltip label="复制路径" shortcut="无快捷键">
           <button
             className="toolbar-btn"
             onClick={handleCopyPath}
@@ -405,7 +410,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <Link2 size={16} />
           </button>
         </Tooltip>
-        <Tooltip label="删除" shortcut="Delete">
+        <Tooltip label="删除" shortcut={shortcut('file.delete')}>
           <button
             className="toolbar-btn"
             onClick={handleDelete}
@@ -414,7 +419,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <Trash2 size={16} />
           </button>
         </Tooltip>
-        <Tooltip label="重命名" shortcut="F2">
+        <Tooltip label="重命名" shortcut={shortcut('file.rename')}>
           <button
             className="toolbar-btn"
             onClick={handleRename}
@@ -428,7 +433,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        <Tooltip label="转到路径" shortcut="Ctrl+L">
+        <Tooltip label="转到路径" shortcut={shortcut('file.path-bar')}>
           <button
             className="toolbar-btn"
             onClick={() => openPathBar(paneId)}
@@ -437,12 +442,12 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <span className="toolbar-label">路径</span>
           </button>
         </Tooltip>
-        <Tooltip label="刷新" shortcut="F5">
+        <Tooltip label="刷新" shortcut={shortcut('file.refresh')}>
           <button className="toolbar-btn" onClick={() => void refresh(paneId)}>
             <RotateCw size={16} />
           </button>
         </Tooltip>
-        <Tooltip label={isFavorite ? '从收藏移除' : '收藏当前目录'}>
+        <Tooltip label={isFavorite ? '从收藏移除' : '收藏当前目录'} shortcut="无快捷键">
           <button
             className={`toolbar-btn toolbar-fav ${isFavorite ? 'active' : ''}`}
             onClick={handleToggleFavorite}
@@ -456,7 +461,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        <Tooltip label={`视图: ${VIEW_MODES.find((m) => m.mode === viewMode)?.label ?? '详情'}`}>
+        <Tooltip label={`视图: ${VIEW_MODES.find((m) => m.mode === viewMode)?.label ?? '详情'}`} shortcut="无快捷键">
           <button
             className="toolbar-btn"
             onClick={() => cycleViewMode(paneId, viewMode, setViewMode)}
@@ -470,17 +475,17 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       {/* G007: 分组切换 (none → type → date → size → none 循环) */}
-      <select aria-label="按文件类型筛选" value={fileType} onChange={e => useFileStore.getState().setFileType(paneId, e.target.value as import('@tabula/bridge').FileTypeCategory)}>
+      <Tooltip label="按文件类型筛选" shortcut="无快捷键"><select aria-label="按文件类型筛选" value={fileType} onChange={e => useFileStore.getState().setFileType(paneId, e.target.value as import('@tabula/bridge').FileTypeCategory)}>
         {Object.entries({ all: '全部类型', folder: '文件夹', image: '图片', document: '文档', code: '代码', archive: '压缩包', audio: '音频', video: '视频' }).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-      </select>
-      <select aria-label="文件工具" value="" onChange={e => {
+      </select></Tooltip>
+      <Tooltip label="文件工具" shortcut="无快捷键"><select aria-label="文件工具" value="" onChange={e => {
         const mode = e.target.value as NonNullable<ReturnType<typeof useUiDialogsStore.getState>['toolsDialog']>['mode'];
         if (mode) useUiDialogsStore.getState().openTools(mode, paneId, ['content', 'duplicates', 'history', 'network'].includes(mode) ? currentPath : selectedPaths.size === 1 ? [...selectedPaths][0] : currentPath);
       }}>
         <option value="">文件工具</option><option value="content">全文内容搜索</option><option value="duplicates">查找重复文件</option><option value="history">文件历史时间线</option><option value="network">连接服务器</option><option value="links">链接管理</option><option value="icons">文件夹图标</option><option value="associations">默认应用</option>
-      </select>
+      </select></Tooltip>
       <div className="toolbar-group">
-        <Tooltip label={`分组: ${groupByLabel(groupBy)}`}>
+        <Tooltip label={`分组: ${groupByLabel(groupBy)}`} shortcut="无快捷键">
           <button
             className={`toolbar-btn ${groupBy !== 'none' ? 'active' : ''}`}
             onClick={() => cycleGroupBy(paneId, groupBy, setGroupBy)}
@@ -495,7 +500,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
 
       {/* 左右分屏 */}
       <div className="toolbar-group">
-        <Tooltip label="左右分屏" shortcut="Ctrl+\\">
+        <Tooltip label="左右分屏" shortcut={shortcut('pane.split-horizontal')}>
           <button
             className="toolbar-btn"
             onClick={() => {
@@ -511,7 +516,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       <div className="toolbar-divider" />
 
       <div className="toolbar-group">
-        <Tooltip label={showHidden ? '隐藏隐藏文件' : '显示隐藏文件'}>
+        <Tooltip label={showHidden ? '隐藏隐藏文件' : '显示隐藏文件'} shortcut="无快捷键">
           <button
             className={`toolbar-btn ${showHidden ? 'active' : ''}`}
             onClick={toggleShowHidden}
@@ -520,7 +525,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
             <span className="toolbar-label">.{showHidden ? '已显' : '隐藏'}</span>
           </button>
         </Tooltip>
-        <Tooltip label={showExtensions ? '隐藏扩展名' : '显示扩展名'}>
+        <Tooltip label={showExtensions ? '隐藏扩展名' : '显示扩展名'} shortcut="无快捷键">
           <button
             className={`toolbar-btn ${showExtensions ? 'active' : ''}`}
             onClick={toggleShowExtensions}
@@ -533,7 +538,7 @@ export function Toolbar({ paneId }: { paneId: string }) {
       </div>
       {/* 右滚动按钮 */}
       {scrollState.right && (
-        <button className="toolbar-scroll-btn toolbar-scroll-right" onClick={() => scrollBy(80)} aria-label="向右滚动">
+        <button className="toolbar-scroll-btn toolbar-scroll-right" onClick={() => scrollBy(80)} aria-label="向右滚动" title="向右滚动（无快捷键）">
           <ChevronRight size={14} />
         </button>
       )}

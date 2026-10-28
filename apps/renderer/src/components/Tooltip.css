@@ -2,9 +2,7 @@
  * Tooltip 气泡样式
  *
  * - 用 .tooltip-wrap 包住子元素(按钮等),子元素可正常布局
- * - 气泡绝对定位在子元素下方居中,带小三角
- * - 父级需要是定位上下文(否则气泡会跑到 .app-root)
- *   → .tooltip-wrap 自身 position: relative
+ * - 气泡通过 portal 固定定位，避免被滚动容器裁切
  * - 主题色:var(--bg-tooltip) / var(--fg-tooltip) — 见 styles/global.css
  */
 .tooltip-wrap {
@@ -16,11 +14,8 @@
 }
 
 .tooltip-bubble {
-  position: absolute;
-  bottom: -34px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
+  position: fixed;
+  z-index: 10000;
   pointer-events: none;
   background: var(--bg-elevated, #1e1e1e);
   color: var(--fg-primary, #e6e6e6);
@@ -38,20 +33,6 @@
   animation: tooltip-fade-in 0.12s ease-out;
 }
 
-/* 小三角(指向子元素) */
-.tooltip-bubble::before {
-  content: '';
-  position: absolute;
-  top: -5px;
-  left: 50%;
-  transform: translateX(-50%) rotate(45deg);
-  width: 8px;
-  height: 8px;
-  background: var(--bg-elevated, #1e1e1e);
-  border-left: 1px solid var(--border, #333);
-  border-top: 1px solid var(--border, #333);
-}
-
 .tooltip-label {
   font-weight: 500;
 }
@@ -66,6 +47,6 @@
 }
 
 @keyframes tooltip-fade-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-2px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
