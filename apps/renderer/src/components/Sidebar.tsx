@@ -10,7 +10,7 @@
  * 拖放:P3 已支持 — favorites / drives / 当前 都作为 drop target。
  */
 import { type DragEvent as ReactDragEvent, useEffect, useState } from 'react';
-import { Folder, HardDrive, Plug, Star, X } from 'lucide-react';
+import { ChevronRight, HardDrive, History, Plus, Plug, RefreshCw, Star, X } from 'lucide-react';
 import type { DriveInfo } from '@tabula/bridge';
 import { useFileStore } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
@@ -168,17 +168,18 @@ export function Sidebar({
             className="sidebar-collapse-btn"
             onClick={() => setFavoritesCollapsed((v) => !v)}
             title={favoritesCollapsed ? '展开快速访问' : '折叠快速访问'}
+            aria-expanded={!favoritesCollapsed}
           >
-            <span className={`sidebar-chevron ${favoritesCollapsed ? 'collapsed' : ''}`}>▶</span>
+            <ChevronRight className={`sidebar-chevron ${favoritesCollapsed ? 'collapsed' : ''}`} size={14} />
+            <span className="sidebar-header">快速访问</span>
           </button>
-          <span className="sidebar-header">快速访问</span>
           {!favoritesCollapsed && (
             <button
               className="sidebar-header-btn"
               onClick={handleAddCurrent}
               title={`收藏当前目录${currentPath ? `: ${currentPath}` : ''}`}
             >
-              ＋
+              <Plus size={14} />
             </button>
           )}
         </div>
@@ -243,17 +244,17 @@ export function Sidebar({
       </div>
 
       {/* 此电脑 / 驱动器 */}
-      {/* 此电脑 / 驱动器 */}
       <div className="sidebar-section">
         <div className="sidebar-header-row">
           <button
             className="sidebar-collapse-btn"
             onClick={() => setDrivesCollapsed((v) => !v)}
             title={drivesCollapsed ? '展开此电脑' : '折叠此电脑'}
+            aria-expanded={!drivesCollapsed}
           >
-            <span className={`sidebar-chevron ${drivesCollapsed ? 'collapsed' : ''}`}>▶</span>
+            <ChevronRight className={`sidebar-chevron ${drivesCollapsed ? 'collapsed' : ''}`} size={14} />
+            <span className="sidebar-header">此电脑</span>
           </button>
-          <span className="sidebar-header">此电脑</span>
           {!drivesCollapsed && (
             <button
               className="sidebar-header-btn"
@@ -267,7 +268,7 @@ export function Sidebar({
               }}
               title="刷新驱动器列表"
             >
-              ⟳
+              <RefreshCw size={13} />
             </button>
           )}
         </div>
@@ -281,25 +282,26 @@ export function Sidebar({
               dragState.targetPath === d.mount;
             const sizeText =
               d.totalBytes > 0
-                ? ` (${formatBytes(d.freeBytes)} 可用 / ${formatBytes(d.totalBytes)})`
+                ? `${formatBytes(d.freeBytes)} 可用 / ${formatBytes(d.totalBytes)}`
                 : '';
-            const display = d.mount.endsWith('\\') || d.mount.endsWith('/') ? d.mount : d.mount;
-            const labelDisplay = d.label && d.label !== d.mount ? `${display} ${d.label}` : display;
+            const mountName = d.mount.replace(/[\\/]+$/, '') || d.mount;
+            const labelDisplay = d.label && d.label.replace(/[\\/]+$/, '').toLowerCase() !== mountName.toLowerCase()
+              ? `${d.label} (${mountName})` : mountName;
             return (
               <button
                 key={d.mount}
-                className={`sidebar-item ${currentPath === d.mount ? 'active' : ''} ${
+                className={`sidebar-item sidebar-drive ${currentPath === d.mount ? 'active' : ''} ${
                   isOver ? 'drag-over' : ''
                 }`}
                 onClick={() => onOpenPath(d.mount)}
                 onDragOver={(e) => handleItemDragOver(e, d.mount)}
                 onDragLeave={() => setDragTarget(null, null, dragState?.effect ?? 'move')}
                 onDrop={(e) => void handleItemDrop(e, d.mount)}
-                title={d.mount}
+                title={`${d.mount}${sizeText ? ` · ${sizeText}` : ''}`}
               >
                 <span className="sidebar-icon"><HardDrive size={13} /></span>
-                <span className="sidebar-name">
-                  {labelDisplay}
+                <span className="sidebar-drive-info">
+                  <span className="sidebar-name">{labelDisplay}</span>
                   {sizeText && <span className="sidebar-meta">{sizeText}</span>}
                 </span>
               </button>
@@ -318,10 +320,11 @@ export function Sidebar({
             className="sidebar-collapse-btn"
             onClick={() => setHistoryCollapsed((v) => !v)}
             title={historyCollapsed ? '展开历史' : '折叠历史'}
+            aria-expanded={!historyCollapsed}
           >
-            <span className={`sidebar-chevron ${historyCollapsed ? 'collapsed' : ''}`}>▶</span>
+            <ChevronRight className={`sidebar-chevron ${historyCollapsed ? 'collapsed' : ''}`} size={14} />
+            <span className="sidebar-header">历史</span>
           </button>
-          <span className="sidebar-header">历史</span>
           {!historyCollapsed && history.length > 0 && (
             <button
               className="sidebar-header-btn"
@@ -355,7 +358,7 @@ export function Sidebar({
                 onDrop={(e) => void handleItemDrop(e, h.path)}
                 title={h.path}
               >
-                <span className="sidebar-icon">↩</span>
+                <span className="sidebar-icon"><History size={14} /></span>
                 <span className="sidebar-name">{display}</span>
               </button>
             );
@@ -442,10 +445,11 @@ function ExtensionPanels() {
           className="sidebar-collapse-btn"
           onClick={() => setExtCollapsed((v) => !v)}
           title={extCollapsed ? '展开扩展' : '折叠扩展'}
+          aria-expanded={!extCollapsed}
         >
-          <span className={`sidebar-chevron ${extCollapsed ? 'collapsed' : ''}`}>▶</span>
+          <ChevronRight className={`sidebar-chevron ${extCollapsed ? 'collapsed' : ''}`} size={14} />
+          <span className="sidebar-header">扩展</span>
         </button>
-        <span className="sidebar-header">扩展</span>
       </div>
       {!extCollapsed && panels.map((panel) => (
         <button
