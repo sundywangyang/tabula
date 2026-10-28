@@ -382,14 +382,15 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
       closeTab: (paneId, tabId) => {
         const root = get().rootLayout;
         const isMultiPane = countPanesInTree(root) > 1;
+        let closed = false;
         const newRoot = mapPane(root, paneId, (p) => {
           const idx = p.tabs.findIndex((t) => t.id === tabId);
           if (idx < 0) return p;
           const tab = p.tabs[idx];
           if (!tab.closable) return p; // 不可关
+          closed = true;
           const newTabs = p.tabs.filter((t) => t.id !== tabId);
-          // 关闭最后一个 tab → pane 留空 (tabs=[], activeTabId=null)
-          // PaneView 会显示"暂无打开的文件夹"空态, 用户要恢复浏览就点 + 新建
+          // Multi-pane layouts first remove the empty pane below.
           if (newTabs.length === 0) {
             return { ...p, tabs: [], activeTabId: null };
           }
@@ -401,9 +402,9 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           }
           return { ...p, tabs: newTabs, activeTabId: nextActive };
         });
+        if (!closed) return;
         setState({ rootLayout: newRoot });
         // 多 pane + 此 pane 变空 → 立刻 mergePane 把空 pane 节点从 layout 树中摘掉
-        // 单 pane 变空: 保留空 pane 节点, PaneView 显示空态 (用户期望)
         if (isMultiPane) {
           const stillEmpty = (() => {
             const node = findPane(newRoot, paneId);
@@ -411,6 +412,23 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           })();
           if (stillEmpty) {
             get().pane.mergePane(paneId);
+          }
+        }
+
+        // Never leave the final pane without a browsing location after closing
+        // its last tab, including when merging into an already empty pane.
+        const finalRoot = get().rootLayout;
+        if (countPanesInTree(finalRoot) === 1) {
+          const finalPaneId = findFirstPane(finalRoot);
+          const finalPane = finalPaneId ? findPane(finalRoot, finalPaneId) : null;
+          if (finalPaneId && finalPane?.type === 'pane' && finalPane.tabs.length === 0) {
+            const path = defaultPath();
+            const fallback = makeFolderTab(path, '主页');
+            setState({
+              rootLayout: mapPane(finalRoot, finalPaneId, (p) => ({ ...p, tabs: [fallback], activeTabId: fallback.id })),
+              activePaneId: finalPaneId,
+            });
+            void useFileStore.getState().loadDir(finalPaneId, path);
           }
         }
       },
