@@ -70,6 +70,7 @@ async function persistConfig<K extends keyof AppConfig>(key: K, value: AppConfig
 
 export const useFileStore = create<FileStore>((set, get, store) => {
   let nextDirectoryRequest = 0;
+  let pathBarGeneration = 0;
   let clipboardGeneration = 0;
   let pendingClipboardWrite: Promise<void> = Promise.resolve();
   let pendingClipboardRead: Promise<void> = Promise.resolve();
@@ -512,6 +513,7 @@ export const useFileStore = create<FileStore>((set, get, store) => {
 
     // ============ 路径栏 ============
     openPathBar: (paneId, initial) => {
+      pathBarGeneration++;
       const data = get().panes[paneId];
       set({
         pathBarOpen: true,
@@ -523,16 +525,19 @@ export const useFileStore = create<FileStore>((set, get, store) => {
     },
 
     closePathBar: () => {
+      pathBarGeneration++;
       set({ pathBarOpen: false, pathBarValue: '', pathBarError: null, pathBarCompletions: [] });
     },
 
     setPathBarValue: (value) => {
+      pathBarGeneration++;
       set({ pathBarValue: value, pathBarError: null, pathBarCompletions: [] });
     },
 
     completePathBar: () => {
       const { pathBarValue, pathBarTargetPaneId } = get();
       if (!pathBarValue) return;
+      const generation = ++pathBarGeneration;
       const m = pathBarValue.match(/^(.*[\\/])([^\\/]*)$/);
       let base: string;
       let prefix: string;
@@ -550,7 +555,14 @@ export const useFileStore = create<FileStore>((set, get, store) => {
         }
       }
       void (async () => {
-        const res = await window.tabula.fs.listDir(base);
+        let res;
+        try {
+          res = await window.tabula.fs.listDir(base);
+        } catch (error) {
+          if (generation === pathBarGeneration) set({ pathBarError: error instanceof Error ? error.message : '无法读取目录' });
+          return;
+        }
+        if (generation !== pathBarGeneration) return;
         if (!res.ok) {
           set({ pathBarError: res.error.message, pathBarCompletions: [] });
           return;
@@ -586,6 +598,7 @@ export const useFileStore = create<FileStore>((set, get, store) => {
 
     submitPathBar: async () => {
       const { pathBarValue, pathBarCompletions, pathBarTargetPaneId } = get();
+      const generation = ++pathBarGeneration;
       let target = pathBarValue.trim();
       if (!target) {
         set({ pathBarError: '路径不能为空' });
@@ -597,9 +610,20 @@ export const useFileStore = create<FileStore>((set, get, store) => {
           target = first;
         }
       }
-      const res = await window.tabula.fs.listDir(target);
+      let res;
+      try {
+        res = await window.tabula.fs.listDir(target);
+      } catch (error) {
+        if (generation === pathBarGeneration) set({ pathBarError: error instanceof Error ? error.message : '无法打开此目录' });
+        return;
+      }
+      if (generation !== pathBarGeneration) return;
       if (!res.ok) {
         set({ pathBarError: res.error.message });
+        return;
+      }
+      if (!pathBarTargetPaneId || !findPaneInLayout(useLayoutStore.getState().rootLayout, pathBarTargetPaneId)) {
+        set({ pathBarError: '目标窗格已关闭，请重新打开转到路径' });
         return;
       }
       set({ pathBarOpen: false, pathBarValue: '', pathBarError: null, pathBarCompletions: [] });

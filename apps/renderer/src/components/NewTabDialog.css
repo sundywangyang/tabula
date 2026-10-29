@@ -32,6 +32,7 @@
 .new-tab-input-wrap:focus-within { border-color: var(--accent); }
 .new-tab-input-wrap input { width: 100%; min-width: 0; height: 40px; padding: 0; border: 0; background: transparent; font-family: var(--font-mono); }
 .new-tab-error { margin-top: 7px; color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
+.path-bar-completions { margin-top: 7px; color: var(--fg-tertiary); font-size: 12px; }
 .new-tab-history-heading { display: flex; align-items: center; gap: 7px; margin: 18px 0 8px; }
 .new-tab-history { min-height: 72px; max-height: min(260px, 32vh); overflow-y: auto; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-base); }
 .new-tab-history-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px; border-radius: var(--radius-sm); text-align: left; color: var(--fg-secondary); }
