@@ -250,7 +250,7 @@ export interface FileStore {
   removePaneData: (paneId: string) => void;
   clearPaneDirectory: (paneId: string) => void;
   loadDir: (paneId: string, path: string) => Promise<void>;
-  refresh: (paneId: string) => Promise<void>;
+  refresh: (paneId: string, preserveSelection?: boolean) => Promise<void>;
 
   // ============ Per-pane: 视图设置(每个 pane 独立)===========
   setViewMode: (paneId: string, mode: ViewMode) => void;

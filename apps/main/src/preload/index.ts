@@ -149,6 +149,13 @@ const api: TabulaAPI = {
 
   fs: {
     listDir: (p) => ipcRenderer.invoke(IpcChannels.FS_LIST_DIR, p),
+    watchDirectory: (paneId, path, token) => ipcRenderer.invoke(IpcChannels.FS_WATCH_DIRECTORY, paneId, path, token),
+    unwatchDirectory: (paneId, token) => ipcRenderer.invoke(IpcChannels.FS_UNWATCH_DIRECTORY, paneId, token),
+    onDirectoryChanged: (listener) => {
+      const wrapped = (_event: IpcRendererEvent, payload: { paneId: string; path: string; token: string; error?: string }) => listener(payload);
+      ipcRenderer.on(IpcChannels.FS_DIRECTORY_CHANGED, wrapped);
+      return () => ipcRenderer.removeListener(IpcChannels.FS_DIRECTORY_CHANGED, wrapped);
+    },
     readFile: (p, enc) => ipcRenderer.invoke(IpcChannels.FS_READ_FILE, p, enc),
     readRtf: (p) => ipcRenderer.invoke(IpcChannels.FS_READ_RTF, p),
     writeFile: (p, data) => ipcRenderer.invoke(IpcChannels.FS_WRITE_FILE, p, data),

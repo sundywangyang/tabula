@@ -138,6 +138,9 @@ export interface TabulaAPI {
   // 文件系统
   fs: {
     listDir(path: string): Promise<Result<ListDirResult>>;
+    watchDirectory(paneId: string, path: string, token: string): Promise<Result<void>>;
+    unwatchDirectory(paneId: string, token: string): Promise<void>;
+    onDirectoryChanged(listener: (event: { paneId: string; path: string; token: string; error?: string }) => void): () => void;
     readFile(path: string, encoding?: 'utf-8' | 'binary'): Promise<Result<string | ArrayBuffer>>;
     readRtf(path: string): Promise<Result<string>>;
     writeFile(path: string, data: string | ArrayBuffer): Promise<Result<void>>;

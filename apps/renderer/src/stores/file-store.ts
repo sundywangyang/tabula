@@ -255,7 +255,7 @@ export const useFileStore = create<FileStore>((set, get, store) => {
       }
     },
 
-    refresh: async (paneId) => {
+    refresh: async (paneId, preserveSelection = false) => {
       const data = get().panes[paneId];
       if (!data || !data.currentPath) return;
       const request = ++nextDirectoryRequest;
@@ -271,7 +271,15 @@ export const useFileStore = create<FileStore>((set, get, store) => {
         set((s) => ({
           panes: {
             ...s.panes,
-            [paneId]: { ...s.panes[paneId], entries: result.data.entries, loading: false, error: null, selectedPaths: new Set() },
+            [paneId]: (() => {
+              const pane = s.panes[paneId];
+              const paths = new Set(result.data.entries.map((entry) => entry.path));
+              return { ...pane, entries: result.data.entries, loading: false, error: null,
+                selectedPaths: preserveSelection ? new Set([...pane.selectedPaths].filter((path) => paths.has(path))) : new Set(),
+                cursorPath: preserveSelection && pane.cursorPath && !paths.has(pane.cursorPath) ? null : pane.cursorPath,
+                lastClickedPath: preserveSelection && pane.lastClickedPath && !paths.has(pane.lastClickedPath) ? null : pane.lastClickedPath,
+              };
+            })(),
           },
         }));
       } else {

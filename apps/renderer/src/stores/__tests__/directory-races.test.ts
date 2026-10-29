@@ -10,6 +10,16 @@ beforeEach(async () => { vi.useFakeTimers(); mock = await seedFiles(); });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('directory request ownership', () => {
+  it('preserves surviving selection and clears removed cursor on automatic refresh', async () => {
+    mock.fs.listDir.mockResolvedValueOnce(listing('C:\\initial', ['a.txt', 'b.txt']));
+    await store().loadDir('p', 'C:\\initial');
+    store().selectOne('p', 'C:\\initial\\a.txt');
+    store().toggleSelect('p', 'C:\\initial\\b.txt');
+    mock.fs.listDir.mockResolvedValueOnce(listing('C:\\initial', ['a.txt', 'new.txt']));
+    await store().refresh('p', true);
+    expect([...store().panes.p.selectedPaths]).toEqual(['C:\\initial\\a.txt']);
+    expect(store().panes.p.cursorPath).toBeNull();
+  });
   it('ignores an older directory response after a newer navigation finishes', async () => {
     const older = deferred<ReturnType<typeof listing>>();
     const newer = deferred<ReturnType<typeof listing>>();

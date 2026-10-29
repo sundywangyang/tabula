@@ -25,6 +25,7 @@ import {
 } from './handlers';
 import * as fsService from '../fs/filesystem';
 import { FileOperations } from '../fs/operations';
+import { DirectoryWatchManager } from '../fs/directory-watch';
 import { readRtf } from '../fs/rtf';
 import { registerFileOperationHandlers } from './file-operations';
 import * as trashService from '../fs/trash';
@@ -59,6 +60,23 @@ import { registerFileToolsHandlers, registerTagHandlers } from './file-tools';
 export type { IpcContext } from './context';
 
 export function registerIpcHandlers(ctx: IpcContext) {
+  const watchedSenders = new Set<number>();
+  const directoryWatch = new DirectoryWatchManager((id, event) => {
+    const target = ctx.windowManager.getAllWindows().find((window) => !window.isDestroyed() && window.webContents.id === id);
+    target?.webContents.send(IpcChannels.FS_DIRECTORY_CHANGED, event);
+  });
+  ipcMain.handle(IpcChannels.FS_WATCH_DIRECTORY, (event, paneId: string, path: string, token: string) => {
+    const id = event.sender.id;
+    if (!watchedSenders.has(id)) {
+      watchedSenders.add(id);
+      event.sender.once('destroyed', () => { directoryWatch.stopOwner(id); watchedSenders.delete(id); });
+    }
+    try { directoryWatch.start(id, paneId, path, token); return { ok: true, data: undefined }; }
+    catch (error) { return { ok: false, error: { code: 'UNKNOWN', message: String(error) } }; }
+  });
+  ipcMain.handle(IpcChannels.FS_UNWATCH_DIRECTORY, (event, paneId: string, token: string) => {
+    directoryWatch.stop(event.sender.id, paneId, token);
+  });
   const dragIcons = new DragIconCache(path => app.getFileIcon(path, { size: 'normal' }));
   const historyDir = join(app.getPath('userData'), 'undo', `${process.pid}-${Date.now()}`);
   const fileOperations = new FileOperations(historyDir, (path) => shell.trashItem(path), undoManager, {

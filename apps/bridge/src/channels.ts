@@ -19,6 +19,9 @@ export const IpcChannels = {
   // 文件系统
   FS_LIST_DIR: 'fs:list-dir',
   FS_CHANGED: 'fs:changed',
+  FS_WATCH_DIRECTORY: 'fs:watch-directory',
+  FS_UNWATCH_DIRECTORY: 'fs:unwatch-directory',
+  FS_DIRECTORY_CHANGED: 'fs:directory-changed',
   FS_READ_FILE: 'fs:read-file',
   FS_READ_RTF: 'fs:read-rtf',
   FS_WRITE_FILE: 'fs:write-file',

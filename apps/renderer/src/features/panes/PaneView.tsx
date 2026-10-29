@@ -65,6 +65,24 @@ export function PaneView({
   const activeTabPath = activeTab?.path;
   const isTrash = isTrashPane(activeTabPath);
   useEffect(() => {
+    const path = paneData?.currentPath;
+    if (!path || isTrash || path !== activeTabPath || !window.tabula.fs.watchDirectory) return;
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let active = true;
+    const off = window.tabula.fs.onDirectoryChanged((event) => {
+      if (!active || event.paneId !== paneId || event.token !== token || event.path !== path) return;
+      if (event.error) {
+        useFileStore.getState().showToast(`目录自动刷新不可用: ${event.error}；请手动刷新`, 'warn', 4000);
+        return;
+      }
+      if (useFileStore.getState().panes[paneId]?.currentPath === path) void useFileStore.getState().refresh(paneId, true);
+    });
+    void window.tabula.fs.watchDirectory(paneId, path, token).then((result) => {
+      if (active && !result.ok) useFileStore.getState().showToast(`目录自动刷新不可用: ${result.error.message}；请手动刷新`, 'warn', 4000);
+    }).catch((error) => { if (active) useFileStore.getState().showToast(`目录自动刷新不可用: ${String(error)}；请手动刷新`, 'warn', 4000); });
+    return () => { active = false; off(); void window.tabula.fs.unwatchDirectory(paneId, token).catch(() => undefined); };
+  }, [paneId, paneData?.currentPath, activeTabPath, isTrash]);
+  useEffect(() => {
     if (!activeTab) return;
     if (!isFocused) return;
     if (!activeTabPath) return;
