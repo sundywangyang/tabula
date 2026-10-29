@@ -12,7 +12,7 @@
  * 走 panes[paneId] 分片。
  */
 import { create } from 'zustand';
-import type { AppConfig } from '@tabula/bridge';
+import type { AppConfig, FolderViewSettings } from '@tabula/bridge';
 import { useLayoutStore } from './layout-store';
 import type { FileStore, ViewMode, SortDir, SortField, ConflictItem } from './file/types';
 import { emptyPaneData } from './file/pane-data';
@@ -109,6 +109,13 @@ export const useFileStore = create<FileStore>((set, get, store) => {
     if (get().clipboard === cb) set({ clipboard: null });
   };
   const directoryRequests = new Map<string, number>();
+  const folderViewRevisions = new Map<string, number>();
+  const saveFolderView = (paneId: string, patch: FolderViewSettings) => {
+    const path = get().panes[paneId]?.currentPath;
+    if (!path || !window.tabula.config.setFolderView) return;
+    folderViewRevisions.set(paneId, (folderViewRevisions.get(paneId) ?? 0) + 1);
+    void window.tabula.config.setFolderView(path, patch).catch(error => get().showToast(`保存目录视图失败: ${String(error)}`, 'warn'));
+  };
   const refreshAffected = async (sources: string[], destination: string) => {
     const normalize = (path: string) => {
       const normalized = path.replace(/[\\/]+/g, '/').replace(/\/$/, '');
@@ -121,6 +128,8 @@ export const useFileStore = create<FileStore>((set, get, store) => {
   };
 
   return {
+    pendingSessionSelections: {},
+    setSessionSelections: (selections) => set({ pendingSessionSelections: selections }),
     // 视图(共享)
     sortBy: 'name',
     thumbnailSize: 64,
@@ -204,7 +213,7 @@ export const useFileStore = create<FileStore>((set, get, store) => {
         }
         set((s) => {
           const data = s.panes[paneId];
-          if (!data || data.viewMode !== 'details') return s;
+          if (!data || (data.currentPath && typeof window.tabula.config.getFolderView === 'function') || data.viewMode !== 'details') return s;
           return { panes: { ...s.panes, [paneId]: { ...data, viewMode: defaultView } } };
         });
       }
@@ -233,6 +242,12 @@ export const useFileStore = create<FileStore>((set, get, store) => {
     loadDir: async (paneId, path) => {
       const request = ++nextDirectoryRequest;
       directoryRequests.set(paneId, request);
+      const viewRevision = folderViewRevisions.get(paneId) ?? 0;
+      const supportsFolderViews = typeof window.tabula.config.getFolderView === 'function';
+      const folderView = supportsFolderViews
+        ? window.tabula.config.getFolderView(path).catch(() => null) : Promise.resolve(null);
+      const defaultView = supportsFolderViews && typeof window.tabula.config.get === 'function'
+        ? window.tabula.config.get('defaultView').catch(() => 'details' as ViewMode) : Promise.resolve('details' as ViewMode);
       // 无 active tab 时自动建一个 tab 再加载
       const layout = useLayoutStore.getState();
       const paneNode = findPaneInLayout(layout.rootLayout, paneId);
@@ -276,14 +291,34 @@ export const useFileStore = create<FileStore>((set, get, store) => {
       } catch (error) {
         result = { ok: false as const, error: { message: String(error) } };
       }
+      const rememberedView = await folderView;
+      const fallbackView = await defaultView;
       if (directoryRequests.get(paneId) !== request || get().panes[paneId]?.currentPath !== path) return;
+      if ((folderViewRevisions.get(paneId) ?? 0) === viewRevision && supportsFolderViews) {
+        set(s => ({ panes: { ...s.panes, [paneId]: { ...s.panes[paneId],
+          viewMode: rememberedView?.viewMode ?? fallbackView,
+          sortBy: rememberedView?.sortBy ?? s.sortBy,
+          sortDir: rememberedView?.sortDir !== undefined ? rememberedView.sortDir : s.sortDir,
+          columnWidths: rememberedView?.columnWidths ?? {},
+          visibleColumns: rememberedView?.visibleColumns ?? {},
+        } } }));
+      }
       if (result.ok) {
-        set((s) => ({
+        set((s) => {
+          const pending = s.pendingSessionSelections[paneId];
+          const matches = pending && sameFilePath(pending.path, path);
+          const paths = new Set(result.data.entries.map(entry => entry.path));
+          const remaining = { ...s.pendingSessionSelections };
+          if (pending) delete remaining[paneId];
+          return ({
+          pendingSessionSelections: remaining,
           panes: {
             ...s.panes,
-            [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), entries: result.data.entries, loading: false },
+            [paneId]: { ...(s.panes[paneId] ?? emptyPaneData()), entries: result.data.entries, loading: false,
+              ...(matches ? { selectedPaths: new Set(pending.paths.filter(item => paths.has(item))), cursorPath: pending.cursorPath && paths.has(pending.cursorPath) ? pending.cursorPath : null,
+                lastClickedPath: pending.cursorPath && paths.has(pending.cursorPath) ? pending.cursorPath : null } : {}) },
           },
-        }));
+        }); });
       } else {
         set((s) => ({
           panes: {
@@ -340,6 +375,13 @@ export const useFileStore = create<FileStore>((set, get, store) => {
         },
       }));
       void persistConfig(VIEW_KEY, mode); // 持久化最后一个切换的视图模式(新 pane 默认值)
+      saveFolderView(paneId, { viewMode: mode });
+    },
+
+    setDetailColumns: (paneId, settings, persist = true) => {
+      if (!get().panes[paneId]) return;
+      set(s => ({ panes: { ...s.panes, [paneId]: { ...s.panes[paneId], ...settings } } }));
+      if (persist) saveFolderView(paneId, settings);
     },
 
     // G007: 设置 pane 的分组模式(per-pane;v1 不持久化,UI 渲染延后实现)
@@ -352,8 +394,10 @@ export const useFileStore = create<FileStore>((set, get, store) => {
       }));
     },
 
-    cycleSort: (field) => {
-      const { sortBy, sortDir } = get();
+    cycleSort: (field, paneId) => {
+      const pane = paneId ? get().panes[paneId] : undefined;
+      const sortBy = pane?.sortBy ?? get().sortBy;
+      const sortDir = pane?.sortDir !== undefined ? pane.sortDir : get().sortDir;
       let nextDir: SortDir;
       if (sortBy !== field) {
         nextDir = 'asc';
@@ -362,9 +406,14 @@ export const useFileStore = create<FileStore>((set, get, store) => {
         else if (sortDir === 'desc') nextDir = null;
         else nextDir = 'asc';
       }
-      set({ sortBy: field, sortDir: nextDir });
-      void persistConfig(SORTBY_KEY, field);
-      void persistConfig(SORTDIR_KEY, nextDir);
+      if (paneId && pane) {
+        set(s => ({ panes: { ...s.panes, [paneId]: { ...s.panes[paneId], sortBy: field, sortDir: nextDir } } }));
+        saveFolderView(paneId, { sortBy: field, sortDir: nextDir });
+      } else {
+        set({ sortBy: field, sortDir: nextDir });
+        void persistConfig(SORTBY_KEY, field);
+        void persistConfig(SORTDIR_KEY, nextDir);
+      }
     },
 
     toggleShowHidden: () => {
@@ -637,7 +686,7 @@ export const useFileStore = create<FileStore>((set, get, store) => {
       const data = get().panes[paneId];
       if (!data) return [];
       const { sortBy, sortDir, showHidden } = get();
-      return displayEntries(data, { sortBy, sortDir, showHidden });
+      return displayEntries(data, { sortBy: data.sortBy ?? sortBy, sortDir: data.sortDir !== undefined ? data.sortDir : sortDir, showHidden });
     },
 
     // ============ P3: 工具 - 取 pane 路径 ============

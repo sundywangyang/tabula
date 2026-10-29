@@ -54,6 +54,7 @@ export function TabBar({
 }) {
   const activateTab = useLayoutStore((s) => s.pane.activateTab);
   const closeTab = useLayoutStore((s) => s.pane.closeTab);
+  const canReopenTab = useLayoutStore((s) => s.closedTabs.length > 0);
   const mergePane = useLayoutStore((s) => s.pane.mergePane);
   const countPanes = useLayoutStore((s) => s.countPanes);
   const focusPane = useLayoutStore((s) => s.pane.focusPane);
@@ -476,6 +477,13 @@ export function TabBar({
             </button>
           )}
           <div className="tab-ctx-divider" />
+          <button className="tab-ctx-item" disabled={!canReopenTab} onClick={() => {
+            useLayoutStore.getState().pane.reopenClosedTab();
+            closeCtxMenu();
+          }}>
+            <span className="tab-ctx-icon">↶</span>
+            <span>恢复关闭的标签</span>
+          </button>
           <button
             className="tab-ctx-item"
             onClick={() => {

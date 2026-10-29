@@ -89,6 +89,14 @@
   font-size: 13px;
 }
 
+.gs-advanced { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; padding: 6px 16px; color: var(--fg-secondary); font-size: 11px; }
+.gs-advanced label { display: flex; flex-direction: column; gap: 3px; }
+.gs-advanced input, .gs-advanced select, .gs-advanced button { min-width: 0; color: var(--fg-primary); background: var(--bg-base); border: 1px solid var(--border); border-radius: 4px; padding: 5px 6px; font: inherit; }
+.gs-advanced input[type='number'] { width: 80px; }
+.gs-advanced button { cursor: pointer; }
+.gs-advanced button:disabled { opacity: .45; cursor: default; }
+.gs-advanced [role='alert'] { color: #f08080; }
+
 .gs-scan-status {
   display: inline-flex;
   align-items: center;

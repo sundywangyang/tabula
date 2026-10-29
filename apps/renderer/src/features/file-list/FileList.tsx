@@ -22,7 +22,7 @@ import { parentPath as parentOf, sameFilePath } from '../../stores/file/paths';
 import { DetailsView } from './views/DetailsView';
 import { ListView } from './views/ListView';
 import { GridView } from './views/GridView';
-import { SortHeader } from './views/SortHeader';
+import { DetailsHeader } from './views/DetailsHeader';
 import { useLayoutStore } from '../../stores/layout-store';
 import { loadTagsForPath, subscribeTagsCache } from '../../components/context-menu/tags';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
@@ -36,8 +36,8 @@ interface Props {
 
 export function FileList({ paneId, onOpenEntry }: Props) {
   // 全部状态从 store 拉
-  const sortBy = useFileStore((s) => s.sortBy);
-  const sortDir = useFileStore((s) => s.sortDir);
+  const sortBy = useFileStore((s) => s.panes[paneId]?.sortBy ?? s.sortBy);
+  const sortDir = useFileStore((s) => s.panes[paneId]?.sortDir !== undefined ? s.panes[paneId].sortDir! : s.sortDir);
   const showHidden = useFileStore((s) => s.showHidden);
   const showExtensions = useFileStore((s) => s.showExtensions);
 
@@ -67,6 +67,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   const selectRect = useFileStore((s) => s.selectRect);
   const setCursor = useFileStore((s) => s.setCursor);
   const cycleSort = useFileStore((s) => s.cycleSort);
+  const setDetailColumns = useFileStore((s) => s.setDetailColumns);
   const beginRename = useFileStore((s) => s.beginRename);
   const endRename = useFileStore((s) => s.endRename);
   const renameEntry = useFileStore((s) => s.renameEntry);
@@ -585,7 +586,8 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   return (
     <div
       ref={containerRef}
-      className={`file-list file-list-${viewMode} ${dropClass}`}
+      className={`file-list file-list-${viewMode} ${dropClass} ${['size', 'mtime', 'type'].filter(key => paneData?.visibleColumns?.[key as 'size' | 'mtime' | 'type'] === false).map(key => `hide-col-${key}`).join(' ')}`}
+      style={{ '--detail-columns': ['minmax(100px, 1fr)', ...(['size', 'mtime', 'type'] as const).filter(key => paneData?.visibleColumns?.[key] !== false).map(key => `${paneData?.columnWidths?.[key] ?? ({ size: 100, mtime: 160, type: 100 })[key]}px`)].join(' ') } as React.CSSProperties}
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onMouseOverCapture={prepareDragIcon}
@@ -596,40 +598,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       onDrop={handleContainerDrop}
     >
       {viewMode === 'details' && (
-        <div className="file-list-header">
-          <SortHeader
-            field="name"
-            label="名称"
-            currentField={sortBy}
-            currentDir={sortDir}
-            onSort={cycleSort}
-            className="col col-name"
-          />
-          <SortHeader
-            field="size"
-            label="大小"
-            currentField={sortBy}
-            currentDir={sortDir}
-            onSort={cycleSort}
-            className="col col-size"
-          />
-          <SortHeader
-            field="mtime"
-            label="修改时间"
-            currentField={sortBy}
-            currentDir={sortDir}
-            onSort={cycleSort}
-            className="col col-mtime"
-          />
-          <SortHeader
-            field="type"
-            label="类型"
-            currentField={sortBy}
-            currentDir={sortDir}
-            onSort={cycleSort}
-            className="col col-type"
-          />
-        </div>
+        <DetailsHeader key={currentPath} settings={paneData ?? {}} sortBy={sortBy} sortDir={sortDir} onSort={field => cycleSort(field, paneId)} onChange={(settings, persist) => setDetailColumns(paneId, settings, persist)} />
       )}
       {viewMode === 'list' && (
         <div className="file-list-header">

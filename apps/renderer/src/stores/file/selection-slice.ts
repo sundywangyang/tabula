@@ -44,7 +44,7 @@ export const createSelectionSlice: FileSlice<Actions> = (set, get) => ({
     if (!data) return;
     const { entries, lastClickedPath } = data;
     const { sortBy, sortDir, showHidden } = get();
-    const list = displayEntries(data, { sortBy, sortDir, showHidden });
+    const list = displayEntries(data, { sortBy: data.sortBy ?? sortBy, sortDir: data.sortDir !== undefined ? data.sortDir : sortDir, showHidden });
     const endIdx = list.findIndex((e) => e.path === path);
     let startIdx = 0;
     if (lastClickedPath) {
@@ -85,7 +85,7 @@ export const createSelectionSlice: FileSlice<Actions> = (set, get) => ({
     const data = get().panes[paneId];
     if (!data) return;
     const { sortBy, sortDir, showHidden } = get();
-    const list = displayEntries(data, { sortBy, sortDir, showHidden });
+    const list = displayEntries(data, { sortBy: data.sortBy ?? sortBy, sortDir: data.sortDir !== undefined ? data.sortDir : sortDir, showHidden });
     set((s) => ({
       panes: {
         ...s.panes,
@@ -99,7 +99,7 @@ export const createSelectionSlice: FileSlice<Actions> = (set, get) => ({
     const data = get().panes[paneId];
     if (!data) return;
     const { sortBy, sortDir, showHidden } = get();
-    const list = displayEntries(data, { sortBy, sortDir, showHidden });
+    const list = displayEntries(data, { sortBy: data.sortBy ?? sortBy, sortDir: data.sortDir !== undefined ? data.sortDir : sortDir, showHidden });
     const inverted = new Set<string>();
     for (const e of list) {
       if (!data.selectedPaths.has(e.path)) inverted.add(e.path);
@@ -155,7 +155,7 @@ export const createSelectionSlice: FileSlice<Actions> = (set, get) => ({
     const data = get().panes[paneId];
     if (!data) return;
     const { sortBy, sortDir, showHidden } = get();
-    const list = displayEntries(data, { sortBy, sortDir, showHidden });
+    const list = displayEntries(data, { sortBy: data.sortBy ?? sortBy, sortDir: data.sortDir !== undefined ? data.sortDir : sortDir, showHidden });
     if (list.length === 0) return;
     let idx = data.cursorPath ? list.findIndex((e) => e.path === data.cursorPath) : -1;
     if (idx < 0) {
@@ -180,7 +180,7 @@ export const createSelectionSlice: FileSlice<Actions> = (set, get) => ({
     const data = get().panes[paneId];
     if (!data) return;
     const { sortBy, sortDir, showHidden } = get();
-    const list = displayEntries(data, { sortBy, sortDir, showHidden });
+    const list = displayEntries(data, { sortBy: data.sortBy ?? sortBy, sortDir: data.sortDir !== undefined ? data.sortDir : sortDir, showHidden });
     if (list.length === 0) return;
     const target = edge === 'start' ? list[0]! : list[list.length - 1]!;
     set((s) => ({

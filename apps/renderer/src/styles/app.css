@@ -11,3 +11,7 @@
   display: flex;
   min-height: 0;
 }
+
+.sidebar-container { position: relative; flex: none; min-width: 160px; max-width: 480px; height: 100%; }
+.sidebar-resize { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 5; }
+.sidebar-resize:hover { background: var(--accent-soft); }

@@ -1,5 +1,7 @@
 .sidebar {
-  width: var(--sidebar-w);
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   background: var(--bg-translucent);
   -webkit-backdrop-filter: var(--blur-md);
   backdrop-filter: var(--blur-md);
@@ -11,6 +13,16 @@
   padding: 14px 10px;
   gap: 16px;
 }
+
+.sidebar-item:has(> .sidebar-tree-children) { flex-wrap: wrap; }
+.sidebar-tree-toggle { order: -1; border: 0; background: transparent; color: var(--fg-tertiary); padding: 0; display: inline-flex; cursor: pointer; }
+.sidebar-tree-toggle svg { transition: transform .15s; }
+.sidebar-tree-toggle .sidebar-tree-open { transform: rotate(90deg); }
+.sidebar-tree-children { order: 2; flex-basis: 100%; min-width: 0; padding-left: 12px; }
+.sidebar-tree-branch { min-width: 0; }
+.sidebar-tree-item { padding: 4px 4px; gap: 3px; }
+.sidebar-tree-label { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; display: flex; align-items: center; gap: 6px; text-align: left; cursor: pointer; }
+.sidebar-tree-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 毛玻璃不支持时降级到纯色 */
 @supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {

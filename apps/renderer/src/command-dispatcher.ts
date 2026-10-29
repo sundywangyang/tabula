@@ -307,6 +307,18 @@ export function runCommandById(commandId: string): boolean {
     }
 
     // ============ 标签 ============
+    case 'navigation.parent': {
+      const path = file.panes[activePaneId]?.currentPath;
+      if (path && !/^\\\\[^\\/]+[\\/][^\\/]+[\\/]?$/.test(path)) {
+        const parent = parentPath(path);
+        if (parent && parent !== path) void layout.pane.navigate(activePaneId, parent);
+      }
+      return true;
+    }
+    case 'tab.reopen': {
+      useLayoutStore.getState().pane.reopenClosedTab();
+      return true;
+    }
     case 'tab.new': {
       useUiDialogsStore.getState().setNewTabPaneId(activePaneId);
       return true;

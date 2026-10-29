@@ -40,7 +40,7 @@ describe('internal file drop targets', () => {
       if (kind === 'tab') root.render(<TabBar paneId="p" pane={pane} />);
     });
     const target = kind === 'breadcrumb' ? container.querySelector('.breadcrumb-segment') :
-      kind === 'sidebar' ? container.querySelector('.sidebar-item') : container.querySelector('[data-tab-index="0"]');
+      kind === 'sidebar' ? container.querySelector('.sidebar-item[title="C:/target"]') : container.querySelector('[data-tab-index="0"]');
     expect(target).not.toBeNull();
     const transfer = { dropEffect: '' };
     await act(async () => sendDrag(target!, 'dragover', transfer));

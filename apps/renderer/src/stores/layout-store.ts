@@ -29,7 +29,7 @@
  *   tabDrag.start / setDropTarget / setDropEdge / end
  */
 import { create } from 'zustand';
-import type { LayoutNode, SplitDirection, Tab } from '@tabula/bridge';
+import type { LayoutNode, SplitDirection, Tab, WindowSessionSnapshot } from '@tabula/bridge';
 import { useFileStore } from './file-store';
 import { makeFolderTab } from './folder-tab';
 import { getCachedRootPath } from '../platform-cache';
@@ -64,15 +64,19 @@ interface LayoutStore {
 
   /** P2 v2: tab 拖动瞬时状态(不持久化) */
   tabDrag: TabDragState | null;
+  closedTabs: Array<{ paneId: string; index: number; tab: Tab }>;
 
   // 生命周期
   hydrateFromConfig: () => Promise<void>;
   persistImmediate: () => Promise<void>;
+  queuePersist: () => void;
+  persistOnUnload: () => void;
 
   // Tab / Pane 操作(对外 namespace)
   pane: {
     openTab(paneId: string, tab: Tab): void;
     closeTab(paneId: string, tabId: string): void;
+    reopenClosedTab(): void;
     activateTab(paneId: string, tabId: string): void;
     pinTab(paneId: string, tabId: string): void;
     unpinTab(paneId: string, tabId: string): void;
@@ -277,9 +281,23 @@ function findFirstPane(node: LayoutNode): string | null {
 
 export const useLayoutStore = create<LayoutStore>((set, get) => {
   const init = makeDefaultLayout();
+  const makeSnapshot = (): WindowSessionSnapshot => {
+    const files = useFileStore.getState();
+    const selections: NonNullable<WindowSessionSnapshot['selections']> = {};
+    for (const paneId of get().getAllPaneIds()) {
+      const node = findPane(get().rootLayout, paneId);
+      const tab = node?.type === 'pane' ? node.tabs.find(item => item.id === node.activeTabId) : null;
+      const pending = files.pendingSessionSelections[paneId];
+      if (pending && pending.path === tab?.path) { selections[paneId] = pending; continue; }
+      const pane = files.panes[paneId];
+      if (!pane?.currentPath || pane.currentPath !== tab?.path) continue;
+      selections[paneId] = { path: pane.currentPath, paths: [...pane.selectedPaths], cursorPath: pane.cursorPath };
+    }
+    return { rootLayout: get().rootLayout, activePaneId: get().activePaneId, selections };
+  };
 
   /** 立即 set 状态(不带持久化) */
-  const setState = (partial: Partial<Pick<LayoutStore, 'rootLayout' | 'activePaneId'>>) => {
+  const setState = (partial: Partial<Pick<LayoutStore, 'rootLayout' | 'activePaneId' | 'closedTabs'>>) => {
     set((s) => ({ ...partial }));
     schedulePersist();
   };
@@ -287,14 +305,11 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
   /** 200ms 防抖持久化 */
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
   let persistInFlight = false;
-  let pendingPersist: PersistedLayout | null = null;
+  let pendingPersist: WindowSessionSnapshot | null = null;
 
   const schedulePersist = () => {
     if (persistTimer) clearTimeout(persistTimer);
-    const snap: PersistedLayout = {
-      rootLayout: get().rootLayout,
-      activePaneId: get().activePaneId,
-    };
+    const snap = makeSnapshot();
     pendingPersist = snap;
     persistTimer = setTimeout(() => {
       persistTimer = null;
@@ -316,7 +331,8 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
       // 走 electron-store(config:cfg:set,key 写在 AppConfig 之外需要 store 接受任意 key)
       // 我们这里借用 config.set 接受任意键
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (window.tabula.config.set as any)(PERSIST_KEY, data);
+      if (typeof window.tabula.windows?.saveSession === 'function') await window.tabula.windows.saveSession(data);
+      else await (window.tabula.config.set as any)(PERSIST_KEY, data);
     } catch (e) {
       console.warn('[layout-store] persist failed', e);
     } finally {
@@ -329,12 +345,14 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
     activePaneId: init.activePaneId,
     hydrated: false,
     tabDrag: null,
+    closedTabs: [],
 
     hydrateFromConfig: async () => {
       try {
+        const session = typeof window.tabula.windows?.getSession === 'function' ? await window.tabula.windows.getSession() : null;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const all = (await (window.tabula.config.all as any)()) as Record<string, unknown>;
-        const data = all[PERSIST_KEY] as PersistedLayout | undefined;
+        const all = !session || session.allowLegacy ? (await (window.tabula.config.all as any)()) as Record<string, unknown> : {};
+        const data = session?.snapshot ?? (session && !session.allowLegacy ? undefined : all[PERSIST_KEY] as PersistedLayout | undefined);
         if (data && data.rootLayout && data.activePaneId) {
           // P2 v2: 老持久化数据的 split 节点没有 id,这里回填,避免 setSplitSizes 找不到节点
           let rootLayout = ensureSplitIds(data.rootLayout);
@@ -348,6 +366,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
               renamedFallback = true;
             }
           }
+          if (session?.snapshot?.selections) useFileStore.getState().setSessionSelections(session.snapshot.selections);
           set({ rootLayout, activePaneId: data.activePaneId, hydrated: true });
           if (renamedFallback) schedulePersist();
         } else {
@@ -364,11 +383,13 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         clearTimeout(persistTimer);
         persistTimer = null;
       }
-      pendingPersist = {
-        rootLayout: get().rootLayout,
-        activePaneId: get().activePaneId,
-      };
+      pendingPersist = makeSnapshot();
       await flushPersist();
+    },
+    queuePersist: () => { if (get().hydrated) schedulePersist(); },
+    persistOnUnload: () => {
+      if (!get().hydrated || typeof window.tabula.windows?.saveSessionSync !== 'function') return;
+      try { window.tabula.windows.saveSessionSync(makeSnapshot()); } catch (error) { console.warn('[layout-store] session flush failed', error); }
     },
 
     pane: {
@@ -394,12 +415,14 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
         const root = get().rootLayout;
         const isMultiPane = countPanesInTree(root) > 1;
         let closed = false;
+        let closedEntry: { paneId: string; index: number; tab: Tab } | null = null;
         const newRoot = mapPane(root, paneId, (p) => {
           const idx = p.tabs.findIndex((t) => t.id === tabId);
           if (idx < 0) return p;
           const tab = p.tabs[idx];
           if (!tab.closable) return p; // 不可关
           closed = true;
+          closedEntry = { paneId, index: idx, tab: { ...tab, history: [...tab.history] } };
           const newTabs = p.tabs.filter((t) => t.id !== tabId);
           // Multi-pane layouts first remove the empty pane below.
           if (newTabs.length === 0) {
@@ -414,7 +437,7 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
           return { ...p, tabs: newTabs, activeTabId: nextActive };
         });
         if (!closed) return;
-        setState({ rootLayout: newRoot });
+        setState({ rootLayout: newRoot, closedTabs: [...get().closedTabs, closedEntry!].slice(-30) });
         // 多 pane + 此 pane 变空 → 立刻 mergePane 把空 pane 节点从 layout 树中摘掉
         if (isMultiPane) {
           const stillEmpty = (() => {
@@ -442,6 +465,22 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
             void useFileStore.getState().loadDir(finalPaneId, path);
           }
         }
+      },
+
+      reopenClosedTab: () => {
+        const entries = get().closedTabs;
+        const last = entries.at(-1);
+        if (!last) return;
+        const original = findPane(get().rootLayout, last.paneId);
+        const paneId = original?.type === 'pane' ? last.paneId : get().activePaneId;
+        const pane = findPane(get().rootLayout, paneId);
+        if (!pane || pane.type !== 'pane') return;
+        const newRoot = mapPane(get().rootLayout, paneId, p => {
+          const tabs = [...p.tabs];
+          tabs.splice(Math.min(last.index, tabs.length), 0, last.tab);
+          return { ...p, tabs, activeTabId: last.tab.id };
+        });
+        setState({ rootLayout: newRoot, activePaneId: paneId, closedTabs: entries.slice(0, -1) });
       },
 
       activateTab: (paneId, tabId) => {

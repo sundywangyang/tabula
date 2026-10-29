@@ -10,7 +10,8 @@
  * P7: 关键路径只 import TitleBar/Sidebar/PathBar/StatusBar/Toast/Conflict/Input/Confirm/PaneContainer
  *     重组件(Settings/PreviewPanel/GlobalSearch)走 React.lazy + Suspense 懒加载
  */
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { ensureStartupDirectory } from './stores/startup-directory';
 import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
 import { PathBar } from './components/PathBar';
@@ -62,6 +63,35 @@ const Settings = lazy(() =>
 export function App() {
   const [version, setVersion] = useState<string>('');
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(230);
+  const sidebarWidthRef = useRef(sidebarWidth);
+  const stopSidebarResize = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    let active = true;
+    void window.tabula.config.all().then(config => {
+      if (active && typeof config.sidebarWidth === 'number') setSidebarWidth(Math.max(160, Math.min(480, config.sidebarWidth)));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  sidebarWidthRef.current = sidebarWidth;
+  useEffect(() => () => stopSidebarResize.current?.(), []);
+  const resizeSidebar = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX, startWidth = sidebarWidthRef.current;
+    stopSidebarResize.current?.();
+    const move = (next: PointerEvent) => {
+      const width = Math.max(160, Math.min(480, startWidth + next.clientX - startX));
+      sidebarWidthRef.current = width; setSidebarWidth(width);
+    };
+    const cleanup = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end); stopSidebarResize.current = null; };
+    const end = () => {
+      cleanup();
+      void window.tabula.config.set('sidebarWidth', sidebarWidthRef.current).catch(console.warn);
+    };
+    stopSidebarResize.current = cleanup;
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+  };
 
   // P3: dialog state — 集中到 ui-dialogs-store(P7 v1 收口),
   // 这样命令面板(runCommandById)也能直接驱动 dialog 开关,
@@ -133,14 +163,27 @@ export function App() {
   const hydrateLayout = useLayoutStore((s) => s.hydrateFromConfig);
 
   // 视图设置(从 file-store 全局取,用于 StatusBar)
-  const sortBy = useFileStore((s) => s.sortBy);
-  const sortDir = useFileStore((s) => s.sortDir);
+  const sortBy = useFileStore((s) => s.panes[activePaneId]?.sortBy ?? s.sortBy);
+  const sortDir = useFileStore((s) => s.panes[activePaneId]?.sortDir !== undefined ? s.panes[activePaneId].sortDir! : s.sortDir);
 
   // StatusBar 数据:从 active pane 拉
   const activePaneData = useFileStore((s) => s.panes[activePaneId]);
   const activePath = activePaneData?.currentPath ?? '';
   const activeEntries = activePaneData?.entries ?? [];
   const activeSelected = activePaneData?.selectedPaths ?? new Set<string>();
+
+  useEffect(() => {
+    const unsubscribe = useFileStore.subscribe((next, previous) => {
+      const ids = new Set([...Object.keys(next.panes), ...Object.keys(previous.panes)]);
+      if ([...ids].some(id => {
+        const a = next.panes[id], b = previous.panes[id];
+        return !a || !b || a.currentPath !== b.currentPath || a.selectedPaths !== b.selectedPaths || a.cursorPath !== b.cursorPath;
+      })) useLayoutStore.getState().queuePersist();
+    });
+    const flush = () => useLayoutStore.getState().persistOnUnload();
+    window.addEventListener('beforeunload', flush);
+    return () => { unsubscribe(); window.removeEventListener('beforeunload', flush); };
+  }, []);
 
   // 所有 paneId(用于 StatusBar 提示)
   const paneCount = useLayoutStore((s) => s.countPanes());
@@ -193,7 +236,9 @@ export function App() {
         const tab = activePane.tabs.find((t) => t.id === activePane.activeTabId);
         if (tab?.path) {
           initPath = tab.path;
-          await loadDir(active, initPath);
+          // PaneView may already have started loading this path after hydration.
+          // A second load would clear the selection just restored by the first.
+          await ensureStartupDirectory(active, initPath);
         }
       }
       // P2 v2: boot 路径优先(被「拖出」开的窗口,默认 tab 替换为 boot 路径)
@@ -341,7 +386,10 @@ export function App() {
 
       <div className="app-body">
         {sidebarVisible && (
-          <Sidebar currentPath={activePath} onOpenPath={(p) => useLayoutStore.getState().pane.navigate(activePaneId, p)} />
+          <div className="sidebar-container" style={{ width: sidebarWidth }}>
+            <Sidebar currentPath={activePath} onOpenPath={(p) => { void useLayoutStore.getState().pane.navigate(activePaneId, p); }} />
+            <div className="sidebar-resize" role="separator" aria-label="调整侧边栏宽度" aria-orientation="vertical" onPointerDown={resizeSidebar} />
+          </div>
         )}
 
         <div className="app-main">

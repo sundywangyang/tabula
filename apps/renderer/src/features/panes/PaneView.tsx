@@ -237,6 +237,15 @@ export function PaneView({
         tabDrag ? 'pane-drag-active' : ''
       }`}
       onMouseDown={onFocusPane}
+      onMouseDownCapture={(event) => {
+        if (event.button !== 3 && event.button !== 4) return;
+        const target = event.target as HTMLElement;
+        if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+        event.preventDefault();
+        focusPane(paneId);
+        const navigation = useLayoutStore.getState().pane;
+        if (event.button === 3) navigation.goBack(paneId); else navigation.goForward(paneId);
+      }}
       data-pane-id={paneId}
       onDragOver={onContainerDragOver}
       onDragLeave={onContainerDragLeave}

@@ -85,6 +85,9 @@ export const IpcChannels = {
   WIN_OPEN: 'win:open',
   WIN_OPEN_WITH_TAB: 'win:open-with-tab',   // P2 v2:拖出 tab 到新窗口
   WIN_GET_BOOT_PATH: 'win:get-boot-path',   // P2 v2:新窗口启动时询问初始路径
+  WIN_SESSION_GET: 'win:session-get',
+  WIN_SESSION_SET: 'win:session-set',
+  WIN_SESSION_SET_SYNC: 'win:session-set-sync',
   WIN_CLOSE: 'win:close',
   WIN_CLOSE_CURRENT: 'win:close-current',
   WIN_MINIMIZE: 'win:minimize',
@@ -108,6 +111,8 @@ export const IpcChannels = {
   CFG_GET: 'cfg:get',
   CFG_SET: 'cfg:set',
   CFG_ALL: 'cfg:all',
+  CFG_FOLDER_VIEW_GET: 'cfg:folder-view-get',
+  CFG_FOLDER_VIEW_SET: 'cfg:folder-view-set',
 
   // 快捷键 (P7 v1)
   SHORTCUTS_GET_ALL: 'shortcuts:get-all',
@@ -132,6 +137,7 @@ export const IpcChannels = {
   // 平台检测
   PLATFORM_GET: 'platform:get',
   PLATFORM_DEFAULT_ROOT: 'platform:default-root',
+  PLATFORM_SPECIAL_PATHS: 'platform:special-paths',
 
   // 性能埋点 (P7 v1)
   PERF_REPORT: 'perf:report',            // 渲染端 → 主进程上报埋点

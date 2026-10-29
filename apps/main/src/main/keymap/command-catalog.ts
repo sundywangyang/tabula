@@ -211,6 +211,8 @@ export const COMMAND_CATALOG: CommandSpec[] = [
     reserved: false,
   },
   // 标签
+  { id: 'navigation.parent', title: '向上一级', category: '导航', defaultCombo: null, reserved: false },
+  { id: 'tab.reopen', title: '恢复关闭的标签', category: '标签', defaultCombo: parseKeyCombo('Ctrl+Shift+W'), reserved: false },
   {
     id: 'tab.new',
     title: '新建标签',

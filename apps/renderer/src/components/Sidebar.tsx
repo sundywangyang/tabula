@@ -10,11 +10,12 @@
  * 拖放:P3 已支持 — favorites / drives / 当前 都作为 drop target。
  */
 import { type DragEvent as ReactDragEvent, useEffect, useState } from 'react';
-import { ChevronRight, HardDrive, History, Plus, Plug, RefreshCw, Star, X } from 'lucide-react';
+import { ChevronRight, Download, FileText, HardDrive, History, Monitor, Plus, Plug, RefreshCw, Star, Trash2, X } from 'lucide-react';
 import type { DriveInfo } from '@tabula/bridge';
 import { useFileStore } from '../stores/file-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
+import { SidebarTree } from './SidebarTree';
 import './Sidebar.css';
 
 function formatBytes(n: number): string {
@@ -61,6 +62,15 @@ export function Sidebar({
   const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [drivesCollapsed, setDrivesCollapsed] = useState(true);
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false);
+  const [specialPaths, setSpecialPaths] = useState<{ desktop: string; downloads: string; documents: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (typeof window.tabula.platform?.specialPaths === 'function') {
+      void window.tabula.platform.specialPaths().then(paths => { if (active) setSpecialPaths(paths); }).catch(console.warn);
+    }
+    return () => { active = false; };
+  }, []);
 
   // 拉驱动器列表(组件挂载时一次 + 手动刷新按钮)
   useEffect(() => {
@@ -161,6 +171,19 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
+      <div className="sidebar-section" aria-label="常用位置">
+        <div className="sidebar-header-row"><span className="sidebar-header">常用位置</span></div>
+        {specialPaths && ([['桌面', specialPaths.desktop, Monitor], ['下载', specialPaths.downloads, Download], ['文档', specialPaths.documents, FileText]] as const).map(([label, path, Icon]) =>
+          <button key={label} className={`sidebar-item ${currentPath === path ? 'active' : ''} ${dragState?.targetKind === 'sidebar' && dragState.targetPath === path ? 'drag-over' : ''}`} title={path} onClick={() => onOpenPath(path)}
+            onDragOver={e => handleItemDragOver(e, path)} onDragLeave={() => setDragTarget(null, null, dragState?.effect ?? 'move')} onDrop={e => void handleItemDrop(e, path)}>
+            <span className="sidebar-icon"><Icon size={14} /></span><span className="sidebar-name">{label}</span>
+          </button>)}
+        <button className="sidebar-item" onClick={() => {
+          const layout = useLayoutStore.getState();
+          const path = 'trash:///';
+          layout.pane.openTab(layout.activePaneId, { id: `trash-${Date.now()}`, type: 'folder', path, title: '回收站', pinned: false, closable: true, history: [path], historyIndex: 0 });
+        }}><span className="sidebar-icon"><Trash2 size={14} /></span><span className="sidebar-name">回收站</span></button>
+      </div>
       {/* 快速访问 */}
       <div className="sidebar-section">
         <div className="sidebar-header-row">
@@ -237,6 +260,7 @@ export function Sidebar({
                 >
                   <X size={12} />
                 </button>
+                <SidebarTree path={f.path} currentPath={currentPath} onOpenPath={onOpenPath} onDragOver={handleItemDragOver} onDrop={(event, path) => void handleItemDrop(event, path)} />
               </div>
             );
           })

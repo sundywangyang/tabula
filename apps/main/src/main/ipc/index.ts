@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
 import type {
   AppConfig,
+  FolderViewSettings,
+  WindowSessionSnapshot,
   FsChecksumRequest,
   FsCreateSymlinkRequest,
   FsErrorCode,
@@ -133,6 +135,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
     return 'linux';
   });
   ipcMain.handle(IpcChannels.PLATFORM_DEFAULT_ROOT, () => getWindowProvider().getDefaultRootPath());
+  ipcMain.handle(IpcChannels.PLATFORM_SPECIAL_PATHS, () => ({ desktop: app.getPath('desktop'), downloads: app.getPath('downloads'), documents: app.getPath('documents') }));
 
   // =================== FS ===================
   ipcMain.handle(IpcChannels.FS_LIST_DIR, (_e, p: string) => {
@@ -157,14 +160,14 @@ export function registerIpcHandlers(ctx: IpcContext) {
   ipcMain.handle(IpcChannels.FS_STAT, (_e, p: string) => fsService.stat(p));
 
   ipcMain.handle(IpcChannels.FS_PICK_DIRECTORY, async (e) => {
-    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    const win = BrowserWindow.fromWebContents(e.sender);
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openDirectory'],
     });
     return result.canceled ? null : result.filePaths[0];
   });
   ipcMain.handle(IpcChannels.FS_PICK_FILE, async (e, opts) => {
-    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    const win = BrowserWindow.fromWebContents(e.sender);
     const result = await dialog.showOpenDialog(win!, {
       properties: opts?.multi ? ['openFile', 'multiSelections'] : ['openFile'],
       filters: opts?.filters,
@@ -233,7 +236,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
     defaultPath?: string;
     filters?: Electron.FileFilter[];
   }) => {
-    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    const win = BrowserWindow.fromWebContents(e.sender);
     const result = await dialog.showSaveDialog(win!, {
       title: opts?.title ?? '保存文件',
       defaultPath: opts?.defaultPath,
@@ -326,14 +329,40 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
   // P2 v2: 新窗口启动时由渲染进程询问初始路径
   ipcMain.handle(IpcChannels.WIN_GET_BOOT_PATH, (e) => {
-    return ctx.windowManager.getInitialPath(e.sender.id.toString());
+    const win = BrowserWindow.fromWebContents(e.sender);
+    return win ? ctx.windowManager.getInitialPath(win.id.toString()) : null;
+  });
+  const getSenderSession = (sender: Electron.WebContents) => {
+    const win = BrowserWindow.fromWebContents(sender);
+    const session = win && ctx.windowManager.getSession(win.id);
+    if (!session) throw new Error('窗口会话不可用');
+    return session;
+  };
+  const saveWindowSession = (sender: Electron.WebContents, snapshot: WindowSessionSnapshot) => {
+    const session = getSenderSession(sender);
+    if (!snapshot || !snapshot.rootLayout || !snapshot.activePaneId) throw new Error('窗口会话无效');
+    const saved = getConfig('windowSessionsV1') ?? [];
+    const index = saved.findIndex(item => item.id === session.id);
+    const next = [...saved];
+    if (index < 0) next.push({ id: session.id, snapshot }); else next[index] = { id: session.id, snapshot };
+    setConfig('windowSessionsV1', next);
+  };
+  ipcMain.handle(IpcChannels.WIN_SESSION_GET, (event) => {
+    const session = getSenderSession(event.sender);
+    const snapshot = (getConfig('windowSessionsV1') ?? []).find(item => item.id === session.id)?.snapshot ?? null;
+    return { snapshot, allowLegacy: session.allowLegacy };
+  });
+  ipcMain.handle(IpcChannels.WIN_SESSION_SET, (event, snapshot: WindowSessionSnapshot) => saveWindowSession(event.sender, snapshot));
+  ipcMain.on(IpcChannels.WIN_SESSION_SET_SYNC, (event, snapshot: WindowSessionSnapshot) => {
+    try { saveWindowSession(event.sender, snapshot); event.returnValue = true; }
+    catch (error) { console.warn('窗口会话保存失败', error); event.returnValue = false; }
   });
   ipcMain.handle(IpcChannels.WIN_CLOSE, (_e, id: string) => {
     ctx.windowManager.getWindow(id)?.close();
   });
   // 关闭当前窗口（渲染进程自己调用）
   ipcMain.handle(IpcChannels.WIN_CLOSE_CURRENT, (e) => {
-    const win = ctx.windowManager.getWindow(e.sender.id.toString()) ?? ctx.windowManager.getMainWindow();
+    const win = BrowserWindow.fromWebContents(e.sender);
     win?.close();
   });
   ipcMain.handle(IpcChannels.WIN_MINIMIZE, (e) => {
@@ -389,6 +418,23 @@ export function registerIpcHandlers(ctx: IpcContext) {
     setConfig(key, value as never),
   );
   ipcMain.handle(IpcChannels.CFG_ALL, () => getAllConfig());
+  const folderKey = (path: string) => {
+    if (typeof path !== 'string' || !path || path.length > 32768) throw new Error('目录路径无效');
+    const normalized = path.replace(/[\\/]+/g, '/').replace(/\/$/, '');
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  };
+  ipcMain.handle(IpcChannels.CFG_FOLDER_VIEW_GET, (_e, path: string) => getConfig('folderViews')?.[folderKey(path)] ?? null);
+  ipcMain.handle(IpcChannels.CFG_FOLDER_VIEW_SET, (_e, path: string, patch: FolderViewSettings) => {
+    if (!patch || typeof patch !== 'object' ||
+      (patch.viewMode !== undefined && !['list', 'grid', 'details'].includes(patch.viewMode)) ||
+      (patch.sortBy !== undefined && !['name', 'size', 'mtime', 'type'].includes(patch.sortBy)) ||
+      (patch.sortDir !== undefined && patch.sortDir !== null && !['asc', 'desc'].includes(patch.sortDir)) ||
+      (patch.columnWidths !== undefined && (!patch.columnWidths || Object.entries(patch.columnWidths).some(([key, value]) => !['size', 'mtime', 'type'].includes(key) || typeof value !== 'number' || !Number.isFinite(value) || value < 60 || value > 600))) ||
+      (patch.visibleColumns !== undefined && (!patch.visibleColumns || Object.entries(patch.visibleColumns).some(([key, value]) => !['size', 'mtime', 'type'].includes(key) || typeof value !== 'boolean')))) throw new Error('目录视图设置无效');
+    const key = folderKey(path);
+    const existing = getConfig('folderViews') ?? {};
+    setConfig('folderViews', { ...existing, [key]: { ...existing[key], ...patch } });
+  });
 
   // =================== P7 Splash ===================
   ipcMain.on(IpcChannels.SPLASH_READY, () => {

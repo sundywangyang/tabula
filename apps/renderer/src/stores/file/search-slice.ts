@@ -49,9 +49,13 @@ type Actions =
   | 'setGlobalSearchPage'
   | 'recomputeGlobalResults';
 
-export const createSearchSlice: FileSlice<Actions> = (set, get) => ({
+export const createSearchSlice: FileSlice<Actions> = (set, get) => {
+  let searchSequence = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return ({
   // ============ P4: 全局搜索 (Ctrl+P / Ctrl+Shift+F) ============
   openGlobalSearch: async () => {
+    searchSequence++; if (timer) clearTimeout(timer);
     // 获取当前 pane 的路径作为搜索根目录
     const layout = useLayoutStore.getState();
     const activePaneId = layout.activePaneId;
@@ -80,30 +84,35 @@ export const createSearchSlice: FileSlice<Actions> = (set, get) => ({
   },
 
   /** P4 v1: 执行递归搜索 */
-  runGlobalSearch: async (query: string, rootPath: string, fileType: FileTypeFilter) => {
-    if (!query || query.trim().length === 0) {
+  runGlobalSearch: async (query, rootPath, fileType, criteria = get().globalSearch.criteria ?? {}) => {
+    if (timer) clearTimeout(timer);
+    const requestId = ++searchSequence;
+    if (!query.trim() && fileType === 'all' && Object.values(criteria).every(value => value === undefined)) {
       set((s) => ({
         globalSearch: {
           ...s.globalSearch,
           entries: [],
           results: [],
-          elapsedMs: 0,
+          elapsedMs: 0, scanning: false, criteria, hasSearched: false,
         },
       }));
       return;
     }
 
     set((s) => ({
-      globalSearch: { ...s.globalSearch, scanning: true, scanError: null },
+      globalSearch: { ...s.globalSearch, scanning: true, scanError: null, criteria },
     }));
 
-    const res = await window.tabula.fs.search({
+    let res;
+    try { res = await window.tabula.fs.search({
       path: rootPath,
       query: query.trim(),
       maxResults: 500,
       fileType,
       maxDepth: 5,
-    });
+      ...criteria,
+    }); } catch (error) { res = { ok: false as const, error: { message: String(error) } }; }
+    if (requestId !== searchSequence || !get().globalSearch.open) return;
 
     if (!res.ok) {
       set((s) => ({
@@ -111,6 +120,7 @@ export const createSearchSlice: FileSlice<Actions> = (set, get) => ({
           ...s.globalSearch,
           scanning: false,
           scanError: res.error.message,
+          entries: [], results: [], selectedIndex: 0, page: 0, truncated: false, hasSearched: true,
         },
       }));
       return;
@@ -136,42 +146,27 @@ export const createSearchSlice: FileSlice<Actions> = (set, get) => ({
         selectedIndex: 0,
         page: 0,
         elapsedMs: res.data.elapsedMs,
+        truncated: res.data.truncated,
+        hasSearched: true,
       },
     }));
   },
 
   closeGlobalSearch: () => {
+    searchSequence++; if (timer) clearTimeout(timer);
     set((s) => ({ globalSearch: { ...s.globalSearch, open: false, query: '' } }));
   },
 
   setGlobalSearchQuery: (q) => {
-    const cur = get().globalSearch;
-    // 如果有 query 且和之前不同,触发递归搜索
-    if (q.trim() && q.trim() !== cur.query) {
-      void get().runGlobalSearch(q.trim(), cur.rootPath || getCachedRootPath(), cur.fileType);
-    }
-    set({
-      globalSearch: {
-        ...cur,
-        query: q,
-        selectedIndex: 0,
-      },
-    });
+    searchSequence++; if (timer) clearTimeout(timer);
+    set(s => ({ globalSearch: { ...s.globalSearch, query: q, selectedIndex: 0, scanning: false } }));
+    timer = setTimeout(() => { const cur = get().globalSearch; if (cur.open) void get().runGlobalSearch(q, cur.rootPath || getCachedRootPath(), cur.fileType); }, 250);
   },
 
   setGlobalSearchFileType: (fileType: FileTypeFilter) => {
+    set(s => ({ globalSearch: { ...s.globalSearch, fileType, selectedIndex: 0 } }));
     const cur = get().globalSearch;
-    // 重新搜索
-    if (cur.query.trim()) {
-      void get().runGlobalSearch(cur.query, cur.rootPath || getCachedRootPath(), fileType);
-    }
-    set({
-      globalSearch: {
-        ...cur,
-        fileType,
-        selectedIndex: 0,
-      },
-    });
+    void get().runGlobalSearch(cur.query, cur.rootPath || getCachedRootPath(), fileType);
   },
 
   setGlobalSearchSelectedIndex: (idx) => {
@@ -196,4 +191,5 @@ export const createSearchSlice: FileSlice<Actions> = (set, get) => ({
       },
     });
   }
-});
+  });
+};

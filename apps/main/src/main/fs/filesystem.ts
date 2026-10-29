@@ -254,9 +254,11 @@ async function searchDirectory(
   currentDepth: number,
   maxDepth: number,
   results: SearchHit[],
+  criteria: SearchRequest,
+  budget: { scanned: number },
 ): Promise<{ truncated: boolean; scannedCount: number }> {
-  if (currentDepth > maxDepth || results.length >= maxResults) {
-    return { truncated: results.length >= maxResults, scannedCount: 0 };
+  if (currentDepth > maxDepth || results.length >= maxResults || budget.scanned >= 100000) {
+    return { truncated: results.length >= maxResults || budget.scanned >= 100000, scannedCount: 0 };
   }
 
   let scannedCount = 0;
@@ -271,24 +273,33 @@ async function searchDirectory(
       const fullPath = join(dirPath, entry.name);
 
       scannedCount++;
+      budget.scanned++;
+      if (budget.scanned > 100000) { truncated = true; break; }
 
       // 计算匹配分数
       const matchResult = computeMatchScore(entry.name, query);
       if (matchResult.score > 0 && matchesFileType(entry.name, fileType)) {
-        let stats = { size: 0, mtime: 0 };
+        let stats: { size: number; mtime: number } | null = null;
         try {
           const s = await fs.stat(fullPath);
           stats = { size: s.size, mtime: s.mtimeMs };
         } catch {
-          // stat 失败不影响搜索
+          // 无法读取元数据的条目无法可靠匹配尺寸或日期条件。
         }
 
-        results.push({
+        const sizeFilter = criteria.minSize !== undefined || criteria.maxSize !== undefined;
+        const matchesMetadata = (!sizeFilter || !entry.isDirectory())
+          && (stats !== null || (!sizeFilter && criteria.modifiedAfter === undefined && criteria.modifiedBefore === undefined))
+          && (criteria.minSize === undefined || (stats !== null && stats.size >= criteria.minSize))
+          && (criteria.maxSize === undefined || (stats !== null && stats.size <= criteria.maxSize))
+          && (criteria.modifiedAfter === undefined || (stats !== null && stats.mtime >= criteria.modifiedAfter))
+          && (criteria.modifiedBefore === undefined || (stats !== null && stats.mtime < criteria.modifiedBefore));
+        if (matchesMetadata) results.push({
           name: entry.name,
           path: fullPath,
           isDirectory: entry.isDirectory(),
-          size: stats.size,
-          mtime: stats.mtime,
+          size: stats?.size ?? 0,
+          mtime: stats?.mtime ?? 0,
           score: matchResult.score,
           matchType: matchResult.matchType,
         });
@@ -309,13 +320,16 @@ async function searchDirectory(
           currentDepth + 1,
           maxDepth,
           results,
+          criteria,
+          budget,
         );
         scannedCount += subResult.scannedCount;
         truncated = subResult.truncated;
       }
     }
-  } catch {
-    // 目录不可访问,跳过
+  } catch (error) {
+    if (currentDepth === 0) throw error;
+    // 子目录不可访问时继续搜索其他目录。
   }
 
   return { truncated, scannedCount };
@@ -328,12 +342,22 @@ export async function search(req: SearchRequest): Promise<Result<SearchResult>> 
   const startTime = Date.now();
   const { path, query, maxResults, fileType, maxDepth = 3 } = req;
 
-  if (!query || query.trim().length === 0) {
+  const invalidNumber = (n: number | undefined) => n !== undefined && (typeof n !== 'number' || !Number.isFinite(n) || n < 0);
+  if (typeof path !== 'string' || typeof query !== 'string' || !Number.isInteger(maxResults) || maxResults < 1 || maxResults > 10000 ||
+    !Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 20 ||
+    invalidNumber(req.minSize) || invalidNumber(req.maxSize) || invalidNumber(req.modifiedAfter) || invalidNumber(req.modifiedBefore) ||
+    (req.minSize !== undefined && req.maxSize !== undefined && req.minSize > req.maxSize) ||
+    (req.modifiedAfter !== undefined && req.modifiedBefore !== undefined && req.modifiedAfter >= req.modifiedBefore)) {
+    return mapError(Object.assign(new Error('搜索条件无效'), { code: 'INVALID_ARGUMENT' }), path);
+  }
+  if (!query.trim() && (!fileType || fileType === 'all') && req.minSize === undefined && req.maxSize === undefined && req.modifiedAfter === undefined && req.modifiedBefore === undefined) {
     return ok({ entries: [], total: 0, elapsedMs: 0, truncated: false });
   }
 
   const results: SearchHit[] = [];
-  const { truncated } = await searchDirectory(
+  let truncated: boolean;
+  try {
+    ({ truncated } = await searchDirectory(
     path,
     query.trim(),
     maxResults,
@@ -341,7 +365,12 @@ export async function search(req: SearchRequest): Promise<Result<SearchResult>> 
     0,
     maxDepth,
     results,
-  );
+    req,
+    { scanned: 0 },
+    ));
+  } catch (error) {
+    return mapError(error, path);
+  }
 
   // 按分数降序排序
   results.sort((a, b) => b.score - a.score);

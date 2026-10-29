@@ -3,6 +3,7 @@
  */
 import type {
   AppConfig,
+  WindowSessionSnapshot,
   AppWindowState,
   ArchiveError,
   ArchiveInfo,
@@ -17,6 +18,7 @@ import type {
   ExtractRequest,
   FileTypeFilter,
   FileTransferJob,
+  FolderViewSettings,
   FsEntry,
   FsChecksumRequest,
   FsChecksumResult,
@@ -88,6 +90,7 @@ export interface TabulaAPI {
     get(): Promise<PlatformType>;
     /** 默认根路径: Windows 'C:\Users' | Unix '/' */
     defaultRootPath(): Promise<string>;
+    specialPaths(): Promise<{ desktop: string; downloads: string; documents: string }>;
   };
 
   // 性能埋点 (P7 v1)
@@ -278,6 +281,9 @@ export interface TabulaAPI {
     openWithTab(req: OpenWithTabRequest): Promise<string>;
     /** P2 v2: 新窗口启动时调用,获取由 openWithTab 传入的初始路径 */
     getBootPath(): Promise<string | null>;
+    getSession(): Promise<{ snapshot: WindowSessionSnapshot | null; allowLegacy: boolean }>;
+    saveSession(snapshot: WindowSessionSnapshot): Promise<void>;
+    saveSessionSync(snapshot: WindowSessionSnapshot): boolean;
     close(windowId: string): Promise<void>;
     closeCurrent(): Promise<void>;
     minimize(): Promise<void>;
@@ -307,6 +313,8 @@ export interface TabulaAPI {
     get<K extends keyof AppConfig>(key: K): Promise<AppConfig[K]>;
     set<K extends keyof AppConfig>(key: K, value: AppConfig[K]): Promise<void>;
     all(): Promise<AppConfig>;
+    getFolderView(path: string): Promise<FolderViewSettings | null>;
+    setFolderView(path: string, patch: FolderViewSettings): Promise<void>;
   };
 
   // 快捷键 (P7 v1)

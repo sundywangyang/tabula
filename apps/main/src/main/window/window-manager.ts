@@ -10,12 +10,16 @@
  */
 import { BrowserWindow, shell, app, screen } from 'electron';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { WindowBounds } from '@tabula/bridge';
 import { getWindowProvider } from '../providers/window';
+import { getConfig, setConfig } from '../store/config';
 
 export interface CreateWindowOptions {
   initialPath?: string;
   bounds?: WindowBounds;
+  sessionId?: string;
+  allowLegacy?: boolean;
 }
 
 export class WindowManager {
@@ -24,6 +28,8 @@ export class WindowManager {
   /** P2 v2: 通过 openWithTab 开窗时记下路径,渲染进程启动后取回 */
   private bootPathByWindow = new Map<string, string>();
   private isDev: boolean;
+  private sessions = new Map<number, { id: string; allowLegacy: boolean }>();
+  private quitting = false;
 
   constructor(opts: { isDev: boolean }) {
     this.isDev = opts.isDev;
@@ -91,8 +97,9 @@ export class WindowManager {
       win.loadFile(htmlPath);
     }
 
-    this.mainWindow = win;
+    if (!this.mainWindow) this.mainWindow = win;
     this.windows.set(win.id.toString(), win);
+    this.sessions.set(win.id, { id: opts.sessionId ?? randomUUID(), allowLegacy: opts.allowLegacy ?? false });
 
     // P2 v2: 记住 boot 路径
     if (opts.initialPath) {
@@ -100,9 +107,15 @@ export class WindowManager {
     }
 
     win.on('closed', () => {
+      const session = this.sessions.get(win.id);
+      if (session && !this.quitting && this.windows.size > 1) {
+        const saved = getConfig('windowSessionsV1') ?? [];
+        setConfig('windowSessionsV1', saved.filter(item => item.id !== session.id));
+      }
+      this.sessions.delete(win.id);
       this.windows.delete(win.id.toString());
       this.bootPathByWindow.delete(win.id.toString());
-      if (this.mainWindow === win) this.mainWindow = null;
+      if (this.mainWindow === win) this.mainWindow = this.windows.values().next().value ?? null;
     });
 
     return win;
@@ -119,6 +132,10 @@ export class WindowManager {
   getAllWindows(): BrowserWindow[] {
     return Array.from(this.windows.values());
   }
+
+  prepareForQuit(): void { this.quitting = true; }
+
+  getSession(windowId: number): { id: string; allowLegacy: boolean } | undefined { return this.sessions.get(windowId); }
 
   /** P2 v2: 取回 openWithTab 传入的初始路径;取完即删 */
   getInitialPath(windowId: string): string | null {

@@ -160,6 +160,23 @@ export interface SearchRequest {
   fileType?: FileTypeFilter;
   /** 递归深度限制(默认 3) */
   maxDepth?: number;
+  minSize?: number;
+  maxSize?: number;
+  modifiedAfter?: number;
+  modifiedBefore?: number;
+}
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  rootPath: string;
+  fileType: FileTypeFilter;
+  minSize?: number;
+  maxSize?: number;
+  modifiedAfter?: number;
+  modifiedBefore?: number;
+  modifiedWithinDays?: number;
 }
 
 /** P4 v1: 文件类型过滤 */
@@ -271,6 +288,13 @@ export type LayoutNode =
       tabs: Tab[];
       activeTabId: string | null;
     };
+
+export interface WindowSessionSnapshot {
+  rootLayout: LayoutNode;
+  activePaneId: string;
+  selections?: Record<string, { path: string; paths: string[]; cursorPath: string | null }>;
+}
+export interface SavedWindowSession { id: string; snapshot: WindowSessionSnapshot }
 
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -386,7 +410,19 @@ export interface KeybindingContribution {
 
 // =================== 配置 ===================
 
+export interface FolderViewSettings {
+  viewMode?: 'list' | 'grid' | 'details';
+  sortBy?: 'name' | 'size' | 'mtime' | 'type';
+  sortDir?: 'asc' | 'desc' | null;
+  columnWidths?: Partial<Record<'size' | 'mtime' | 'type', number>>;
+  visibleColumns?: Partial<Record<'size' | 'mtime' | 'type', boolean>>;
+}
+
 export interface AppConfig {
+  folderViews?: Record<string, FolderViewSettings>;
+  sidebarWidth?: number;
+  savedSearches?: SavedSearch[];
+  windowSessionsV1?: SavedWindowSession[];
   thumbnailSize?: number;
   theme: 'light' | 'dark' | 'system';
   accentColor?: string;

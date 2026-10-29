@@ -68,6 +68,7 @@ const api: TabulaAPI = {
   platform: {
     get: () => ipcRenderer.invoke(IpcChannels.PLATFORM_GET),
     defaultRootPath: () => ipcRenderer.invoke(IpcChannels.PLATFORM_DEFAULT_ROOT),
+    specialPaths: () => ipcRenderer.invoke(IpcChannels.PLATFORM_SPECIAL_PATHS),
   },
 
   // P7 启动屏
@@ -249,6 +250,9 @@ const api: TabulaAPI = {
     open: (initialPath) => ipcRenderer.invoke(IpcChannels.WIN_OPEN, initialPath),
     openWithTab: (req) => ipcRenderer.invoke(IpcChannels.WIN_OPEN_WITH_TAB, req),
     getBootPath: () => ipcRenderer.invoke(IpcChannels.WIN_GET_BOOT_PATH),
+    getSession: () => ipcRenderer.invoke(IpcChannels.WIN_SESSION_GET),
+    saveSession: (snapshot) => ipcRenderer.invoke(IpcChannels.WIN_SESSION_SET, snapshot),
+    saveSessionSync: (snapshot) => ipcRenderer.sendSync(IpcChannels.WIN_SESSION_SET_SYNC, snapshot),
     close: (id) => ipcRenderer.invoke(IpcChannels.WIN_CLOSE, id),
     closeCurrent: () => ipcRenderer.invoke(IpcChannels.WIN_CLOSE_CURRENT),
     minimize: () => ipcRenderer.invoke(IpcChannels.WIN_MINIMIZE),
@@ -277,6 +281,8 @@ const api: TabulaAPI = {
     get: (k) => ipcRenderer.invoke(IpcChannels.CFG_GET, k),
     set: (k, v) => ipcRenderer.invoke(IpcChannels.CFG_SET, k, v),
     all: () => ipcRenderer.invoke(IpcChannels.CFG_ALL),
+    getFolderView: (path) => ipcRenderer.invoke(IpcChannels.CFG_FOLDER_VIEW_GET, path),
+    setFolderView: (path, patch) => ipcRenderer.invoke(IpcChannels.CFG_FOLDER_VIEW_SET, path, patch),
   },
 
   // P7 快捷键 (sibling p7-shortcuts)

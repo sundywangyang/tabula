@@ -5,7 +5,8 @@
  * v1 数据源:使用 fs:search IPC 递归搜索当前 pane 目录,
  * 支持文件类型过滤和分页。
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { SavedSearch, SearchRequest } from '@tabula/bridge';
 import { useFileStore, type FileTypeFilter } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
 import { getCachedRootPath } from '../../platform-cache';
@@ -50,7 +51,26 @@ export function GlobalSearch() {
   const replaceTabPath = useLayoutStore((s) => s.pane.replaceTabPath);
   const activePaneId = useLayoutStore((s) => s.activePaneId);
   const inputRef = useRef<HTMLInputElement>(null);
+  const keyboardSelection = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const [minMb, setMinMb] = useState('');
+  const [maxMb, setMaxMb] = useState('');
+  const [after, setAfter] = useState('');
+  const [before, setBefore] = useState('');
+  const [recentDays, setRecentDays] = useState('');
+  const [presetName, setPresetName] = useState('');
+  const [presets, setPresets] = useState<SavedSearch[]>([]);
+  const [selectedPreset, setSelectedPreset] = useState('');
+  const [filterError, setFilterError] = useState('');
+  useEffect(() => {
+    let active = true;
+    if (gs.open) {
+      setMinMb(''); setMaxMb(''); setAfter(''); setBefore(''); setRecentDays('');
+      setPresetName(''); setSelectedPreset(''); setFilterError(''); keyboardSelection.current = false;
+      void window.tabula.config.all().then(config => { if (active) setPresets(config.savedSearches ?? []); }).catch(console.warn);
+    }
+    return () => { active = false; };
+  }, [gs.open]);
 
   // 打开时自动 focus
   useEffect(() => {
@@ -91,8 +111,7 @@ export function GlobalSearch() {
     return gs.results.slice(start, start + gs.pageSize);
   }, [gs.results, gs.page, gs.pageSize]);
 
-  const handleSelect = (idx: number) => {
-    const actualIdx = gs.page * gs.pageSize + idx;
+  const handleSelect = (actualIdx: number) => {
     if (actualIdx < 0 || actualIdx >= gs.results.length) return;
     const hit = gs.results[actualIdx];
     if (!hit) return;
@@ -115,13 +134,64 @@ export function GlobalSearch() {
   };
 
   const handleSearch = () => {
-    if (gs.query.trim()) {
-      void runSearch(gs.query, gs.rootPath || getCachedRootPath(), gs.fileType);
+    keyboardSelection.current = false;
+    const criteria = buildCriteria();
+    if (criteria) void runSearch(gs.query, gs.rootPath || getCachedRootPath(), gs.fileType, criteria);
+  };
+
+  const buildCriteria = (): Pick<SearchRequest, 'minSize' | 'maxSize' | 'modifiedAfter' | 'modifiedBefore'> | null => {
+    const minSize = minMb === '' ? undefined : Number(minMb) * 1024 * 1024;
+    const maxSize = maxMb === '' ? undefined : Number(maxMb) * 1024 * 1024;
+    const modifiedAfter = recentDays ? Date.now() - Number(recentDays) * 86400000 : after ? new Date(`${after}T00:00:00`).getTime() : undefined;
+    const endDate = before && !recentDays ? new Date(`${before}T00:00:00`) : undefined;
+    if (endDate) endDate.setDate(endDate.getDate() + 1);
+    const modifiedBefore = endDate?.getTime();
+    if ((minSize !== undefined && (!Number.isFinite(minSize) || minSize < 0)) || (maxSize !== undefined && (!Number.isFinite(maxSize) || maxSize < 0)) ||
+      (minSize !== undefined && maxSize !== undefined && minSize > maxSize) ||
+      (modifiedAfter !== undefined && !Number.isFinite(modifiedAfter)) || (modifiedBefore !== undefined && !Number.isFinite(modifiedBefore)) ||
+      (modifiedAfter !== undefined && modifiedBefore !== undefined && modifiedAfter >= modifiedBefore)) {
+      setFilterError('请检查大小和日期范围'); return null;
     }
+    setFilterError(''); return { minSize, maxSize, modifiedAfter, modifiedBefore };
+  };
+  const savePreset = async () => {
+    const criteria = buildCriteria();
+    const name = presetName.trim();
+    if (!criteria || !name) { if (!name) setFilterError('请输入搜索名称'); return; }
+    const preset: SavedSearch = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name, query: gs.query,
+      rootPath: gs.rootPath || getCachedRootPath(), fileType: gs.fileType, ...criteria,
+      ...(recentDays ? { modifiedWithinDays: Number(recentDays), modifiedAfter: undefined } : {}) };
+    try {
+      const current = (await window.tabula.config.all()).savedSearches ?? [];
+      const next = [...current, preset]; await window.tabula.config.set('savedSearches', next);
+      setPresets(next); setPresetName('');
+    } catch (error) { setFilterError(`保存失败: ${String(error)}`); }
+  };
+  const applyPreset = (preset: SavedSearch) => {
+    setSelectedPreset(preset.id);
+    setMinMb(preset.minSize === undefined ? '' : String(preset.minSize / 1048576));
+    setMaxMb(preset.maxSize === undefined ? '' : String(preset.maxSize / 1048576));
+    const dateText = (value?: number) => value === undefined ? '' : new Date(value - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    setAfter(dateText(preset.modifiedAfter)); setBefore(dateText(preset.modifiedBefore === undefined ? undefined : preset.modifiedBefore - 1));
+    setRecentDays(preset.modifiedWithinDays ? String(preset.modifiedWithinDays) : '');
+    const criteria = { minSize: preset.minSize, maxSize: preset.maxSize,
+      modifiedAfter: preset.modifiedWithinDays ? Date.now() - preset.modifiedWithinDays * 86400000 : preset.modifiedAfter,
+      modifiedBefore: preset.modifiedBefore };
+    useFileStore.setState(s => ({ globalSearch: { ...s.globalSearch, query: preset.query, rootPath: preset.rootPath, fileType: preset.fileType } }));
+    void runSearch(preset.query, preset.rootPath, preset.fileType, criteria);
+  };
+  const deletePreset = async () => {
+    try {
+      const current = (await window.tabula.config.all()).savedSearches ?? [];
+      const next = current.filter(item => item.id !== selectedPreset);
+      await window.tabula.config.set('savedSearches', next); setPresets(next); setSelectedPreset('');
+    } catch (error) { setFilterError(`删除失败: ${String(error)}`); }
   };
 
   const handleFileTypeChange = (type: FileTypeFilter) => {
     setFileType(type);
+    const criteria = buildCriteria();
+    if (criteria) void runSearch(gs.query, gs.rootPath || getCachedRootPath(), type, criteria);
   };
 
   if (!gs.open) return null;
@@ -144,25 +214,27 @@ export function GlobalSearch() {
             value={gs.query}
             placeholder="搜索文件名(输入后按 Enter 搜索,支持递归)"
             spellCheck={false}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { keyboardSelection.current = false; setQuery(e.target.value); }}
             onKeyDown={(e) => {
               // input 自己处理:Enter / ↑↓,App.tsx 全局 Ctrl+P 在 input 失焦后才触发
               if (e.key === 'Enter') {
                 e.preventDefault();
-                handleSearch();
+                if (keyboardSelection.current && gs.results.length) handleSelect(gs.selectedIndex);
+                else handleSearch();
               } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                const nextIdx = (gs.page * gs.pageSize + gs.selectedIndex + 1) % gs.results.length;
+                if (!gs.results.length) return;
+                const nextIdx = (gs.selectedIndex + 1) % gs.results.length;
+                keyboardSelection.current = true;
                 setSelected(nextIdx);
+                setPage(Math.floor(nextIdx / gs.pageSize));
               } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                const prevIdx = (gs.page * gs.pageSize + gs.selectedIndex - 1 + gs.results.length) % gs.results.length;
+                if (!gs.results.length) return;
+                const prevIdx = (gs.selectedIndex - 1 + gs.results.length) % gs.results.length;
+                keyboardSelection.current = true;
                 setSelected(prevIdx);
-              } else if (e.key === 'Tab') {
-                e.preventDefault();
-                const delta = e.shiftKey ? -1 : 1;
-                const nextIdx = (gs.page * gs.pageSize + gs.selectedIndex + delta + gs.results.length) % gs.results.length;
-                setSelected(nextIdx);
+                setPage(Math.floor(prevIdx / gs.pageSize));
               }
             }}
           />
@@ -171,6 +243,23 @@ export function GlobalSearch() {
               <span className="loading-spinner-small" /> 搜索中…
             </span>
           )}
+        </div>
+
+        <div className="gs-advanced">
+          <label>最小大小 MB<input aria-label="最小大小 MB" type="number" min="0" value={minMb} onChange={e => setMinMb(e.target.value)} /></label>
+          <label>最大大小 MB<input aria-label="最大大小 MB" type="number" min="0" value={maxMb} onChange={e => setMaxMb(e.target.value)} /></label>
+          <label>修改时间<select aria-label="修改时间" value={recentDays} onChange={e => setRecentDays(e.target.value)}><option value="">指定日期</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option></select></label>
+          {!recentDays && <><label>起始日期<input aria-label="起始日期" type="date" value={after} onChange={e => setAfter(e.target.value)} /></label><label>结束日期<input aria-label="结束日期" type="date" value={before} onChange={e => setBefore(e.target.value)} /></label></>}
+          <button type="button" onClick={handleSearch}>搜索</button>
+        </div>
+        <div className="gs-advanced">
+          <input aria-label="搜索名称" placeholder="保存搜索名称" value={presetName} onChange={e => setPresetName(e.target.value)} />
+          <button type="button" onClick={() => void savePreset()}>保存搜索</button>
+          <select aria-label="已保存的搜索" value={selectedPreset} onChange={e => { const preset = presets.find(item => item.id === e.target.value); if (preset) applyPreset(preset); else setSelectedPreset(''); }}>
+            <option value="">选择已保存的搜索</option>{presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
+          </select>
+          <button type="button" disabled={!selectedPreset} onClick={() => void deletePreset()}>删除搜索</button>
+          {filterError && <span role="alert">{filterError}</span>}
         </div>
 
         {/* 文件类型过滤 */}
@@ -192,9 +281,10 @@ export function GlobalSearch() {
             <span>正在递归搜索: {gs.rootPath || 'C:\\'}…</span>
           ) : (
             <span>
-              {gs.query ? (
+              {gs.hasSearched ? (
                 <>
                   找到 {gs.results.length} 项
+                  {gs.truncated && '（结果已截断，请缩小搜索范围）'}
                   {gs.elapsedMs > 0 && ` (${gs.elapsedMs}ms)`}
                   {totalPages > 1 && ` · 第 ${gs.page + 1}/${totalPages} 页`}
                 </>
@@ -209,7 +299,7 @@ export function GlobalSearch() {
         <div className="gs-list" ref={listRef}>
           {visibleResults.length === 0 && !gs.scanning && (
             <div className="gs-empty">
-              {gs.query ? '无匹配结果' : '输入关键字开始搜索'}
+              {gs.hasSearched ? '无匹配结果' : '输入关键字或选择筛选条件开始搜索'}
             </div>
           )}
           {visibleResults.map((hit, i) => (
@@ -218,7 +308,7 @@ export function GlobalSearch() {
               data-idx={gs.page * gs.pageSize + i}
               className={`gs-row ${gs.page * gs.pageSize + i === gs.selectedIndex ? 'gs-row-selected' : ''}`}
               onMouseEnter={() => setSelected(gs.page * gs.pageSize + i)}
-              onClick={() => handleSelect(i)}
+              onClick={() => handleSelect(gs.page * gs.pageSize + i)}
             >
               <span className="gs-row-icon">{hit.isDirectory ? '📁' : '📄'}</span>
               <button aria-label={`定位 ${hit.name}`} onClick={event => { event.stopPropagation(); void useFileStore.getState().revealInPane(activePaneId, hit.path).then(close); }}>定位</button>

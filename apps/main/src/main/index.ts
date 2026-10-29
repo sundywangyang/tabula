@@ -110,13 +110,16 @@ async function bootstrap() {
   // 创建窗口管理器
   setSplashProgress(60, '正在构建主窗口…');
   windowManager = new WindowManager({ isDev });
-  const mainWindow = windowManager.createMainWindow({ initialPath: undefined });
+  const restoredSessions = config.windowSessionsV1 ?? [];
+  const mainWindow = windowManager.createMainWindow({ initialPath: undefined, sessionId: restoredSessions[0]?.id, allowLegacy: restoredSessions.length === 0 });
   // eslint-disable-next-line no-console
   console.error('[main] mainWindow created, webContents id:', mainWindow.webContents.id);
 
   // 注册所有 IPC
   setSplashProgress(80, '正在注册系统服务…');
   registerIpcHandlers({ windowManager });
+  for (const session of restoredSessions.slice(1)) windowManager.createMainWindow({ sessionId: session.id });
+  app.on('before-quit', () => windowManager?.prepareForQuit());
 
   // P7: 启动 perf 内存采样定时器(独立于 IPC 注册,职责分离)
   // 关键路径上的后台 timer,setInterval + unref,不阻塞进程退出

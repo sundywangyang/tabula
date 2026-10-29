@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { ArchiveProgress, FsEntry, TrashEntry, FileTypeCategory } from '@tabula/bridge';
+import type { ArchiveProgress, FsEntry, TrashEntry, FileTypeCategory, SearchRequest, WindowSessionSnapshot, FolderViewSettings } from '@tabula/bridge';
 
 export interface BreadcrumbSegment {
   name: string;
@@ -112,6 +112,10 @@ export interface PaneFileData {
 
   /** 视图模式(list/grid/details)，每个 pane 独立 */
   viewMode: ViewMode;
+  sortBy?: SortField;
+  sortDir?: SortDir;
+  columnWidths?: FolderViewSettings['columnWidths'];
+  visibleColumns?: FolderViewSettings['visibleColumns'];
 
   // G007: 当前 pane 的分组模式(per-pane)
   groupBy: GroupByMode;
@@ -172,6 +176,9 @@ export interface GlobalSearchState {
   pageSize: number;
   /** 搜索用时(ms) */
   elapsedMs: number;
+  criteria?: Pick<SearchRequest, 'minSize' | 'maxSize' | 'modifiedAfter' | 'modifiedBefore'>;
+  truncated?: boolean;
+  hasSearched?: boolean;
 }
 
 /** P4: 文件类型过滤 */
@@ -190,6 +197,8 @@ export interface ThumbnailEntry {
 }
 
 export interface FileStore {
+  pendingSessionSelections: NonNullable<WindowSessionSnapshot['selections']>;
+  setSessionSelections: (selections: NonNullable<WindowSessionSnapshot['selections']>) => void;
   thumbnailSize: number;
   setThumbnailSize: (size: number) => void;
   setFileType: (paneId: string, type: FileTypeCategory) => void;
@@ -255,9 +264,10 @@ export interface FileStore {
 
   // ============ Per-pane: 视图设置(每个 pane 独立)===========
   setViewMode: (paneId: string, mode: ViewMode) => void;
+  setDetailColumns: (paneId: string, settings: Pick<FolderViewSettings, 'columnWidths' | 'visibleColumns'>, persist?: boolean) => void;
   // G007: 设置 pane 的分组模式
   setGroupBy: (paneId: string, mode: GroupByMode) => void;
-  cycleSort: (field: SortField) => void;
+  cycleSort: (field: SortField, paneId?: string) => void;
   toggleShowHidden: () => void;
   toggleShowExtensions: () => void;
   hydrateFromConfig: () => Promise<void>;
@@ -385,7 +395,7 @@ export interface FileStore {
   // ============ P4: 全局搜索(Ctrl+P / Ctrl+Shift+F)============
   openGlobalSearch: () => Promise<void>;
   /** P4 v1: 执行递归搜索 */
-  runGlobalSearch: (query: string, rootPath: string, fileType: FileTypeFilter) => Promise<void>;
+  runGlobalSearch: (query: string, rootPath: string, fileType: FileTypeFilter, criteria?: Pick<SearchRequest, 'minSize' | 'maxSize' | 'modifiedAfter' | 'modifiedBefore'>) => Promise<void>;
   closeGlobalSearch: () => void;
   setGlobalSearchQuery: (q: string) => void;
   setGlobalSearchFileType: (fileType: FileTypeFilter) => void;

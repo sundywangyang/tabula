@@ -13,6 +13,7 @@ import { useMemo, useState, useRef, useEffect, useCallback, type ReactNode } fro
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   Plus,
   Copy,
   Scissors,
@@ -42,6 +43,7 @@ import { useLayoutStore } from '../stores/layout-store';
 import { useKeymapStore } from '../stores/keymap-store';
 import { getCachedPlatform } from '../platform-cache';
 import { shortcutLabel } from '../shortcut-label';
+import { parentPath } from '../stores/file/paths';
 import { Tooltip } from './Tooltip';
 import type { Tab } from '@tabula/bridge';
 import './Toolbar.css';
@@ -90,17 +92,19 @@ export function Toolbar({ paneId }: { paneId: string }) {
   const historyMenuRef = useRef<HTMLDivElement>(null);
 
   // 获取 active tab
+  const rootLayout = useLayoutStore((s) => s.rootLayout);
   const activeTab = useMemo(() => {
-    const root = useLayoutStore.getState().rootLayout;
+    const root = rootLayout;
     const paneNode = findPaneNode(root, paneId);
     if (!paneNode || paneNode.type !== 'pane' || !paneNode.activeTabId) return null;
     return paneNode.tabs.find((t) => t.id === paneNode.activeTabId) ?? null;
-  }, [paneId]);
+  }, [paneId, rootLayout]);
 
   const history = useMemo(() => activeTab ? getTabHistory(activeTab) : [], [activeTab]);
   const historyIndex = activeTab?.historyIndex ?? -1;
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
+  const parent = /^\\\\[^\\/]+[\\/][^\\/]+[\\/]?$/.test(currentPath) ? '' : parentPath(currentPath);
 
   // 关闭历史菜单的 effect
   useEffect(() => {
@@ -320,6 +324,12 @@ export function Toolbar({ paneId }: { paneId: string }) {
             disabled={!canGoForward}
           >
             <ArrowRight size={16} />
+          </button>
+        </Tooltip>
+        <Tooltip label="向上一级" shortcut={shortcut('navigation.parent')}>
+          <button className="toolbar-btn toolbar-nav" aria-label="向上一级" disabled={!parent}
+            onClick={() => { if (parent) void useLayoutStore.getState().pane.navigate(paneId, parent); }}>
+            <ArrowUp size={16} />
           </button>
         </Tooltip>
       </div>
