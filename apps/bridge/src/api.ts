@@ -16,6 +16,7 @@ import type {
   ExtensionPanel,
   ExtractRequest,
   FileTypeFilter,
+  FileTransferJob,
   FsEntry,
   FsChecksumRequest,
   FsChecksumResult,
@@ -29,6 +30,7 @@ import type {
   LogPaths,
   MemorySample,
   MoveOrCopyRequest,
+  NativeFileClipboard,
   OpenWithTabRequest,
   PerfEvent,
   PerfReport,
@@ -64,6 +66,13 @@ export interface TagsApi {
 export type PlatformType = 'windows' | 'macos' | 'linux';
 
 export interface TabulaAPI {
+  transfers: {
+    start(mode: 'copy' | 'move', request: MoveOrCopyRequest): Promise<string>;
+    list(): Promise<FileTransferJob[]>;
+    cancel(id: string): Promise<boolean>;
+    retry(id: string): Promise<string | null>;
+    onUpdate(listener: (job: FileTransferJob) => void): () => void;
+  };
   tools: import('./tools').FileToolsApi;
   // 系统
   app: {
@@ -138,6 +147,9 @@ export interface TabulaAPI {
   // 文件系统
   fs: {
     listDir(path: string): Promise<Result<ListDirResult>>;
+    readFileClipboard(): Promise<Result<NativeFileClipboard>>;
+    writeFileClipboard(paths: string[], mode: 'copy' | 'cut'): Promise<Result<NativeFileClipboard>>;
+    clearFileClipboard(sequence: number): Promise<Result<boolean>>;
     watchDirectory(paneId: string, path: string, token: string): Promise<Result<void>>;
     unwatchDirectory(paneId: string, token: string): Promise<void>;
     onDirectoryChanged(listener: (event: { paneId: string; path: string; token: string; error?: string }) => void): () => void;

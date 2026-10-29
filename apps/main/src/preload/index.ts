@@ -39,6 +39,17 @@ function makeEvents() {
 const PERF_PUSH_CHANNELS: readonly string[] = [IpcChannels.PERF_MEMORY_SAMPLE];
 
 const api: TabulaAPI = {
+  transfers: {
+    start: (mode, request) => ipcRenderer.invoke(IpcChannels.TRANSFER_START, mode, request),
+    list: () => ipcRenderer.invoke(IpcChannels.TRANSFER_LIST),
+    cancel: (id) => ipcRenderer.invoke(IpcChannels.TRANSFER_CANCEL, id),
+    retry: (id) => ipcRenderer.invoke(IpcChannels.TRANSFER_RETRY, id),
+    onUpdate: (listener) => {
+      const wrapped = (_event: IpcRendererEvent, job: import('@tabula/bridge').FileTransferJob) => listener(job);
+      ipcRenderer.on(IpcChannels.TRANSFER_UPDATE, wrapped);
+      return () => ipcRenderer.removeListener(IpcChannels.TRANSFER_UPDATE, wrapped);
+    },
+  },
   tools: {
     run: (method, input) => ipcRenderer.invoke(IpcChannels.TOOLS_RUN, method, input),
     onProgress: (listener) => {
@@ -149,6 +160,9 @@ const api: TabulaAPI = {
 
   fs: {
     listDir: (p) => ipcRenderer.invoke(IpcChannels.FS_LIST_DIR, p),
+    readFileClipboard: () => ipcRenderer.invoke(IpcChannels.FS_READ_FILE_CLIPBOARD),
+    writeFileClipboard: (paths, mode) => ipcRenderer.invoke(IpcChannels.FS_WRITE_FILE_CLIPBOARD, paths, mode),
+    clearFileClipboard: (sequence) => ipcRenderer.invoke(IpcChannels.FS_CLEAR_FILE_CLIPBOARD, sequence),
     watchDirectory: (paneId, path, token) => ipcRenderer.invoke(IpcChannels.FS_WATCH_DIRECTORY, paneId, path, token),
     unwatchDirectory: (paneId, token) => ipcRenderer.invoke(IpcChannels.FS_UNWATCH_DIRECTORY, paneId, token),
     onDirectoryChanged: (listener) => {

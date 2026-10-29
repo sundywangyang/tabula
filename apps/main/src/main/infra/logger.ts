@@ -62,7 +62,9 @@ export function initLogger(): void {
     log.transports.console.level = 'debug';
   } else {
     log.transports.file.level = 'info';
-    log.transports.console.level = 'warn';
+    // Packaged Windows GUI processes may inherit a closed console pipe. Logging
+    // its EPIPE error back to that pipe causes an endless error/logging loop.
+    log.transports.console.level = false;
   }
 
   // 4) 把 console 接到 log 文件(开发期方便)

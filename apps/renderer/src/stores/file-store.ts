@@ -24,6 +24,7 @@ import { createSearchSlice } from './file/search-slice';
 import { createTrashSlice } from './file/trash-slice';
 import { createThumbnailSlice } from './file/thumbnail-slice';
 import { createArchiveSlice } from './file/archive-slice';
+import { getCachedPlatform } from '../platform-cache';
 
 export { makeFolderTab } from './folder-tab';
 export type {
@@ -69,6 +70,43 @@ async function persistConfig<K extends keyof AppConfig>(key: K, value: AppConfig
 
 export const useFileStore = create<FileStore>((set, get, store) => {
   let nextDirectoryRequest = 0;
+  let clipboardGeneration = 0;
+  let pendingClipboardWrite: Promise<void> = Promise.resolve();
+  let pendingClipboardRead: Promise<void> = Promise.resolve();
+  const nativeClipboard = () => getCachedPlatform() === 'windows' && typeof window.tabula.fs.readFileClipboard === 'function';
+  const setFileClipboard = (paneId: string, mode: 'copy' | 'cut') => {
+    const data = get().panes[paneId];
+    if (!data || data.selectedPaths.size === 0) { get().showToast('未选中任何项', 'warn'); return; }
+    const paths = Array.from(data.selectedPaths);
+    const generation = ++clipboardGeneration;
+    set({ clipboard: { mode, paths, sourcePaneId: paneId } });
+    if (!nativeClipboard()) {
+      void navigator.clipboard?.writeText(paths.join('\n')).catch(() => null);
+      get().showToast(`已${mode === 'copy' ? '复制' : '剪切'} ${paths.length} 项`, 'info', 2000);
+      return;
+    }
+    pendingClipboardWrite = pendingClipboardWrite.then(async () => {
+      const result = await window.tabula.fs.writeFileClipboard(paths, mode);
+      if (!result.ok) throw new Error(result.error.message);
+      if (generation === clipboardGeneration) set({ clipboard: { ...result.data, sourcePaneId: paneId } });
+      get().showToast(`已${mode === 'copy' ? '复制' : '剪切'} ${paths.length} 项`, 'info', 2000);
+    }).catch((error) => {
+      if (generation === clipboardGeneration) set({ clipboard: null });
+      get().showToast(`系统剪贴板写入失败: ${String(error)}`, 'error', 4000);
+    });
+  };
+  const completeCut = async (sources: string[]) => {
+    const cb = get().clipboard;
+    if (!cb || cb.mode !== 'cut' || !cb.paths.every((path) => sources.some((source) => sameFilePath(path, source)))) return;
+    if (nativeClipboard() && cb.sequence !== undefined) {
+      try {
+        const result = await window.tabula.fs.clearFileClipboard(cb.sequence);
+        if (!result.ok) { get().showToast(`文件已移动，但剪贴板清理失败: ${result.error.message}`, 'warn', 4000); return; }
+        if (!result.data) { void get().syncFileClipboard(); return; }
+      } catch (error) { get().showToast(`文件已移动，但剪贴板清理失败: ${String(error)}`, 'warn', 4000); return; }
+    }
+    if (get().clipboard === cb) set({ clipboard: null });
+  };
   const directoryRequests = new Map<string, number>();
   const refreshAffected = async (sources: string[], destination: string) => {
     const normalize = (path: string) => {
@@ -590,37 +628,38 @@ export const useFileStore = create<FileStore>((set, get, store) => {
     },
 
     // ============ P3: 剪贴板 ============
-    copySelected: (paneId) => {
-      const data = get().panes[paneId];
-      if (!data || data.selectedPaths.size === 0) {
-        get().showToast('未选中任何项', 'warn');
-        return;
-      }
-      const paths = Array.from(data.selectedPaths);
-      set({ clipboard: { mode: 'copy', paths, sourcePaneId: paneId } });
-      // 顺便写系统剪贴板(纯文本,每行一个路径)
-      void navigator.clipboard?.writeText(paths.join('\n')).catch(() => null);
-      get().showToast(`已复制 ${paths.length} 项(可粘贴)`, 'info', 2000);
-    },
+    copySelected: (paneId) => setFileClipboard(paneId, 'copy'),
 
-    cutSelected: (paneId) => {
-      const data = get().panes[paneId];
-      if (!data || data.selectedPaths.size === 0) {
-        get().showToast('未选中任何项', 'warn');
-        return;
-      }
-      const paths = Array.from(data.selectedPaths);
-      set({ clipboard: { mode: 'cut', paths, sourcePaneId: paneId } });
-      void navigator.clipboard?.writeText(paths.join('\n')).catch(() => null);
-      get().showToast(`已剪切 ${paths.length} 项(Ctrl+V 粘贴)`, 'info', 2000);
+    cutSelected: (paneId) => setFileClipboard(paneId, 'cut'),
+
+    syncFileClipboard: async () => {
+      if (!nativeClipboard()) return;
+      const generation = clipboardGeneration;
+      pendingClipboardRead = pendingClipboardRead.then(async () => {
+        await pendingClipboardWrite;
+        try {
+          const result = await window.tabula.fs.readFileClipboard();
+          if (generation !== clipboardGeneration) return;
+          if (!result.ok) throw new Error(result.error.message);
+          set({ clipboard: result.data.paths.length ? { ...result.data, sourcePaneId: null } : null });
+        } catch (error) {
+          if (generation === clipboardGeneration) {
+            set({ clipboard: null });
+            get().showToast(`读取系统剪贴板失败: ${String(error)}`, 'warn', 4000);
+          }
+        }
+      });
+      await pendingClipboardRead;
     },
 
     clearClipboard: () => {
+      clipboardGeneration++;
       set({ clipboard: null });
     },
 
     // ============ P3: 粘贴 ============
     pasteToPane: async (paneId) => {
+      if (nativeClipboard()) await get().syncFileClipboard();
       const cb = get().clipboard;
       if (!cb || cb.paths.length === 0) {
         get().showToast('剪贴板为空', 'warn');
@@ -797,20 +836,25 @@ export const useFileStore = create<FileStore>((set, get, store) => {
           let success = 0;
           let firstError: string | null = null;
           const operations = allOps.filter((op) => op.dest !== op.source);
+          const cb = get().clipboard;
           const request = {
             sources: operations.map((op) => op.source),
             destination: pc.destinationDir,
             destinations: operations.map((op) => op.dest),
             overwrites: operations.map((op) => op.overwrite),
+            clipboardSequence: pc.mode === 'move' && cb?.mode === 'cut' && cb.paths.every((path) => operations.some((op) => sameFilePath(path, op.source))) ? cb.sequence : undefined,
           };
           const result = await window.tabula.fs[pc.mode === 'copy' ? 'copy' : 'move'](request);
+          if (!result.ok && result.error.code === 'ABORT_ERR') {
+            get().setProgress(null);
+            get().showToast('操作已取消，文件已回滚', 'info', 2500);
+            await refreshAffected(pc.sources, pc.destinationDir);
+            return;
+          }
           if (result.ok) success = operations.length;
           else firstError = result.error.message;
           get().setProgress(null);
-          if (pc.mode === 'move') {
-            const cb = get().clipboard;
-            if (!firstError && cb?.mode === 'cut' && cb.paths.every((path) => pc.sources.includes(path))) set({ clipboard: null });
-          }
+          if (pc.mode === 'move' && !firstError) await completeCut(operations.map((op) => op.source));
           if (firstError) {
             get().showToast(
               `${verb}失败: ${firstError} (成功 ${success}/${allOps.length})`,
@@ -958,8 +1002,15 @@ export const useFileStore = create<FileStore>((set, get, store) => {
           // 透传 op.dest, including generated keep-both names. One batch creates one undo entry.
           destinations: autoResolved.map((op) => op.dest),
           overwrites: autoResolved.map((op) => op.overwrite),
+          clipboardSequence: mode === 'move' && get().clipboard?.mode === 'cut' && get().clipboard!.paths.every((path) => autoResolved.some((op) => sameFilePath(path, op.source))) ? get().clipboard?.sequence : undefined,
         };
         const result = await window.tabula.fs[mode === 'copy' ? 'copy' : 'move'](request);
+        if (!result.ok && result.error.code === 'ABORT_ERR') {
+          get().setProgress(null);
+          get().showToast('操作已取消，文件已回滚', 'info', 2500);
+          await refreshAffected(sources, destDir);
+          return { ok: false, moved: 0, error: result.error.message };
+        }
         if (result.ok) success = autoResolved.length;
         else firstError = result.error.message;
         get().setProgress(null);
@@ -968,10 +1019,7 @@ export const useFileStore = create<FileStore>((set, get, store) => {
           return { ok: false, moved: success, error: firstError };
         } else {
           get().showToast(`已${verb} ${success} 项`, 'success', 2500);
-          if (mode === 'move') {
-            const cb = get().clipboard;
-            if (cb?.mode === 'cut' && cb.paths.every((path) => sources.includes(path))) set({ clipboard: null });
-          }
+          if (mode === 'move') await completeCut(autoResolved.map((op) => op.source));
           await refreshAffected(sources, destDir);
           return { ok: true, moved: success };
         }

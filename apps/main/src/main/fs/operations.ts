@@ -8,6 +8,7 @@ import { copy } from './copy';
 import { move } from './move';
 import { assertAbsent, containsPath, fileError, pathExists, pathKey, samePath } from './path-safety';
 import { mapError, ok } from './result';
+import { checkCancelled, copyControlled, type TransferControl } from './transfer-control';
 export interface OperationHooks {
   migrate?: (mappings: Array<{ source: string; destination: string }>, copy?: boolean) => void;
   record?: (event: { operation: string; phase: 'do' | 'undo' | 'redo'; paths: string[]; destinations?: string[] }) => void;
@@ -70,10 +71,11 @@ export class FileOperations {
     }
   }
 
-  copy(request: MoveOrCopyRequest): Promise<Result<void>> { return this.transfer(request, 'copy'); }
-  move(request: MoveOrCopyRequest): Promise<Result<void>> { return this.transfer(request, 'move'); }
+  copy(request: MoveOrCopyRequest, control?: TransferControl): Promise<Result<void>> { return this.transfer(request, 'copy', control); }
+  move(request: MoveOrCopyRequest, control?: TransferControl): Promise<Result<void>> { return this.transfer(request, 'move', control); }
 
-  private async transfer(request: MoveOrCopyRequest, mode: 'copy' | 'move'): Promise<Result<void>> {
+  private async transfer(request: MoveOrCopyRequest, mode: 'copy' | 'move', control?: TransferControl): Promise<Result<void>> {
+    let firstExecution = true;
     const backup = join(this.backupRoot, randomUUID());
     const plans = request.sources.map((source, index) => ({
       source, destination: request.destinations?.[index] ?? join(request.destination, basename(source)),
@@ -82,20 +84,29 @@ export class FileOperations {
       overwrite: request.overwrites?.[index] ?? request.overwrite ?? false,
       before: undefined as string | null | undefined, after: null as string | null,
       sourceBefore: undefined as string | null | undefined,
+      copiedStage: false,
+      removalStarted: false,
     })).filter((plan) => !samePath(plan.source, plan.destination));
     if (!plans.length) return ok(undefined);
 
     const undoPlan = async (plan: typeof plans[number]) => {
       if (plan.done) {
+        if (plan.after === null) throw new Error(`无法确认目标文件状态，请检查: ${plan.destination}`);
+        await assertUnchanged(plan.destination, plan.after);
+        if (mode === 'move') await assertAbsent(plan.source);
         if (mode === 'move') await relocate(plan.destination, plan.source);
         else await fs.rm(plan.destination, { recursive: true });
         plan.done = false;
       }
       if (await pathExists(plan.staging)) {
         if (mode === 'move') {
+          if (plan.copiedStage && !plan.removalStarted && await pathExists(plan.source)) {
+            await fs.rm(plan.staging, { recursive: true });
+          } else {
           // A failed cross-volume deletion can leave both paths. Preserve the recovery copy.
           if (await pathExists(plan.source)) throw new Error(`源文件和临时副本均保留，请检查: ${plan.staging}`);
           await relocate(plan.staging, plan.source);
+          }
         } else await fs.rm(plan.staging, { recursive: true });
       }
       if (plan.saved) {
@@ -107,9 +118,13 @@ export class FileOperations {
     };
 
     return this.execute(`${mode === 'copy' ? '复制' : '移动'} ${plans.length} 项`, async () => {
+      const activeControl = firstExecution ? control : undefined;
+      firstExecution = false;
+      if (activeControl) checkCancelled(activeControl.signal);
       const targets = new Set(plans.map((plan) => pathKey(plan.destination)));
       if (targets.size !== plans.length) throw fileError('EEXIST', '多个源文件不能写入同一个目标');
       for (const plan of plans) {
+        if (activeControl) checkCancelled(activeControl.signal);
         if (plans.some((other) => samePath(other.source, plan.destination) || containsPath(other.source, plan.destination)
           || containsPath(plan.destination, other.source))) throw fileError('EINVAL', '源目录和目标目录不能互相包含');
         await fs.lstat(plan.source);
@@ -120,11 +135,33 @@ export class FileOperations {
       }
       try {
         for (const plan of plans) {
+          if (activeControl) checkCancelled(activeControl.signal);
+          activeControl?.onFile(plan.source);
+          plan.copiedStage = false;
+          plan.removalStarted = false;
           // Write to a private name first. A failed copy must not remove a racing destination.
           await assertAbsent(plan.staging);
-          unwrap(await (mode === 'copy' ? copy : move)({
-            sources: [plan.source], destination: dirname(plan.staging), destinations: [plan.staging], overwrite: false,
-          }));
+          if (!activeControl) {
+            unwrap(await (mode === 'copy' ? copy : move)({
+              sources: [plan.source], destination: dirname(plan.staging), destinations: [plan.staging], overwrite: false,
+            }));
+          } else if (mode === 'copy') {
+            await copyControlled(plan.source, plan.staging, activeControl);
+          } else {
+            try { await fs.rename(plan.source, plan.staging); }
+            catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+              plan.copiedStage = true;
+              const sourceBeforeCopy = await fingerprint(plan.source);
+              await copyControlled(plan.source, plan.staging, activeControl);
+              checkCancelled(activeControl.signal);
+              await assertUnchanged(plan.source, sourceBeforeCopy);
+              plan.removalStarted = true;
+              await fs.rm(plan.source, { recursive: true });
+            }
+          }
+          if (activeControl) checkCancelled(activeControl.signal);
+          await assertUnchanged(plan.destination, plan.before!);
           if (plan.before !== null) {
             await relocate(plan.destination, plan.backup);
             plan.saved = true;
@@ -132,7 +169,9 @@ export class FileOperations {
           await relocate(plan.staging, plan.destination);
           plan.done = true;
           plan.after = await fingerprint(plan.destination);
+          activeControl?.onItem();
         }
+        if (activeControl) checkCancelled(activeControl.signal);
         this.hooks.migrate?.(plans.map(p => ({ source: p.source, destination: p.destination })), mode === 'copy');
       } catch (error) {
         const rollbackErrors: string[] = [];

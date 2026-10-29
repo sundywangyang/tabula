@@ -163,6 +163,7 @@ export function App() {
     void (async () => {
       // 平台信息缓存 (同步供 onKey handler 使用)
       await initPlatformCache();
+      void useFileStore.getState().syncFileClipboard();
       // P5: 先 hydrate 主题(影响整体样式),再 hydrate favorites / settings / file-config / layout
       await hydrateTheme();
       await hydrateSettings();
@@ -321,6 +322,12 @@ export function App() {
   useEffect(() => {
     window.addEventListener('keydown', handleShortcutKeyDown, true);
     return () => window.removeEventListener('keydown', handleShortcutKeyDown, true);
+  }, []);
+
+  useEffect(() => {
+    const updateClipboard = () => { void useFileStore.getState().syncFileClipboard(); };
+    window.addEventListener('focus', updateClipboard);
+    return () => window.removeEventListener('focus', updateClipboard);
   }, []);
 
   const renderLayout = useMemo(() => {

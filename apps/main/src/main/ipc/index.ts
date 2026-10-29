@@ -26,6 +26,9 @@ import {
 import * as fsService from '../fs/filesystem';
 import { FileOperations } from '../fs/operations';
 import { DirectoryWatchManager } from '../fs/directory-watch';
+import { TransferJobs } from '../fs/transfer-jobs';
+import { readWindowsFileClipboard, writeWindowsFileClipboard, clearWindowsFileClipboard } from '../fs/windows-file-clipboard';
+import { mapError, ok } from '../fs/result';
 import { readRtf } from '../fs/rtf';
 import { registerFileOperationHandlers } from './file-operations';
 import * as trashService from '../fs/trash';
@@ -82,12 +85,27 @@ export function registerIpcHandlers(ctx: IpcContext) {
   const fileOperations = new FileOperations(historyDir, (path) => shell.trashItem(path), undoManager, {
     migrate: (mappings, copy) => { tagsStore.migrateTags(mappings, copy); migrateFolderIcons(mappings, copy); }, record: recordActivity,
   });
+  const transfers = new TransferJobs(fileOperations, (job) => {
+    for (const window of ctx.windowManager.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(IpcChannels.TRANSFER_UPDATE, job);
+  }, async (mode, request) => {
+    if (process.platform === 'win32' && mode === 'move' && request.clipboardSequence !== undefined) {
+      await clearWindowsFileClipboard(request.clipboardSequence);
+    }
+  });
+  ipcMain.handle(IpcChannels.TRANSFER_START, (_event, mode, request) => {
+    if (mode !== 'copy' && mode !== 'move') throw new Error('无效的文件任务类型');
+    return transfers.start(mode, request).id;
+  });
+  ipcMain.handle(IpcChannels.TRANSFER_LIST, () => transfers.list());
+  ipcMain.handle(IpcChannels.TRANSFER_CANCEL, (_event, id: string) => transfers.cancel(id));
+  ipcMain.handle(IpcChannels.TRANSFER_RETRY, (_event, id: string) => transfers.retry(id));
   registerFileToolsHandlers(ctx);
 
   // Finish queued mutations and remove history backups on normal exit. Failed recovery backups remain intact.
   app.once('will-quit', (event) => {
     event.preventDefault();
-    void fileOperations.history.disposeAll().finally(async () => {
+    transfers.cancelAll();
+    void transfers.waitForIdle().then(() => fileOperations.history.disposeAll()).finally(async () => {
       await rmdir(historyDir).catch(() => undefined);
       app.quit();
     });
@@ -134,7 +152,7 @@ export function registerIpcHandlers(ctx: IpcContext) {
     fsService.readFile(p, enc),
   );
   ipcMain.handle(IpcChannels.FS_READ_RTF, (_e, p: string) => readRtf(p));
-  registerFileOperationHandlers(ipcMain.handle.bind(ipcMain), fileOperations);
+  registerFileOperationHandlers(ipcMain.handle.bind(ipcMain), fileOperations, (mode, request) => transfers.start(mode, request).result);
   ipcMain.handle(IpcChannels.FS_EXISTS, (_e, p: string) => fsService.exists(p));
   ipcMain.handle(IpcChannels.FS_STAT, (_e, p: string) => fsService.stat(p));
 
@@ -177,6 +195,18 @@ export function registerIpcHandlers(ctx: IpcContext) {
   );
 
   // =================== Clipboard (new) ===================
+  ipcMain.handle(IpcChannels.FS_READ_FILE_CLIPBOARD, async () => {
+    try { if (process.platform !== 'win32') throw new Error('当前平台不支持原生文件剪贴板'); return ok(await readWindowsFileClipboard()); }
+    catch (error) { return mapError(error); }
+  });
+  ipcMain.handle(IpcChannels.FS_WRITE_FILE_CLIPBOARD, async (_e, paths: string[], mode: 'copy' | 'cut') => {
+    try { if (process.platform !== 'win32' || !['copy', 'cut'].includes(mode)) throw new Error('不支持的剪贴板操作'); return ok(await writeWindowsFileClipboard(paths, mode)); }
+    catch (error) { return mapError(error); }
+  });
+  ipcMain.handle(IpcChannels.FS_CLEAR_FILE_CLIPBOARD, async (_e, sequence: number) => {
+    try { if (process.platform !== 'win32') throw new Error('当前平台不支持原生文件剪贴板'); return ok(await clearWindowsFileClipboard(sequence)); }
+    catch (error) { return mapError(error); }
+  });
   ipcMain.handle(IpcChannels.FS_WRITE_CLIPBOARD, (_e, text: string) => {
     clipboard.writeText(text);
   });

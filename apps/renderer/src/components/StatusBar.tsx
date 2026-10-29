@@ -11,6 +11,7 @@ import type { SortField } from '../stores/file-store';
 import { useFileStore } from '../stores/file-store';
 import { useLayoutStore } from '../stores/layout-store';
 import { ThemeToggle } from './ThemeToggle';
+import { TransferPanel } from './TransferPanel';
 import { PanelLeft, PanelLeftClose, Settings, Terminal } from 'lucide-react';
 
 const SORT_LABELS: Record<SortField, string> = {
@@ -122,6 +123,7 @@ export function StatusBar({
         )}
       </div>
       <div className="status-right">
+        <TransferPanel />
         <span
           className="status-item status-hint"
           title="按 Ctrl+P 打开全局模糊搜索"

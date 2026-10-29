@@ -31,6 +31,7 @@ export interface ClipboardState {
   paths: string[];
   /** cut 模式时,标出每个 source 来自哪个 pane(用于粘贴后高亮?目前 v1 不需要) */
   sourcePaneId: string | null;
+  sequence?: number;
 }
 
 /** 拖放状态(渲染进程内部状态,不走系统 dataTransfer) */
@@ -305,6 +306,7 @@ export interface FileStore {
   // ============ P3: 剪贴板(全局)============
   copySelected: (paneId: string) => void;
   cutSelected: (paneId: string) => void;
+  syncFileClipboard: () => Promise<void>;
   pasteToPane: (paneId: string) => Promise<void>;
   clearClipboard: () => void;
 

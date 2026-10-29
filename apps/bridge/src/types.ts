@@ -75,6 +75,7 @@ export type FsErrorCode =
   | 'ENOTDIR'
   | 'EISDIR'
   | 'EBUSY'
+  | 'ABORT_ERR'
   | 'UNKNOWN';
 
 export interface FsError {
@@ -101,6 +102,29 @@ export interface MoveOrCopyRequest {
    * 缺省或长度不足时,该下标回退到默认行为,保持向后兼容。
    */
   destinations?: string[];
+  /** Clipboard generation to clear after a successful cut, if still current. */
+  clipboardSequence?: number;
+}
+
+export interface FileTransferJob {
+  id: string;
+  mode: 'copy' | 'move';
+  status: 'queued' | 'running' | 'cancelling' | 'completed' | 'cancelled' | 'failed';
+  totalItems: number;
+  completedItems: number;
+  totalBytes: number | null;
+  completedBytes: number;
+  currentPath: string | null;
+  bytesPerSecond: number | null;
+  remainingSeconds: number | null;
+  error: string | null;
+  warning: string | null;
+}
+
+export interface NativeFileClipboard {
+  paths: string[];
+  mode: 'copy' | 'cut';
+  sequence: number;
 }
 
 /** 回收站条目 (P3) */
