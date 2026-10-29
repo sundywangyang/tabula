@@ -10,8 +10,8 @@
   flex-direction: column;
   flex-shrink: 0;
   overflow-y: auto;
-  padding: 14px 10px;
-  gap: 16px;
+  padding: 10px 8px;
+  gap: 5px;
 }
 
 .sidebar-item:has(> .sidebar-tree-children) { flex-wrap: wrap; }
@@ -20,7 +20,7 @@
 .sidebar-tree-toggle .sidebar-tree-open { transform: rotate(90deg); }
 .sidebar-tree-children { order: 2; flex-basis: 100%; min-width: 0; padding-left: 12px; }
 .sidebar-tree-branch { min-width: 0; }
-.sidebar-tree-item { padding: 4px 4px; gap: 3px; }
+.sidebar .sidebar-tree-item { padding: 3px 4px; gap: 3px; }
 .sidebar-tree-label { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; display: flex; align-items: center; gap: 6px; text-align: left; cursor: pointer; }
 .sidebar-tree-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -33,7 +33,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .sidebar-header {
@@ -49,8 +49,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 28px;
-  margin-bottom: 3px;
+  min-height: 26px;
 }
 
 .sidebar-header-btn {
@@ -72,7 +71,7 @@
 }
 
 .sidebar-empty {
-  padding: 6px 10px 6px 32px;
+  padding: 4px 10px 4px 32px;
   font-size: 11px;
   color: var(--fg-tertiary);
   font-style: italic;
@@ -83,8 +82,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  padding: 7px 10px;
+  min-height: 28px;
+  padding: 4px 10px;
   border-radius: var(--radius-sm);
   color: var(--fg-secondary);
   font-size: 13px;
@@ -108,8 +107,8 @@
   content: '';
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 6px;
+  bottom: 6px;
   width: 3px;
   border-radius: 3px;
   background: var(--accent);
@@ -173,7 +172,7 @@
   align-items: flex-start;
   min-width: 0;
   flex: 1;
-  gap: 2px;
+  gap: 0;
 }
 
 .sidebar-drive-info .sidebar-name,
@@ -183,7 +182,7 @@
 }
 
 .sidebar-drive {
-  min-height: 46px;
+  min-height: 38px;
 }
 
 .sidebar-rename-input {
@@ -293,7 +292,7 @@
 .sidebar-collapse-btn {
   flex: 1;
   min-width: 0;
-  height: 28px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
