@@ -27,7 +27,7 @@ import { ContextMenu } from './components/ContextMenu';
 import { ExtensionPanelView } from './components/ExtensionPanelView';
 import { CommandPalette } from './features/command-palette/CommandPalette';
 import { runCommandById } from './command-dispatcher';
-import { handleShortcutKeyDown } from './keyboard-shortcuts';
+import { handleNativeCloseTabCommand, handleShortcutKeyDown } from './keyboard-shortcuts';
 import { IpcChannels } from '@tabula/bridge';
 import { LayoutView } from './features/panes/PaneContainer';
 import { PerfPanel } from './features/perf/PerfPanel';
@@ -274,7 +274,8 @@ export function App() {
       IpcChannels.COMMANDS_RUN_COMMAND,
       (payload) => {
         if (payload && typeof payload.commandId === 'string') {
-          runCommandById(payload.commandId);
+          if (payload.commandId === 'tab.close') handleNativeCloseTabCommand();
+          else runCommandById(payload.commandId);
         }
       },
     );

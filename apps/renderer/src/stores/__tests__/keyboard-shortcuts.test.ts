@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KeyCombo } from '@tabula/bridge';
-import { findShortcutCommand, handleShortcutKeyDown } from '../../keyboard-shortcuts';
-import { closeCommandPalette, isCommandPaletteOpen } from '../../features/command-palette/CommandPalette';
-import { useFileStore } from '../file-store';
+import { findShortcutCommand, handleNativeCloseTabCommand, handleShortcutKeyDown } from '../../keyboard-shortcuts';
+import { closeCommandPalette, isCommandPaletteOpen, toggleCommandPalette } from '../../features/command-palette/CommandPalette';
+import { makeFolderTab, useFileStore } from '../file-store';
+import { useLayoutStore } from '../layout-store';
 import { useKeymapStore } from '../keymap-store';
 import { useUiDialogsStore } from '../ui-dialogs-store';
 import { entry, seedFiles } from './file-fixtures';
@@ -135,5 +136,90 @@ describe('configured keyboard dispatch', () => {
     const binding = new Map([['pane.split-vertical', combo('\\', { ctrl: true, shift: true })]]);
     expect(findShortcutCommand({ key: '|', ctrlKey: false, metaKey: true, shiftKey: true, altKey: false }, binding, 'macos')).toBe('pane.split-vertical');
     expect(findShortcutCommand({ key: '|', ctrlKey: false, metaKey: true, shiftKey: true, altKey: false }, binding, 'windows')).toBeNull();
+  });
+});
+
+describe('native close-tab context', () => {
+  let closingTabId: string;
+  const tabIds = () => {
+    const pane = useLayoutStore.getState().getActivePane();
+    return pane?.type === 'pane' ? pane.tabs.map(tab => tab.id) : [];
+  };
+
+  beforeEach(() => {
+    const tab = makeFolderTab('C:\\second');
+    closingTabId = tab.id;
+    useLayoutStore.getState().pane.openTab('p', tab);
+  });
+
+  it('closes only the active tab in the normal file-browser context', () => {
+    const originalTab = tabIds().find(id => id !== closingTabId);
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toEqual([originalTab]);
+  });
+
+  it.each([
+    ['new tab', () => useUiDialogsStore.getState().setNewTabPaneId('p')],
+    ['new folder', () => useUiDialogsStore.getState().setNewFolder(true, 'p')],
+    ['new file', () => useUiDialogsStore.getState().setNewFile(true, 'p')],
+    ['delete confirmation', () => useUiDialogsStore.getState().setConfirmDelete({ paneId: 'p', count: 1 })],
+    ['permanent delete', () => useUiDialogsStore.getState().setConfirmPermanentDelete({ paneId: 'p', count: 1, paths: ['C:\\initial\\a.txt'] })],
+    ['settings', () => useUiDialogsStore.getState().setSettingsOpen(true)],
+    ['batch rename', () => useUiDialogsStore.getState().openBatchRename('p', [], [])],
+    ['properties', () => useUiDialogsStore.getState().openPropertiesPanel('p', entry('C:\\initial\\a.txt'))],
+    ['file tools', () => useUiDialogsStore.getState().openTools('content', 'p', 'C:\\initial')],
+  ] as const)('keeps the tab open under the %s dialog', (_name, open) => {
+    open();
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toContain(closingTabId);
+  });
+
+  it.each(['input', 'textarea', 'select', 'contenteditable'])('keeps the tab open while editing a focused %s', kind => {
+    const input = document.createElement(kind === 'contenteditable' ? 'div' : kind);
+    if (kind === 'contenteditable') {
+      input.setAttribute('contenteditable', 'true');
+      input.tabIndex = 0;
+    }
+    target.append(input);
+    input.focus();
+    expect(document.activeElement).toBe(input);
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toContain(closingTabId);
+    input.blur();
+    handleNativeCloseTabCommand();
+    expect(tabIds()).not.toContain(closingTabId);
+  });
+
+  it('keeps the tab open while the address bar owns navigation', () => {
+    useFileStore.getState().openPathBar('p');
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toContain(closingTabId);
+  });
+
+  it('keeps the tab open while search, preview or the command palette is open', () => {
+    const file = useFileStore.getState();
+    useFileStore.setState({ globalSearch: { ...file.globalSearch, open: true } });
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toContain(closingTabId);
+    useFileStore.setState({ globalSearch: { ...file.globalSearch, open: false } });
+    useKeymapStore.setState({ bindings: new Map([['preview.toggle', combo('space')]]) });
+    press(' ');
+    expect(useFileStore.getState().previewState).not.toBeNull();
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toContain(closingTabId);
+    useFileStore.getState().closePreview();
+    toggleCommandPalette();
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toContain(closingTabId);
+  });
+
+  it('keeps the source tab open while a file conflict awaits a decision', () => {
+    useFileStore.setState({ pendingConflicts: {
+      paneId: 'p', sources: ['C:\\initial\\a.txt'], destinationDir: 'C:\\dest', mode: 'copy',
+      resolved: [], autoResolved: [], queue: [{ sourcePath: 'C:\\initial\\a.txt', sourceName: 'a.txt',
+        destPath: 'C:\\dest\\a.txt', destDir: 'C:\\dest', destName: 'a.txt', isDirectory: false }],
+    } });
+    handleNativeCloseTabCommand();
+    expect(tabIds()).toContain(closingTabId);
   });
 });

@@ -11,6 +11,7 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
 import { WindowManager } from './window/window-manager';
+import { updateApplicationMenu } from './window/application-menu';
 import { registerIpcHandlers } from './ipc';
 import { getWindowProvider } from './providers/window';
 import { loadConfig } from './store/config';
@@ -126,6 +127,7 @@ async function bootstrap() {
   // 实际 registerShortcutsHandlers 内部已读 store,所以这里读时机一致)
   // 注意:initKeymap() 内部会用内置命令目录,不传 specs 也行
   initKeymap();
+  updateApplicationMenu();
 
   // 监听主窗口 ready-to-show → 关闭 splash
   let splashClosed = false;
