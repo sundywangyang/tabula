@@ -94,14 +94,15 @@ async function bootstrap() {
     : join(process.resourcesPath, 'resources', 'Tabula.icns');
   getWindowProvider().setDockIcon(dockIcon);
 
+  // 在创建任何窗口前读取主题,避免浅色启动时先显示深色启动屏。
+  await loadConfig();
+
   // P7: 启动屏(splash)
   // 必须在主窗口创建之前,这样用户不会看到空白
   createSplash();
   setSplashMessage('正在准备 Tabula…');
 
-  // 加载配置
-  setSplashProgress(15, '正在读取用户配置…');
-  const config = await loadConfig();
+  setSplashProgress(15, '用户配置已就绪…');
 
   // 初始化扩展宿主(后台进程)
   setSplashProgress(35, '正在发现扩展…');

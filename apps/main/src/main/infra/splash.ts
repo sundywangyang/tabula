@@ -18,13 +18,15 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IpcChannels } from '@tabula/bridge';
 import type { SplashStatus } from '@tabula/bridge';
+import { getWindowAppearance, type WindowAppearance } from '../providers/window/appearance';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 const SPLASH_WIDTH = 480;
 const SPLASH_HEIGHT = 280;
 
-const SPLASH_HTML = /* html */ `<!doctype html>
+function createSplashHtml(appearance: WindowAppearance): string {
+  return /* html */ `<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
@@ -32,16 +34,17 @@ const SPLASH_HTML = /* html */ `<!doctype html>
     <title>Tabula</title>
     <style>
       :root {
-        color-scheme: dark;
-        --bg: #1a1a1f;
-        --bg-elev: #22232a;
-        --fg: #e6e6ec;
-        --fg-dim: #a8a8b3;
-        --accent: #6366f1;
+        color-scheme: ${appearance.theme};
+        --bg: ${appearance.background};
+        --bg-elev: ${appearance.elevated};
+        --fg: ${appearance.foreground};
+        --fg-dim: ${appearance.secondary};
+        --separator: ${appearance.separator};
+        --accent: ${appearance.accent};
       }
       html, body { height: 100%; margin: 0; padding: 0; }
       body {
-        background: linear-gradient(135deg, #1a1a1f 0%, #22232a 100%);
+        background: var(--bg);
         color: var(--fg);
         font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
         display: flex;
@@ -77,12 +80,12 @@ const SPLASH_HTML = /* html */ `<!doctype html>
         border-radius: 10px;
         color: #fff;
         font-size: 26px;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 25%, transparent);
         animation: pulse 2.4s ease-in-out infinite;
       }
       @keyframes pulse {
-        0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
-        50% { transform: scale(1.05); box-shadow: 0 6px 18px rgba(99, 102, 241, 0.6); }
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.03); }
       }
       .version {
         font-size: 12px;
@@ -93,7 +96,7 @@ const SPLASH_HTML = /* html */ `<!doctype html>
       .spinner {
         width: 36px;
         height: 36px;
-        border: 3px solid rgba(255, 255, 255, 0.1);
+        border: 3px solid var(--separator);
         border-top-color: var(--accent);
         border-radius: 50%;
         animation: spin 0.9s linear infinite;
@@ -104,7 +107,7 @@ const SPLASH_HTML = /* html */ `<!doctype html>
       .progress-track {
         width: 100%;
         height: 4px;
-        background: rgba(255, 255, 255, 0.08);
+        background: var(--separator);
         border-radius: 2px;
         overflow: hidden;
         position: relative;
@@ -112,7 +115,7 @@ const SPLASH_HTML = /* html */ `<!doctype html>
       .progress-fill {
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, var(--accent), #a855f7);
+        background: var(--accent);
         border-radius: 2px;
         transition: width 0.25s ease;
       }
@@ -134,10 +137,13 @@ const SPLASH_HTML = /* html */ `<!doctype html>
       }
       .tip {
         font-size: 11px;
-        color: rgba(255, 255, 255, 0.35);
+        color: var(--fg-dim);
         margin-top: 6px;
       }
       body.fade-out { opacity: 0; transition: opacity 220ms ease; }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
     </style>
   </head>
   <body>
@@ -152,7 +158,7 @@ const SPLASH_HTML = /* html */ `<!doctype html>
         <div class="progress-fill" id="fill"></div>
       </div>
       <div class="message" id="msg">正在准备…</div>
-      <div class="tip">v1 打磨版 · 由 Electron 驱动</div>
+      <div class="tip">多标签 · 多窗格 · 自由浏览</div>
     </div>
     <script>
       (function () {
@@ -192,6 +198,7 @@ const SPLASH_HTML = /* html */ `<!doctype html>
     </script>
   </body>
 </html>`;
+}
 
 let splashWindow: BrowserWindow | null = null;
 let readyResolver: (() => void) | null = null;
@@ -211,6 +218,7 @@ export function createSplash(): BrowserWindow {
     return splashWindow;
   }
 
+  const appearance = getWindowAppearance();
   splashWindow = new BrowserWindow({
     width: SPLASH_WIDTH,
     height: SPLASH_HEIGHT,
@@ -225,7 +233,7 @@ export function createSplash(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     focusable: false,
-    backgroundColor: '#1a1a1f',
+    backgroundColor: appearance.background,
     webPreferences: {
       preload: resolveSplashPreloadPath(),
       contextIsolation: true,
@@ -244,7 +252,7 @@ export function createSplash(): BrowserWindow {
 
   // 把 SPLASH_HTML 用 data: URL 加载,完全绕开文件系统
   // 不用 loadFile + 临时文件,因为某些环境(沙箱、daemon 改 TEMP)会失败
-  const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(SPLASH_HTML);
+  const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(createSplashHtml(appearance));
   splashWindow.loadURL(dataUrl).catch((err) => {
     // eslint-disable-next-line no-console
     console.error('[splash] loadURL failed:', err);

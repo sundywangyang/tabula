@@ -12,6 +12,11 @@
  * 大文件(>1MB 文本)截断到 100 行;图片 >5MB 拒绝加载。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Archive, Ban, ChevronLeft, ChevronRight, FileCode2, FileText, Film,
+  Image as ImageIcon, Lightbulb, Minus, Music, Plus, Presentation, Sheet,
+  TriangleAlert, Type, X, type LucideIcon,
+} from 'lucide-react';
 import 'highlight.js/styles/atom-one-dark.css';
 import { useFileStore } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
@@ -39,6 +44,23 @@ import { RtfView, MarkdownView, TextWithLineNumbers } from './views/TextViews';
 import { ArchiveView } from './views/ArchiveView';
 import { FontView } from './views/FontView';
 export { parseArchive } from './views/ArchiveView';
+
+const PREVIEW_ICONS: Record<PreviewKind, LucideIcon> = {
+  image: ImageIcon,
+  video: Film,
+  audio: Music,
+  pdf: FileText,
+  font: Type,
+  archive: Archive,
+  docx: FileText,
+  xlsx: Sheet,
+  pptx: Presentation,
+  rtf: FileText,
+  markdown: FileText,
+  code: FileCode2,
+  text: FileText,
+  unsupported: Ban,
+};
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -262,34 +284,21 @@ export function PreviewPanel() {
   }, [preview]);
 
   if (!preview || !entry) return null;
+  const PreviewIcon = PREVIEW_ICONS[kind];
 
   return (
     <div
-      className="preview-overlay"
+      className="ui-overlay preview-overlay"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) closePreview();
       }}
     >
-      <div className="preview-panel" ref={containerRef} tabIndex={-1}>
+      <div className="ui-surface preview-panel" ref={containerRef} tabIndex={-1}>
         <div className="preview-header">
           <div className="preview-title">
-            <span className="preview-icon">{
-              kind === 'image' ? '🖼'
-                : kind === 'video' ? '🎬'
-                  : kind === 'audio' ? '🎵'
-                    : kind === 'pdf' ? '📕'
-                      : kind === 'font' ? '🅰'
-                        : kind === 'archive' ? '🗜'
-                          : kind === 'docx' ? '📄'
-                            : kind === 'xlsx' ? '📊'
-                              : kind === 'pptx' ? '🎞'
-                                : kind === 'rtf' ? '📰'
-                                  : kind === 'markdown' ? '📝'
-                                    : kind === 'code' ? '📜'
-                                      : '📄'
-            }</span>
+            <span className="preview-icon"><PreviewIcon size={18} strokeWidth={1.75} aria-hidden="true" /></span>
             <span className="preview-filename" title={entry.path}>{entry.name}</span>
             <span className="preview-meta">
               {formatSize(entry.size)} · {formatDate(entry.mtime)} · {entry.ext || '文件'}
@@ -310,7 +319,7 @@ export function PreviewPanel() {
                   title="上一个 (←)"
                   aria-label="上一个文件"
                 >
-                  ‹
+                  <ChevronLeft size={16} aria-hidden="true" />
                 </button>
                 <button
                   className="preview-nav preview-nav-next"
@@ -319,7 +328,7 @@ export function PreviewPanel() {
                   title="下一个 (→)"
                   aria-label="下一个文件"
                 >
-                  ›
+                  <ChevronRight size={16} aria-hidden="true" />
                 </button>
               </>
             )}
@@ -329,7 +338,7 @@ export function PreviewPanel() {
               title="关闭 (Esc)"
               aria-label="关闭预览"
             >
-              ✕
+              <X size={16} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -342,7 +351,7 @@ export function PreviewPanel() {
               title="上一个 (←)"
               aria-label="上一个文件"
             >
-              ‹
+              <ChevronLeft size={22} aria-hidden="true" />
             </button>
           )}
           {navInfo && navInfo.canNext && (
@@ -352,7 +361,7 @@ export function PreviewPanel() {
               title="下一个 (→)"
               aria-label="下一个文件"
             >
-              ›
+              <ChevronRight size={22} aria-hidden="true" />
             </button>
           )}
           {preview.loading && !preview.error && (
@@ -364,7 +373,7 @@ export function PreviewPanel() {
 
           {preview.error && (
             <div className="preview-error">
-              <div className="error-icon">⚠</div>
+              <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
               <div className="error-message">{preview.error}</div>
               <div className="preview-error-meta">
                 路径: <code>{entry.path}</code>
@@ -421,7 +430,7 @@ export function PreviewPanel() {
               )}
               {kind === 'unsupported' && (
                 <div className="preview-unsupported">
-                  <div className="unsupported-icon">🚫</div>
+                  <div className="unsupported-icon"><Ban size={42} strokeWidth={1.25} aria-hidden="true" /></div>
                   <div className="unsupported-title">此文件类型暂不支持预览</div>
                   <div className="preview-error-meta">
                     扩展名: <code>{entry.ext || '(无)'}</code>
@@ -431,7 +440,7 @@ export function PreviewPanel() {
                     路径: <code>{entry.path}</code>
                     {suggestConversionFor(entry.ext) && (
                       <div className="preview-error-hint">
-                        💡 提示: {suggestConversionFor(entry.ext)}
+                        <Lightbulb size={14} aria-hidden="true" /> 提示: {suggestConversionFor(entry.ext)}
                       </div>
                     )}
                   </div>
@@ -442,7 +451,7 @@ export function PreviewPanel() {
 
           {preview.truncated && (
             <div className="preview-truncated-banner">
-              ⚠ 文件过大,仅显示前 {TEXT_TRUNCATE_LINES} 行(共 {preview.totalLines} 行)
+              <TriangleAlert size={14} aria-hidden="true" /> 文件过大,仅显示前 {TEXT_TRUNCATE_LINES} 行(共 {preview.totalLines} 行)
             </div>
           )}
         </div>
@@ -556,7 +565,7 @@ function PdfView({ url }: { url: string; }) {
           onClick={() => setPageNum((p) => Math.max(1, p - 1))}
           disabled={pageNum <= 1}
           title="上一页 (←)"
-        >‹</button>
+        ><ChevronLeft size={16} aria-hidden="true" /></button>
         <span className="preview-pdf-pageinfo">
           {pageNum} / {totalPages}
         </span>
@@ -565,19 +574,19 @@ function PdfView({ url }: { url: string; }) {
           onClick={() => setPageNum((p) => Math.min(totalPages, p + 1))}
           disabled={pageNum >= totalPages}
           title="下一页 (→)"
-        >›</button>
+        ><ChevronRight size={16} aria-hidden="true" /></button>
         <span className="preview-pdf-sep" />
         <button
           className="preview-pdf-btn"
           onClick={() => setScale((s) => Math.max(0.5, s - 0.25))}
           title="缩小 (-)"
-        >−</button>
+        ><Minus size={16} aria-hidden="true" /></button>
         <span className="preview-pdf-pageinfo">{Math.round(scale * 100)}%</span>
         <button
           className="preview-pdf-btn"
           onClick={() => setScale((s) => Math.min(3, s + 0.25))}
           title="放大 (+)"
-        >+</button>
+        ><Plus size={16} aria-hidden="true" /></button>
         <button
           className="preview-pdf-btn"
           onClick={() => setScale(1.0)}
@@ -587,7 +596,7 @@ function PdfView({ url }: { url: string; }) {
       <div className="preview-pdf-canvas-wrap">
         {loadError ? (
           <div className="preview-error">
-            <div className="error-icon">⚠</div>
+            <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
             <div className="error-message">PDF 加载失败: {loadError}</div>
           </div>
         ) : (

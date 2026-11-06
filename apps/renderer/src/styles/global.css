@@ -1,208 +1,127 @@
-/**
- * Tabula 全局样式 (macOS Big Sur+ 设计语言)
- *
- * 主题系统(P5):
- * - :root 上没有 data-theme 时,默认为暗色(向后兼容)
- * - :root[data-theme="dark"] 显式暗色
- * - :root[data-theme="light"] 浅色
- * - --accent 由 theme-store 运行时注入(document.documentElement.style.setProperty)
- * - 切换通过 data-theme 替换 → 整页 CSS 变量重新解析,无 reload
- *
- * macOS 风格 token (P6+ 重构):
- * - accent #007AFF (macOS 系统蓝,可在 theme-store 覆盖)
- * - 圆角加大: sm=6, md=10, lg=14, xl=20
- * - 毛玻璃: --blur-sm/md/lg + --bg-translucent(半透明背景层)
- * - 阴影: 4 档 (sm/md/lg/xl),更柔和
- * - 字体: SF Pro 优先栈
- */
-
+@import './controls.css';
+/* Finder foundations: neutral content, quiet chrome and semantic interaction colors. */
 :root {
-  /* =================== 字体 (主题无关) =================== */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text',
-    'SF Pro Display', 'Helvetica Neue', 'PingFang SC',
-    'Microsoft YaHei', '微软雅黑', system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'JetBrains Mono', Menlo, Monaco,
-    'Cascadia Code', Consolas, monospace;
-  --font-display: -apple-system, BlinkMacSystemFont,
-    'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
-
-  /* =================== 圆角 (加大) =================== */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: 'SF Mono', Menlo, 'Cascadia Code', Consolas, monospace;
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --radius-xl: 20px;
-
-  /* =================== 尺寸 (主题无关) =================== */
-  --titlebar-h: 32px;
-  --statusbar-h: 22px;
+  --radius-xl: 18px;
+  --titlebar-h: 40px;
+  --statusbar-h: 26px;
   --sidebar-w: 240px;
-  --breadcrumb-h: 36px;
-  --tabbar-h: 36px;
-  --tab-h: 30px;
-
-  /* =================== 毛玻璃 (macOS Big Sur+ 标志) =================== */
-  --blur-sm: blur(12px) saturate(150%);
-  --blur-md: blur(20px) saturate(180%);
-  --blur-lg: blur(30px) saturate(200%);
-
-  /* =================== Accent (默认 macOS 系统蓝) =================== */
-  --accent: #007AFF;
-  --accent-hover: #1A8CFF;
-  --accent-active: #0066D6;
-  --accent-soft: rgba(0, 122, 255, 0.15);
-  --accent-soft-hover: rgba(0, 122, 255, 0.22);
-
-  /* =================== 阴影 (4 档,更柔和) =================== */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.18);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.35);
-
-  /* =================== 滚动条尺寸 =================== */
+  --breadcrumb-h: 28px;
+  --toolbar-h: 44px;
+  --tabbar-h: 34px;
+  --tab-h: 27px;
+  --blur-sm: blur(8px) saturate(120%);
+  --blur-md: blur(16px) saturate(130%);
+  --blur-lg: blur(20px) saturate(130%);
+  --accent: #007aff;
+  --accent-hover: color-mix(in srgb, var(--accent) 86%, var(--fg-primary));
+  --accent-active: color-mix(in srgb, var(--accent) 76%, var(--fg-primary));
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-soft-hover: color-mix(in srgb, var(--accent) 20%, transparent);
+  --accent-contrast: #fff;
+  --selection-bg: var(--accent);
+  --selection-fg: var(--accent-contrast);
+  --focus-ring: color-mix(in srgb, var(--accent) 65%, transparent);
+  --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  --warning-soft: color-mix(in srgb, var(--warning) 12%, transparent);
   --scrollbar-w: 8px;
-
-  color-scheme: dark;
+  --motion-fast: 140ms;
+  --motion-normal: 180ms;
 }
-
-/* =================== 暗色主题(默认 + 显式 dark) =================== */
-:root,
-:root[data-theme='dark'] {
-  --bg-base: #1c1c1e;
-  --bg-elevated: #2c2c2e;
-  --bg-overlay: #3a3a3c;
-  --bg-hover: rgba(255, 255, 255, 0.06);
-  --bg-active: rgba(255, 255, 255, 0.10);
-  --bg-translucent: rgba(30, 30, 32, 0.72);
-  --bg-translucent-elevated: rgba(44, 44, 46, 0.85);
-
-  --fg-primary: #f5f5f7;
-  --fg-secondary: #aeaeb2;
-  --fg-tertiary: #8e8e93;
-
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-
-  --danger: #ff453a;
-  --warning: #ff9f0a;
-  --success: #30d158;
-
-  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+:root, :root[data-theme='dark'] {
+  --bg-base: #1e1e1e;
+  --bg-elevated: #303030;
+  --bg-overlay: #383838;
+  --bg-toolbar: #292929;
+  --bg-sidebar: #252525;
+  --bg-hover: rgba(255, 255, 255, .065);
+  --bg-active: rgba(255, 255, 255, .11);
+  --bg-stripe: rgba(255, 255, 255, .025);
+  --bg-translucent: rgba(40, 40, 40, .92);
+  --bg-translucent-elevated: rgba(48, 48, 48, .96);
+  --fg-primary: #f2f2f2;
+  --fg-secondary: #b8b8bc;
+  --fg-tertiary: #929296;
+  --border: rgba(255, 255, 255, .09);
+  --border-strong: rgba(255, 255, 255, .18);
+  --selection-inactive-bg: #48484b;
+  --selection-inactive-fg: var(--fg-primary);
+  --danger: #ff6961;
+  --danger-contrast: #1e1e1e;
+  --warning: #ffb340;
+  --success: #45c76f;
+  --scrim: rgba(0, 0, 0, .38);
+  --shadow-sm: 0 1px 2px #0004;
+  --shadow-md: 0 3px 12px #0005, 0 0 0 1px #0002;
+  --shadow-lg: 0 12px 36px #0006, 0 2px 8px #0003;
+  --shadow-xl: 0 20px 60px #0007, 0 4px 12px #0003;
+  --scrollbar-thumb: rgba(255, 255, 255, .22);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, .35);
   --scrollbar-track: transparent;
-
+  --text: var(--fg-primary);
+  --text-muted: var(--fg-secondary);
+  --error: var(--danger);
   color-scheme: dark;
 }
-
-/* =================== 浅色主题 =================== */
 :root[data-theme='light'] {
-  --bg-base: #f5f5f7;
+  --bg-base: #ffffff;
   --bg-elevated: #ffffff;
-  --bg-overlay: #ececef;
-  --bg-hover: rgba(0, 0, 0, 0.04);
-  --bg-active: rgba(0, 0, 0, 0.08);
-  --bg-translucent: rgba(246, 246, 248, 0.78);
-  --bg-translucent-elevated: rgba(255, 255, 255, 0.92);
-
-  --fg-primary: #1d1d1f;
-  --fg-secondary: #6e6e73;
-  --fg-tertiary: #8e8e93;
-
-  --border: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.16);
-
-  --accent-hover: #0066D6;
-  --accent-active: #0050A0;
-  --accent-soft: rgba(0, 122, 255, 0.12);
-  --accent-soft-hover: rgba(0, 122, 255, 0.18);
-
-  --danger: #ff3b30;
-  --warning: #ff9500;
-  --success: #34c759;
-
-  --scrollbar-thumb: rgba(0, 0, 0, 0.20);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
-  --scrollbar-track: transparent;
-
+  --bg-overlay: #e9e9eb;
+  --bg-toolbar: #f3f3f3;
+  --bg-sidebar: #ededee;
+  --bg-hover: rgba(0, 0, 0, .045);
+  --bg-active: rgba(0, 0, 0, .085);
+  --bg-stripe: rgba(0, 0, 0, .022);
+  --bg-translucent: rgba(237, 237, 238, .92);
+  --bg-translucent-elevated: rgba(255, 255, 255, .96);
+  --fg-primary: #252527;
+  --fg-secondary: #656569;
+  --fg-tertiary: #7c7c81;
+  --border: rgba(0, 0, 0, .10);
+  --border-strong: rgba(0, 0, 0, .20);
+  --selection-inactive-bg: #dedee2;
+  --danger: #d9322c;
+  --danger-contrast: #fff;
+  --warning: #a96a00;
+  --success: #248a3d;
+  --scrim: rgba(30, 30, 35, .20);
+  --shadow-sm: 0 1px 2px #00000014;
+  --shadow-md: 0 3px 12px #00000016, 0 0 0 1px #00000005;
+  --shadow-lg: 0 12px 36px #00000024, 0 2px 8px #0000000d;
+  --shadow-xl: 0 20px 60px #0000002b, 0 4px 12px #00000012;
+  --scrollbar-thumb: rgba(0, 0, 0, .24);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, .38);
   color-scheme: light;
 }
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root {
+  height: 100vh; width: 100vw; overflow: hidden;
+  background: var(--bg-base); color: var(--fg-primary);
+  font: 13px/1.4 var(--font-sans); user-select: none;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
-
-html,
-body,
-#root {
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  background: var(--bg-base);
-  color: var(--fg-primary);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.4;
-  user-select: none;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  /* 主题切换零闪烁:背景色过渡 */
-  transition: background-color 0.12s ease, color 0.12s ease;
+button { font: inherit; color: inherit; background: transparent; border: none; cursor: pointer; -webkit-app-region: no-drag; }
+button:disabled { cursor: default; }
+input, textarea, select {
+  font: inherit; background: var(--bg-elevated); border: 1px solid var(--border-strong);
+  color: var(--fg-primary); border-radius: var(--radius-sm); padding: 5px 8px; accent-color: var(--accent);
 }
-
-button {
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-}
-
-input,
-textarea {
-  font-family: inherit;
-  font-size: inherit;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  color: var(--fg-primary);
-  border-radius: var(--radius-sm);
-  outline: none;
-  padding: 4px 8px;
-}
-
-input:focus,
-textarea:focus {
-  border-color: var(--accent);
-}
-
-/* =================== 滚动条 (macOS 风格) =================== */
-::-webkit-scrollbar {
-  width: var(--scrollbar-w);
-  height: var(--scrollbar-w);
-}
-
-::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-  transition: background 0.15s;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
+input, textarea { user-select: text; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); outline: none; }
+:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
+svg { vertical-align: middle; flex-shrink: 0; }
+::-webkit-scrollbar { width: var(--scrollbar-w); height: var(--scrollbar-w); }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-thumb-hover); }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

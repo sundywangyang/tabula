@@ -7,17 +7,16 @@
   position: fixed;
   inset: 0;
   z-index: 8000;
-  background: rgba(0, 0, 0, 0.5);
+
   display: flex;
   align-items: center;
   justify-content: center;
-  -webkit-backdrop-filter: var(--blur-lg);
-  backdrop-filter: var(--blur-lg);
+
   animation: preview-fade-in 0.15s ease-out;
 }
 
 @supports not ((backdrop-filter: blur(30px)) or (-webkit-backdrop-filter: blur(30px))) {
-  .preview-overlay { background: rgba(0, 0, 0, 0.78); }
+  .preview-overlay {  }
 }
 
 @keyframes preview-fade-in {
@@ -32,12 +31,7 @@
 .preview-panel {
   width: min(92vw, 1200px);
   height: min(88vh, 820px);
-  background: var(--bg-translucent-elevated);
-  -webkit-backdrop-filter: var(--blur-md);
-  backdrop-filter: var(--blur-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
+
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -46,7 +40,7 @@
 }
 
 @supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
-  .preview-panel { background: var(--bg-elevated); border-color: var(--border-strong); }
+  .preview-panel {  border-color: var(--border-strong); }
 }
 
 @keyframes preview-pop-in {
@@ -862,7 +856,7 @@
   margin: 0.8em 0;
   padding: 6px 14px;
   border-left: 3px solid var(--accent);
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--accent-soft);
   color: var(--fg-secondary);
 }
 
@@ -991,3 +985,14 @@
   pointer-events: none;
   z-index: 1;
 }
+
+.preview-header { background: var(--bg-toolbar); }
+.preview-pdf-toolbar { background: var(--bg-toolbar); border-color: var(--border); }
+.preview-pdf-btn:hover:not(:disabled) { background: var(--bg-hover); }
+.preview-pdf-sep { background: var(--border-strong); }
+.preview-media-meta { color: #dedee2; }
+.preview-media-stat-dim { color: #aaaab0; }
+.preview-error-hint { color: var(--warning); border-color: var(--warning); background: var(--warning-soft); }
+
+.preview-error-hint, .preview-truncated-banner { display: inline-flex; align-items: center; gap: 6px; }
+.preview-icon, .unsupported-icon, .preview-archive-icon { display: inline-flex; align-items: center; justify-content: center; }

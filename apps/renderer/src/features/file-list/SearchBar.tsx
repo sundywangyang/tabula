@@ -8,6 +8,7 @@
  * - 显式 × 按钮清空
  */
 import { useEffect, useRef } from 'react';
+import { Search, X } from 'lucide-react';
 import { useFileStore } from '../../stores/file-store';
 import './SearchBar.css';
 
@@ -32,7 +33,7 @@ export function SearchBar({ paneId }: { paneId: string }) {
 
   return (
     <div className="search-bar">
-      <span className="search-bar-icon">🔍</span>
+      <span className="search-bar-icon"><Search size={14} /></span>
       <input
         ref={inputRef}
         className="search-bar-input"
@@ -64,7 +65,7 @@ export function SearchBar({ paneId }: { paneId: string }) {
           onClick={() => setQuery(paneId, '')}
           title="清空"
         >
-          ✕
+          <X size={12} />
         </button>
       )}
       <span className="search-bar-hint">Esc 清空/关闭</span>

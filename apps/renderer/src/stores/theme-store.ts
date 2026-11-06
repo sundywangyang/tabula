@@ -23,9 +23,11 @@ import { create } from 'zustand';
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type EffectiveTheme = 'light' | 'dark';
 
+export const DEFAULT_ACCENT_COLOR = '#007aff';
+
 const ACCENT_PRESETS: { name: string; value: string }[] = [
   { name: '靛蓝', value: '#6366f1' },
-  { name: '蓝色', value: '#3b82f6' },
+  { name: '蓝色', value: DEFAULT_ACCENT_COLOR },
   { name: '紫色', value: '#a855f7' },
   { name: '粉色', value: '#ec4899' },
   { name: '橙色', value: '#f97316' },
@@ -59,27 +61,52 @@ function applyTheme(effective: EffectiveTheme, accent: string): void {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', effective);
   document.documentElement.style.setProperty('--accent', accent);
+  document.documentElement.style.setProperty('--accent-contrast', accentContrast(accent));
+  const selection = selectionBackground(accent);
+  document.documentElement.style.setProperty('--selection-bg', selection);
+  document.documentElement.style.setProperty('--selection-fg', accentContrast(selection));
+}
+
+/** 选中态略深于重点色,让默认 Finder 蓝可搭配清晰的白色文字。 */
+function selectionBackground(accent: string): string {
+  const hex = /^#([\da-f]{6})$/i.exec(accent)?.[1];
+  if (!hex) return accent;
+  return `#${[0, 2, 4].map((offset) =>
+    Math.round(parseInt(hex.slice(offset, offset + 2), 16) * 0.9).toString(16).padStart(2, '0'),
+  ).join('')}`;
+}
+
+/** 选择与用户重点色对比度更高的黑色或白色前景。 */
+function accentContrast(accent: string): '#000000' | '#ffffff' {
+  const hex = accent.replace(/^#/, '');
+  if (!/^[\da-f]{6}$/i.test(hex)) return '#ffffff';
+  const linear = [0, 2, 4].map((offset) => {
+    const channel = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = linear[0]! * 0.2126 + linear[1]! * 0.7152 + linear[2]! * 0.0722;
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#ffffff';
 }
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
   mode: 'system',
-  effective: 'dark',
-  accentColor: '#6366f1',
+  effective: resolveSystem(),
+  accentColor: DEFAULT_ACCENT_COLOR,
   hydrated: false,
 
   hydrate: async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cfg = await (window.tabula.config.all as any)();
-      const mode = (cfg.theme as ThemeMode) ?? 'system';
-      const accent = (cfg.accentColor as string) ?? '#6366f1';
+      const cfg = await window.tabula.config.all();
+      const mode = cfg.theme === 'light' || cfg.theme === 'dark' ? cfg.theme : 'system';
+      const accent = cfg.accentColor ?? DEFAULT_ACCENT_COLOR;
       const eff = effectiveFor(mode);
       set({ mode, accentColor: accent, effective: eff, hydrated: true });
       applyTheme(eff, accent);
     } catch (e) {
       console.warn('[theme-store] hydrate failed', e);
-      set({ hydrated: true });
-      applyTheme('dark', '#6366f1');
+      const effective = resolveSystem();
+      set({ mode: 'system', effective, accentColor: DEFAULT_ACCENT_COLOR, hydrated: true });
+      applyTheme(effective, DEFAULT_ACCENT_COLOR);
     }
   },
 

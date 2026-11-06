@@ -50,6 +50,8 @@ export function handleNativeCloseTabCommand(): void {
 /** Capture before component handlers, so a key executes exactly one command. */
 export function handleShortcutKeyDown(event: KeyboardEvent): void {
   if (event.defaultPrevented || event.isComposing) return;
+  // Portal menus own navigation and Escape; never dispatch file commands behind them.
+  if (event.target instanceof Element && event.target.closest('[role="menu"]')) return;
   // The open context menu owns Escape; let its handler close it without clearing selection.
   if (event.key === 'Escape' && document.querySelector('.context-menu')) return;
   if (isShortcutModalOpen()) return;

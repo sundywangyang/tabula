@@ -50,12 +50,12 @@ export function InputDialog({
 
   return (
     <div
-      className="input-dialog-overlay"
+      className="ui-overlay input-dialog-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="input-dialog" role="dialog" aria-modal="true">
+      <div className="ui-surface input-dialog" role="dialog" aria-modal="true">
         <div className="input-dialog-title">{title}</div>
         <input
           ref={inputRef}
@@ -77,11 +77,11 @@ export function InputDialog({
         />
         {warning && <div className="input-dialog-warning">{warning}</div>}
         <div className="input-dialog-actions">
-          <button className="input-dialog-btn" onClick={onCancel}>
+          <button className="ui-control-button input-dialog-btn" onClick={onCancel}>
             {cancelLabel}
           </button>
           <button
-            className="input-dialog-btn input-dialog-btn-primary"
+            className="ui-control-button input-dialog-btn input-dialog-btn-primary"
             disabled={!value.trim()}
             onClick={() => value.trim() && onSubmit(value)}
           >

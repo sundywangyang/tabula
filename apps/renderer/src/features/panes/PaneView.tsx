@@ -3,9 +3,9 @@
  *
  * 结构:
  * - TabBar(一条 tab chips)
- * - PaneContent(包 Toolbar + Breadcrumb + FileList)
+ * - Toolbar / SearchBar / FileList / 底部 Breadcrumb
  *
- * 焦点 pane 视觉上有 accent 边框。
+ * 焦点 pane 通过选中态和标签前景区分。
  * activeTab.path 变化会触发 file-store.loadDir(用 useEffect 监听)。
  *
  * P2 v2: 拖动 tab 到 pane 边缘 = 「拖出新建窗口」。
@@ -14,6 +14,7 @@
  *  - drop → 调 window.tabula.windows.openWithTab + 从源 pane 移除 tab
  */
 import { useEffect, useRef, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { FolderOpen } from 'lucide-react';
 import type { FsEntry, LayoutNode, Tab } from '@tabula/bridge';
 import { Breadcrumb } from '../../components/Breadcrumb';
 import { Toolbar } from '../../components/Toolbar';
@@ -234,16 +235,6 @@ export function PaneView({
 
       {!isTrash && (
         <>
-          <div className="pane-toolbar" data-no-context-menu onContextMenu={blockContextMenu}>
-            <Breadcrumb
-              segments={breadcrumb}
-              onNavigate={(p) => {
-                if (activeTab) replaceTabPath(paneId, activeTab.id, p);
-                else void loadDir(paneId, p);
-              }}
-              onOpenPicker={handleOpen}
-            />
-          </div>
           <Toolbar paneId={paneId} />
           <SearchBar paneId={paneId} />
         </>
@@ -253,7 +244,7 @@ export function PaneView({
         {/* 空窗格(无 tabs):显示引导提示 */}
         {pane.activeTabId === null ? (
           <div className="pane-empty-state">
-            <div className="pane-empty-icon">📂</div>
+            <div className="pane-empty-icon"><FolderOpen size={44} strokeWidth={1.25} /></div>
             <div className="pane-empty-title">暂无打开的文件夹</div>
             <div className="pane-empty-hint">双击任意文件夹或在地址栏输入路径开始浏览</div>
           </div>
@@ -276,6 +267,15 @@ export function PaneView({
           </>
         )}
       </div>
+
+      {!isTrash && (
+        <div className="pane-pathbar" data-no-context-menu onContextMenu={blockContextMenu}>
+          <Breadcrumb segments={breadcrumb} onNavigate={(p) => {
+            if (activeTab) replaceTabPath(paneId, activeTab.id, p);
+            else void loadDir(paneId, p);
+          }} onOpenPicker={handleOpen} />
+        </div>
+      )}
 
       {/* P2 v2: 拖出新建窗口的虚线占位 */}
       {showRightZone && (

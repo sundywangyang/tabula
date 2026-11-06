@@ -12,11 +12,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import type { FsEntry } from '@tabula/bridge';
+import { FolderOpen, TriangleAlert } from 'lucide-react';
 import { useFileStore } from '../../stores/file-store';
 import { parentPath as parentOf, sameFilePath } from '../../stores/file/paths';
 import { DetailsView } from './views/DetailsView';
@@ -27,7 +29,14 @@ import { useLayoutStore } from '../../stores/layout-store';
 import { loadTagsForPath, subscribeTagsCache } from '../../components/context-menu/tags';
 import { useFileListPerfReport } from '../../perf/use-file-list-perf';
 import './FileList.css';
-import { buildViewRows, entriesInBox, gridColumnCount } from './view-layout';
+import { buildViewRows, entriesInBox, FILE_VIEW_METRICS, gridColumnCount, gridRowHeight } from './view-layout';
+
+const FILE_VIEW_STYLE = {
+  '--file-row-h': `${FILE_VIEW_METRICS.rowHeight}px`,
+  '--file-group-h': `${FILE_VIEW_METRICS.groupHeaderHeight}px`,
+  '--grid-padding-inline': `${FILE_VIEW_METRICS.gridInlinePadding}px`,
+  '--grid-column-gap': `${FILE_VIEW_METRICS.gridColumnGap}px`,
+} as CSSProperties;
 
 interface Props {
   paneId: string;
@@ -322,9 +331,9 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       if (path === 'PageUp' || path === 'PageDown') {
         e.preventDefault();
         const dir = path === 'PageDown' ? 1 : -1;
-        const rowH = viewMode === 'grid' ? 110 : 28;
-        const visible = Math.max(1, Math.floor((containerRef.current?.clientHeight ?? 400) / rowH) - 1);
-        const step = viewMode === 'grid' ? dir * gridCols : dir * visible;
+        const rowH = viewMode === 'grid' ? gridRowHeight(thumbnailSize) : FILE_VIEW_METRICS.rowHeight;
+        const visible = Math.max(1, Math.floor((bodyRef.current?.clientHeight || containerRef.current?.clientHeight || 400) / rowH) - 1);
+        const step = dir * visible * (viewMode === 'grid' ? gridCols : 1);
         moveCursor(paneId, step, visible);
         return;
       }
@@ -363,6 +372,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       cursorToEdge,
       viewMode,
       gridCols,
+      thumbnailSize,
       moveCursor,
       currentPath,
       loadDir,
@@ -424,7 +434,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
       const viewport = bodyRef.current;
       if (!viewport) return [];
       const rect = viewport.getBoundingClientRect();
-      return entriesInBox(buildViewRows(list, groupBy, viewMode === 'grid' ? gridCols : 1, viewMode === 'grid' ? thumbnailSize + 48 : 28), {
+      return entriesInBox(buildViewRows(list, groupBy, viewMode === 'grid' ? gridCols : 1, viewMode === 'grid' ? gridRowHeight(thumbnailSize) : FILE_VIEW_METRICS.rowHeight), {
         left: Math.min(band.startX, band.curX) - rect.left + viewport.scrollLeft,
         right: Math.max(band.startX, band.curX) - rect.left + viewport.scrollLeft,
         top: Math.min(band.startY, band.curY) - rect.top + viewport.scrollTop,
@@ -538,7 +548,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
   if (error) {
     return (
       <div className="file-list-error">
-        <div className="error-icon">⚠</div>
+        <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
         <div className="error-message">{error}</div>
       </div>
     );
@@ -557,6 +567,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     return (
       <div
         className={`file-list file-list-${viewMode} file-list-empty-wrap ${dragState ? 'file-list-dropping' : ''}`}
+        style={FILE_VIEW_STYLE}
         ref={containerRef}
         tabIndex={0}
         onKeyDown={handleKeyDown}
@@ -566,7 +577,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
         onDrop={handleContainerDrop}
       >
         <div className="file-list-empty">
-          <div className="empty-icon">📂</div>
+          <div className="empty-icon"><FolderOpen size={42} strokeWidth={1.25} aria-hidden="true" /></div>
           <div>{showHidden ? '此目录为空' : '此目录为空(隐藏文件已隐藏)'}</div>
         </div>
       </div>
@@ -586,6 +597,7 @@ export function FileList({ paneId, onOpenEntry }: Props) {
     <div
       ref={containerRef}
       className={`file-list file-list-${viewMode} ${dropClass}`}
+      style={FILE_VIEW_STYLE}
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onMouseOverCapture={prepareDragIcon}

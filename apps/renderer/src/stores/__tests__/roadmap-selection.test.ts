@@ -15,8 +15,11 @@ describe('grouped selection and type filtering', () => {
   });
   it('rubber-band includes group headers in geometry while selecting files only', () => {
     const rows = buildViewRows([entries[0], entries[2]], 'type');
+    expect(rows.map(row => [row.top, row.height])).toEqual([[0, 28], [28, 32], [60, 32]]);
     expect(entriesInBox(rows, { left: 10, right: 500, top: 36, bottom: 100 }, 600)).toEqual([entries[0].path, entries[2].path]);
     expect(entriesInBox(rows, { left: 0, right: 600, top: 0, bottom: 28 }, 600)).toEqual([]);
+    expect(entriesInBox(rows, { left: 0, right: 600, top: 59, bottom: 60 }, 600)).toEqual([entries[0].path]);
+    expect(entriesInBox(rows, { left: 0, right: 600, top: 60, bottom: 61 }, 600)).toEqual([entries[2].path]);
   });
   it('grid layout and hit testing follow thumbnail sizes and group boundaries', () => {
     const rows = buildViewRows(entries, 'type', 3, 176);

@@ -4,14 +4,15 @@
  * 单一实现,TitleBar / StatusBar 都用。
  * 点击展开下拉,3 个模式 + 6 个 accent preset。
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Sun, Moon, Monitor, Check } from 'lucide-react';
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from '../stores/theme-store';
 import './ThemeToggle.css';
 
-const MODE_OPTIONS: { value: ThemeMode; label: string; icon: string }[] = [
-  { value: 'light', label: '浅色', icon: '☀' },
-  { value: 'dark', label: '深色', icon: '☾' },
-  { value: 'system', label: '跟随系统', icon: '◐' },
+const MODE_OPTIONS: { value: ThemeMode; label: string; icon: ReactNode }[] = [
+  { value: 'light', label: '浅色', icon: <Sun size={14} /> },
+  { value: 'dark', label: '深色', icon: <Moon size={14} /> },
+  { value: 'system', label: '跟随系统', icon: <Monitor size={14} /> },
 ];
 
 export function ThemeToggle({ compact = false }: { compact?: boolean }) {
@@ -40,7 +41,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
     };
   }, [open]);
 
-  const modeIcon = mode === 'system' ? '◐' : effective === 'dark' ? '☾' : '☀';
+  const modeIcon = mode === 'system' ? <Monitor size={13} /> : effective === 'dark' ? <Moon size={13} /> : <Sun size={13} />;
   const modeLabel = MODE_OPTIONS.find((m) => m.value === mode)?.label ?? mode;
 
   return (
@@ -70,7 +71,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
             >
               <span className="theme-option-icon">{opt.icon}</span>
               <span className="theme-option-label">{opt.label}</span>
-              {mode === opt.value && <span className="theme-option-check">✓</span>}
+              {mode === opt.value && <span className="theme-option-check"><Check size={13} /></span>}
             </button>
           ))}
           <div className="theme-section-title">重点色</div>

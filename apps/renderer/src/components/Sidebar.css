@@ -9,7 +9,7 @@
   flex-shrink: 0;
   overflow-y: auto;
   padding: 14px 10px;
-  gap: 16px;
+  gap: 20px;
 }
 
 /* 毛玻璃不支持时降级到纯色 */
@@ -71,7 +71,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
+  min-height: 34px;
   padding: 7px 10px;
   border-radius: var(--radius-sm);
   color: var(--fg-secondary);
@@ -87,21 +87,12 @@
 }
 
 .sidebar-item.active {
-  background: var(--accent-soft);
-  color: var(--fg-primary);
+  background: var(--selection-bg);
+  color: var(--selection-fg);
   font-weight: 600;
 }
 
-.sidebar-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--accent);
-}
+.sidebar-item.active::before { display: none; }
 
 .sidebar-item.active .sidebar-icon {
   color: var(--accent);
@@ -219,8 +210,8 @@
 }
 
 .sidebar-ctxmenu-item:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--selection-bg);
+  color: var(--selection-fg);
 }
 
 .sidebar-ctxmenu-item.danger {
@@ -237,7 +228,7 @@
   padding: 1px 7px;
   border-radius: 10px;
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   font-size: 10px;
   line-height: 1.4;
   min-width: 16px;
@@ -274,7 +265,7 @@
 
 .sidebar-remove-btn:hover {
   background: var(--danger);
-  color: white;
+  color: var(--danger-contrast);
 }
 
 /* 折叠按钮 */
@@ -313,3 +304,8 @@
 .sidebar-chevron.collapsed {
   transform: rotate(0deg);
 }
+
+.sidebar-item.active .sidebar-icon, .sidebar-item.active .sidebar-meta { color: inherit; }
+.sidebar-icon { color: var(--accent); }
+
+.sidebar-item.active .sidebar-remove-btn { color: inherit; }

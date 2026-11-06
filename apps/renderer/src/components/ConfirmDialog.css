@@ -2,20 +2,16 @@
 .confirm-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 7000;
-  backdrop-filter: blur(2px);
 }
 
 .confirm-dialog {
   width: min(420px, 90vw);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -77,7 +73,7 @@
 
 .confirm-btn-primary {
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   border-color: var(--accent);
 }
 .confirm-btn-primary:hover {
@@ -87,10 +83,10 @@
 
 .confirm-btn-danger {
   background: var(--danger);
-  color: white;
+  color: var(--danger-contrast);
   border-color: var(--danger);
 }
 .confirm-btn-danger:hover {
-  background: #dc2626;
-  border-color: #dc2626;
+  background: color-mix(in srgb, var(--danger) 88%, var(--fg-primary));
+  border-color: color-mix(in srgb, var(--danger) 88%, var(--fg-primary));
 }

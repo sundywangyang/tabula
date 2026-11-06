@@ -19,7 +19,7 @@ describe('settings-store', () => {
  it('默认值符合预期', () => {
  const s = useSettingsStore.getState();
  expect(s.theme).toBe('system');
- expect(s.accentColor).toBe('#6366f1');
+ expect(s.accentColor).toBe('#007aff');
  expect(s.showHidden).toBe(false);
  expect(s.showExtensions).toBe(true);
  expect(s.sortBy).toBe('name');
@@ -35,7 +35,7 @@ describe('settings-store', () => {
 
  const s = useSettingsStore.getState();
  expect(s.theme).toBe('system');
- expect(s.accentColor).toBe('#6366f1');
+ expect(s.accentColor).toBe('#007aff');
  expect(s.showHidden).toBe(false);
  expect(s.showExtensions).toBe(true);
  expect(s.sortBy).toBe('name');

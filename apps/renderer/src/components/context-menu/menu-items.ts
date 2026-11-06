@@ -1,4 +1,11 @@
 import type { FsEntry } from '@tabula/bridge';
+import { createElement } from 'react';
+import {
+  Archive, ArrowRightLeft, Calculator, ChartNoAxesCombined, ClipboardPaste,
+  Copy, ExternalLink, FilePenLine, Files, FileText, Folder, FolderOpen,
+  Hash, Info, Link2, LockKeyhole, LockKeyholeOpen, PackageOpen, PanelsTopLeft,
+  Pencil, RefreshCw, Scissors, Send, Star, Tags, Trash2, X, Zap, type LucideIcon,
+} from 'lucide-react';
 import type { MenuItem } from './types';
 import { useFileStore, makeFolderTab } from '../../stores/file-store';
 import { useFavoritesStore } from '../../stores/favorites-store';
@@ -7,6 +14,10 @@ import { isReadOnly } from '../../utils/permissions';
 import { getCachedReadonly, resolveLockMenuLabel, setCachedReadonly } from '../readonly-cache';
 import { getCachedTags, addTagForPath, removeTagForPath } from './tags';
 import { hideGlobalMenu } from './state';
+
+function menuIcon(Icon: LucideIcon) {
+  return createElement(Icon, { size: 15, strokeWidth: 1.75, 'aria-hidden': true });
+}
 
 /** G008: 5 个颜色预设 (红/橙/黄/绿/蓝) — 每个加一个带 emoji 的彩色标签 */
 const TAG_COLOR_PRESETS: ReadonlyArray<{ color: string; emoji: string; label: string; tag: string; }> = [
@@ -34,7 +45,7 @@ export function buildMenuItems(args: {
     const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
     items.push({
       label: '粘贴',
-      icon: '📄',
+      icon: menuIcon(ClipboardPaste),
       shortcut: 'Ctrl+V',
       disabled: !hasClipboard,
       action: () => { void actions.pasteToPane(paneId); hideGlobalMenu(); },
@@ -42,7 +53,7 @@ export function buildMenuItems(args: {
     items.push({ label: '', divider: true });
     items.push({
       label: '新建文件夹',
-      icon: '📁',
+      icon: menuIcon(Folder),
       shortcut: 'Ctrl+N',
       action: () => {
         window.dispatchEvent(new CustomEvent('tabula:new-folder', { detail: { paneId } }));
@@ -51,7 +62,7 @@ export function buildMenuItems(args: {
     });
     items.push({
       label: '新建文件',
-      icon: '📄',
+      icon: menuIcon(FileText),
       action: () => {
         window.dispatchEvent(new CustomEvent('tabula:new-file', { detail: { paneId } }));
         hideGlobalMenu();
@@ -60,14 +71,14 @@ export function buildMenuItems(args: {
     items.push({ label: '', divider: true });
     items.push({
       label: '刷新',
-      icon: '⟳',
+      icon: menuIcon(RefreshCw),
       shortcut: 'F5',
       action: () => { void actions.loadDir(paneId, currentPath); hideGlobalMenu(); },
     });
     // G002: 空右键菜单也提供反选
     items.push({
       label: '反选',
-      icon: '⇄',
+      icon: menuIcon(ArrowRightLeft),
       shortcut: 'Ctrl+Shift+I',
       action: () => { actions.selectInvert(paneId); hideGlobalMenu(); },
     });
@@ -77,7 +88,7 @@ export function buildMenuItems(args: {
     // 1. 打开 (顶层,最常用)
     items.push({
       label: '打开',
-      icon: '📂',
+      icon: menuIcon(FolderOpen),
       action: () => {
         if (targetEntry) {
           if (targetEntry.isDirectory) {
@@ -93,25 +104,25 @@ export function buildMenuItems(args: {
     // 2. 文件操作 (二级: 复制/剪切/粘贴)
     items.push({
       label: '文件操作',
-      icon: '📁',
+      icon: menuIcon(Folder),
       submenu: [
         {
           label: '复制',
-          icon: '📋',
+          icon: menuIcon(Copy),
           shortcut: 'Ctrl+C',
           disabled: !hasSelection,
           action: () => { actions.copySelected(paneId); hideGlobalMenu(); },
         },
         {
           label: '剪切',
-          icon: '✂',
+          icon: menuIcon(Scissors),
           shortcut: 'Ctrl+X',
           disabled: !hasSelection,
           action: () => { actions.cutSelected(paneId); hideGlobalMenu(); },
         },
         {
           label: '粘贴',
-          icon: '📄',
+          icon: menuIcon(ClipboardPaste),
           shortcut: 'Ctrl+V',
           disabled: !clipboard || clipboard.paths.length === 0,
           action: () => { void actions.pasteToPane(paneId); hideGlobalMenu(); },
@@ -125,7 +136,7 @@ export function buildMenuItems(args: {
       if (targetEntry?.isDirectory) {
         openSubmenu.push({
           label: '在新标签页打开',
-          icon: '🏷',
+          icon: menuIcon(Tags),
           action: () => {
             if (targetEntry) {
               const newTab = makeFolderTab(targetEntry.path, targetEntry.name);
@@ -136,7 +147,7 @@ export function buildMenuItems(args: {
         });
         openSubmenu.push({
           label: '在新窗口中打开',
-          icon: '🪟',
+          icon: menuIcon(PanelsTopLeft),
           action: () => {
             if (targetEntry) {
               void window.tabula.windows.open(targetEntry.path);
@@ -148,7 +159,7 @@ export function buildMenuItems(args: {
       if (targetEntry) {
         openSubmenu.push({
           label: '在文件资源管理器中打开',
-          icon: '📁',
+          icon: menuIcon(Folder),
           action: () => {
             if (targetEntry) {
               void window.tabula.fs.showInFolder(targetEntry.path);
@@ -160,7 +171,7 @@ export function buildMenuItems(args: {
       if (targetEntry && !targetEntry.isDirectory) {
         openSubmenu.push({
           label: '打开方式...',
-          icon: '⚡',
+          icon: menuIcon(Zap),
           action: () => {
             if (targetEntry) {
               void window.tabula.fs.openWithDialog(targetEntry.path);
@@ -172,7 +183,7 @@ export function buildMenuItems(args: {
       if (openSubmenu.length > 0) {
         items.push({
           label: '打开方式',
-          icon: '↗',
+          icon: menuIcon(ExternalLink),
           submenu: openSubmenu,
         });
       }
@@ -184,7 +195,7 @@ export function buildMenuItems(args: {
 
       editSubmenu.push({
         label: '重命名',
-        icon: '✏',
+        icon: menuIcon(Pencil),
         shortcut: 'F2',
         disabled: selectedPaths.size !== 1 && !targetEntry,
         action: () => {
@@ -198,7 +209,7 @@ export function buildMenuItems(args: {
       if (selectedPaths.size >= 2) {
         editSubmenu.push({
           label: '批量重命名',
-          icon: '📝',
+          icon: menuIcon(FilePenLine),
           action: () => {
             void import('../../command-dispatcher').then((m) =>
               m.runCommandById('file.batch-rename'),
@@ -210,7 +221,7 @@ export function buildMenuItems(args: {
 
       editSubmenu.push({
         label: '复制路径',
-        icon: '🔗',
+        icon: menuIcon(Link2),
         disabled: !hasSelection && !targetEntry,
         action: async () => {
           const paths: string[] = [];
@@ -229,7 +240,7 @@ export function buildMenuItems(args: {
 
       editSubmenu.push({
         label: '复制到当前位置',
-        icon: '📑',
+        icon: menuIcon(Files),
         shortcut: 'Ctrl+D',
         disabled: selectedPaths.size !== 1 && !targetEntry,
         action: () => {
@@ -249,7 +260,7 @@ export function buildMenuItems(args: {
 
       editSubmenu.push({
         label: '发送到...',
-        icon: '📨',
+        icon: menuIcon(Send),
         disabled: !hasSelection && !targetEntry,
         action: async () => {
           const srcPath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
@@ -274,7 +285,7 @@ export function buildMenuItems(args: {
       if (targetEntry) {
         editSubmenu.push({
           label: '添加到收藏夹',
-          icon: '★',
+          icon: menuIcon(Star),
           action: () => {
             if (targetEntry) {
               const pathToFav = targetEntry.isDirectory ? targetEntry.path : currentPath;
@@ -295,7 +306,7 @@ export function buildMenuItems(args: {
 
       items.push({
         label: '编辑',
-        icon: '✏',
+        icon: menuIcon(Pencil),
         submenu: editSubmenu,
       });
     }
@@ -307,7 +318,7 @@ export function buildMenuItems(args: {
       const tagSubmenu: MenuItem[] = [];
       tagSubmenu.push({
         label: '添加标签...',
-        icon: '🏷',
+        icon: menuIcon(Tags),
         action: () => {
           window.dispatchEvent(new CustomEvent('tabula:add-tag', { detail: { path: entryPath } }));
           hideGlobalMenu();
@@ -317,7 +328,7 @@ export function buildMenuItems(args: {
         const alreadyTagged = existingTags.includes(preset.tag);
         tagSubmenu.push({
           label: alreadyTagged ? `移除 ${preset.tag}` : `标记为 ${preset.label}`,
-          icon: alreadyTagged ? '✖' : preset.emoji,
+          icon: alreadyTagged ? menuIcon(X) : preset.emoji,
           action: () => {
             if (alreadyTagged) {
               void removeTagForPath(entryPath, preset.tag);
@@ -338,7 +349,7 @@ export function buildMenuItems(args: {
         for (const tag of nonPresetTags) {
           tagSubmenu.push({
             label: `移除 ${tag}`,
-            icon: '✖',
+            icon: menuIcon(X),
             action: () => {
               void removeTagForPath(entryPath, tag);
               actions.showToast(`已移除标签: ${tag}`, 'success', 1500);
@@ -349,7 +360,7 @@ export function buildMenuItems(args: {
       }
       items.push({
         label: '标签',
-        icon: '🏷',
+        icon: menuIcon(Tags),
         submenu: tagSubmenu,
       });
     }
@@ -359,7 +370,7 @@ export function buildMenuItems(args: {
       const archiveSubmenu: MenuItem[] = [];
       archiveSubmenu.push({
         label: '压缩为 ZIP…',
-        icon: '🗜',
+        icon: menuIcon(Archive),
         action: () => {
           if (selectedPaths.size > 0) {
             void useFileStore.getState().startCompress(Array.from(selectedPaths), paneId);
@@ -367,12 +378,12 @@ export function buildMenuItems(args: {
           hideGlobalMenu();
         },
       });
-      for (const format of ['tar', 'tgz'] as const) archiveSubmenu.push({ label: `压缩为 ${format.toUpperCase()}…`, icon: '🗜', action: () => { void useFileStore.getState().startCompress([...selectedPaths], paneId, format); hideGlobalMenu(); } });
+      for (const format of ['tar', 'tgz'] as const) archiveSubmenu.push({ label: `压缩为 ${format.toUpperCase()}…`, icon: menuIcon(Archive), action: () => { void useFileStore.getState().startCompress([...selectedPaths], paneId, format); hideGlobalMenu(); } });
       const hasZip = Array.from(selectedPaths).some((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
       if (hasZip && targetEntry && !targetEntry.isDirectory) {
         archiveSubmenu.push({
           label: '解压到…',
-          icon: '📦',
+          icon: menuIcon(PackageOpen),
           action: () => {
             const zipPath = Array.from(selectedPaths).find((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
             if (zipPath) {
@@ -385,7 +396,7 @@ export function buildMenuItems(args: {
         if (extractHereZipPath && currentPath) {
           archiveSubmenu.push({
             label: '解压到此处',
-            icon: '📂',
+            icon: menuIcon(FolderOpen),
             action: () => {
               void useFileStore.getState().startExtract(extractHereZipPath, currentPath, paneId);
               hideGlobalMenu();
@@ -395,7 +406,7 @@ export function buildMenuItems(args: {
       }
       items.push({
         label: '压缩/解压',
-        icon: '🗜',
+        icon: menuIcon(Archive),
         submenu: archiveSubmenu,
       });
     }
@@ -406,7 +417,7 @@ export function buildMenuItems(args: {
       if (targetEntry?.isDirectory) {
         computeSubmenu.push({
           label: '计算文件夹大小',
-          icon: '📊',
+          icon: menuIcon(ChartNoAxesCombined),
           action: () => {
             if (targetEntry) {
               const path = targetEntry.path;
@@ -445,7 +456,7 @@ export function buildMenuItems(args: {
       if (targetEntry && !targetEntry.isDirectory) {
         computeSubmenu.push({
           label: '计算 SHA-256',
-          icon: '#️⃣',
+          icon: menuIcon(Hash),
           action: () => {
             if (targetEntry) {
               const p = targetEntry.path;
@@ -472,7 +483,7 @@ export function buildMenuItems(args: {
       if (computeSubmenu.length > 0) {
         items.push({
           label: '计算',
-          icon: '🧮',
+          icon: menuIcon(Calculator),
           submenu: computeSubmenu,
         });
       }
@@ -483,7 +494,7 @@ export function buildMenuItems(args: {
     // 8. G002: 反选 — 与选择相关,留在顶层(高频)
     items.push({
       label: '反选',
-      icon: '⇄',
+      icon: menuIcon(ArrowRightLeft),
       shortcut: 'Ctrl+Shift+I',
       action: () => { actions.selectInvert(paneId); hideGlobalMenu(); },
     });
@@ -498,11 +509,11 @@ export function buildMenuItems(args: {
       }
       const firstPath = targetPaths[0];
       const cachedMode = firstPath ? getCachedReadonly(firstPath) : undefined;
-      const { label, icon } = resolveLockMenuLabel(cachedMode);
+      const { label } = resolveLockMenuLabel(cachedMode);
       const anyWritable = cachedMode === undefined ? true : !isReadOnly(cachedMode);
       items.push({
         label,
-        icon,
+        icon: menuIcon(anyWritable ? LockKeyhole : LockKeyholeOpen),
         disabled: targetPaths.length === 0,
         action: async () => {
           let succeeded = 0;
@@ -552,7 +563,7 @@ export function buildMenuItems(args: {
     // 10. 删除 (顶层,高频独立)
     items.push({
       label: '删除',
-      icon: '🗑',
+      icon: menuIcon(Trash2),
       shortcut: 'Delete',
       danger: true,
       disabled: !hasSelection,
@@ -575,7 +586,7 @@ export function buildMenuItems(args: {
       const singlePath = targetEntry?.path ?? (selectedPaths.size === 1 ? Array.from(selectedPaths)[0] : null);
       items.push({
         label: '创建快捷方式',
-        icon: '🔗',
+        icon: menuIcon(Link2),
         disabled: !singlePath,
         action: () => {
           if (singlePath) {
@@ -593,7 +604,7 @@ export function buildMenuItems(args: {
     // 12. 属性 (顶层,常驻)
     items.push({
       label: '属性',
-      icon: 'ℹ',
+      icon: menuIcon(Info),
       action: () => {
         if (targetEntry) {
           window.dispatchEvent(

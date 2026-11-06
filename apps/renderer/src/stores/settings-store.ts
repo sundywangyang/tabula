@@ -18,7 +18,7 @@
  */
 import { create } from 'zustand';
 import type { ThemeMode } from './theme-store';
-import { useThemeStore } from './theme-store';
+import { DEFAULT_ACCENT_COLOR, useThemeStore } from './theme-store';
 
 export type SortField = 'name' | 'size' | 'mtime' | 'type';
 export type SortDir = 'asc' | 'desc';
@@ -58,7 +58,7 @@ async function persist(key: string, value: unknown) {
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: 'system',
-  accentColor: '#6366f1',
+  accentColor: DEFAULT_ACCENT_COLOR,
   showHidden: false,
   showExtensions: true,
   sortBy: 'name',
@@ -72,7 +72,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cfg = await (window.tabula.config.all as any)();
       const theme = cfg.theme ?? 'system';
-      const accentColor = cfg.accentColor ?? '#6366f1';
+      const accentColor = cfg.accentColor ?? DEFAULT_ACCENT_COLOR;
       set({
         theme,
         accentColor,

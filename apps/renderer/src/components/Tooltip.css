@@ -28,7 +28,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
   /* 简单出现动画 */
   animation: tooltip-fade-in 0.12s ease-out;
 }

@@ -41,6 +41,7 @@ type ResolvedMap = Map<string, KeyCombo | null>;
 
 class KeymapManager {
   private store: Store<{ shortcutsV1: UserOverrides }> | null = null;
+  private memoryOverrides: UserOverrides | null = null;
   private resolved: ResolvedMap = new Map();
   private specById: Map<string, CommandSpec> = new Map();
 
@@ -50,14 +51,23 @@ class KeymapManager {
    */
   init(specs: CommandSpec[]): void {
     this.specById = new Map(specs.map((s) => [s.id, s]));
-    if (!this.store) {
-      this.store = new Store<{ shortcutsV1: UserOverrides }>({
-        name: 'tabula-config',
-        defaults: { shortcutsV1: {} },
-      });
+    if (this.memoryOverrides !== null) {
+      this.rebuild(this.memoryOverrides);
+      return;
     }
-    const overrides = this.store.get(PERSIST_KEY) ?? {};
-    this.rebuild(overrides);
+    try {
+      if (!this.store) {
+        this.store = new Store<{ shortcutsV1: UserOverrides }>({
+          name: 'tabula-config',
+          defaults: { shortcutsV1: {} },
+          clearInvalidConfig: false,
+        });
+      }
+      this.rebuild(this.store.get(PERSIST_KEY) ?? {});
+    } catch (error) {
+      this.useMemoryOverrides(error, {});
+      this.rebuild({});
+    }
   }
 
   /** 重新从用户覆盖构建 resolved map */
@@ -156,22 +166,40 @@ class KeymapManager {
 
   /** 重置所有用户覆盖 → 全部回到默认 */
   resetAll(): void {
+    if (this.memoryOverrides !== null) {
+      this.memoryOverrides = {};
+      this.rebuild({});
+      return;
+    }
     if (!this.store) return;
-    this.store.set(PERSIST_KEY, {});
+    try {
+      this.store.set(PERSIST_KEY, {});
+    } catch (error) {
+      this.useMemoryOverrides(error, {});
+    }
     this.rebuild({});
   }
 
   private applyAndPersist(commandId: string, combo: KeyCombo | null): void {
-    if (!this.store) return;
+    if (!this.store && this.memoryOverrides === null) return;
     this.resolved.set(commandId, combo);
-    // 读取现有覆盖,更新一条
-    const overrides = this.store.get(PERSIST_KEY) ?? {};
-    if (combo === null) {
-      overrides[commandId] = null;
-    } else {
-      overrides[commandId] = comboToString(combo);
+    try {
+      const overrides = this.memoryOverrides ?? this.store!.get(PERSIST_KEY) ?? {};
+      overrides[commandId] = combo === null ? null : comboToString(combo);
+      if (this.memoryOverrides !== null) this.memoryOverrides = overrides;
+      else this.store!.set(PERSIST_KEY, overrides);
+    } catch (error) {
+      const overrides = Object.fromEntries(Array.from(this.resolved, ([id, binding]) =>
+        [id, binding === null ? null : comboToString(binding)],
+      ));
+      this.useMemoryOverrides(error, overrides);
     }
-    this.store.set(PERSIST_KEY, overrides);
+  }
+
+  private useMemoryOverrides(error: unknown, overrides: UserOverrides): void {
+    this.store = null;
+    this.memoryOverrides = overrides;
+    console.warn('[keymap] configuration unavailable; keeping shortcuts in memory for this run, original file preserved', error);
   }
 }
 

@@ -1,14 +1,14 @@
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import type { FsEntry } from '@tabula/bridge';
 import type { GroupByMode } from '../../../stores/file/types';
-import { groupEntries } from '../../../stores/file/view-selectors';
+import { buildViewRows } from '../view-layout';
 
 // =================== 详情视图 ===================
 
 /** G007: 视图内一行可能是 header 或 entry */
 export type ViewRow =
-  | { kind: 'header'; key: string; header: string; }
-  | { kind: 'entry'; key: string; entry: FsEntry; };
+  | { kind: 'header'; key: string; header: string; height: number; }
+  | { kind: 'entry'; key: string; entry: FsEntry; height: number; };
 
 export interface FileViewProps {
   entries: FsEntry[];
@@ -38,11 +38,10 @@ export interface FileViewProps {
 }
 
 export function buildGroupedRows(entries: FsEntry[], groupBy: GroupByMode): ViewRow[] {
-  const sections = groupEntries(entries, groupBy);
   const out: ViewRow[] = [];
-  for (const sec of sections) {
-    if (sec.header) out.push({ kind: 'header', key: `h:${sec.header}`, header: sec.header });
-    for (const e of sec.entries) out.push({ kind: 'entry', key: `e:${e.path}`, entry: e });
+  for (const row of buildViewRows(entries, groupBy)) {
+    if (row.header) out.push({ kind: 'header', key: `h:${row.header}`, header: row.header, height: row.height });
+    for (const entry of row.entries) out.push({ kind: 'entry', key: `e:${entry.path}`, entry, height: row.height });
   }
   return out;
 }

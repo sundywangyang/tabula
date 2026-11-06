@@ -1,16 +1,8 @@
-/**
- * 标题栏 (macOS 风格)
- *
- * 渲染内容已最小化: drag region (始终) + Win/Linux 平台窗口控制按钮。
- * logo / version / sidebar toggle / settings / DevTools 全部在 StatusBar。
- *
- * macOS: traffic lights (红/黄/绿) 系统自动渲染在窗口最左侧,
- *   3 个按钮总宽约 52px, 加 8px 边距 + 安全间距 = 80px, 给 traffic lights 留 80px 左边距。
- */
+/* Draggable app chrome; native macOS controls keep their reserved inset. */
 
 .title-bar {
   height: var(--titlebar-h);
-  background: var(--bg-elevated);
+  background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: stretch;
@@ -76,3 +68,10 @@
   background: var(--bg-hover);
   color: var(--fg-primary);
 }
+
+.title-bar-drag { gap: 16px; min-width: 0; }
+.title-bar-action { width: 30px; height: 28px; align-self: center; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--fg-secondary); flex-shrink: 0; }
+.title-bar-action:hover { background: var(--bg-hover); color: var(--fg-primary); }
+.title-bar-settings { margin: 0 12px 0 auto; }
+.title-bar-brand { display: inline-flex; align-items: center; gap: 7px; color: var(--fg-secondary); font-size: 12px; font-weight: 600; }
+.title-bar-window-controls { margin-left: 0; }

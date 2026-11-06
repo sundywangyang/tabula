@@ -6,6 +6,7 @@
  * 支持文件类型过滤和分页。
  */
 import { useEffect, useMemo, useRef } from 'react';
+import { Search, Folder, File } from 'lucide-react';
 import { useFileStore, type FileTypeFilter } from '../../stores/file-store';
 import { useLayoutStore } from '../../stores/layout-store';
 import { getCachedRootPath } from '../../platform-cache';
@@ -128,16 +129,16 @@ export function GlobalSearch() {
 
   return (
     <div
-      className="gs-overlay"
+      className="ui-overlay gs-overlay"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="gs-panel">
+      <div className="ui-surface gs-panel">
         <div className="gs-header">
-          <span className="gs-icon">🔍</span>
+          <span className="gs-icon"><Search size={20} strokeWidth={1.6} /></span>
           <input
             ref={inputRef}
             className="gs-input"
@@ -220,8 +221,8 @@ export function GlobalSearch() {
               onMouseEnter={() => setSelected(gs.page * gs.pageSize + i)}
               onClick={() => handleSelect(i)}
             >
-              <span className="gs-row-icon">{hit.isDirectory ? '📁' : '📄'}</span>
-              <button aria-label={`定位 ${hit.name}`} onClick={event => { event.stopPropagation(); void useFileStore.getState().revealInPane(activePaneId, hit.path).then(close); }}>定位</button>
+              <span className="gs-row-icon">{hit.isDirectory ? <Folder size={17} /> : <File size={17} />}</span>
+              <button className="gs-reveal" aria-label={`定位 ${hit.name}`} onClick={event => { event.stopPropagation(); void useFileStore.getState().revealInPane(activePaneId, hit.path).then(close); }}>定位</button>
               <span className="gs-row-name" title={hit.name}>
                 <HighlightMatch name={hit.name} query={gs.query} />
               </span>
@@ -231,9 +232,6 @@ export function GlobalSearch() {
                 </span>
                 <span className="gs-row-info">
                   {hit.isDirectory ? '文件夹' : formatSize(hit.size)} · {formatDate(hit.mtime)}
-                  {hit.matchType && hit.matchType !== 'exact' && (
-                    <span className="gs-match-type"> ({hit.matchType})</span>
-                  )}
                 </span>
               </span>
             </div>

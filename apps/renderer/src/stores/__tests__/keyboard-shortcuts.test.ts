@@ -118,6 +118,29 @@ describe('configured keyboard dispatch', () => {
     expect(useFileStore.getState().panes.p.selectedPaths.size).toBe(0);
   });
 
+  it.each(['Escape', 'Enter', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'])('leaves %s to a portal menu without executing file operations', (key) => {
+    useKeymapStore.setState({ bindings: new Map([
+      ['file.open', combo('enter')],
+      ['file.copy', combo('arrowdown')],
+      ['file.delete', combo('arrowup')],
+      ['search.focus', combo('arrowleft')],
+      ['preview.toggle', combo('arrowright')],
+    ]) });
+    const menu = document.createElement('div'); menu.setAttribute('role', 'menu');
+    const menuItem = document.createElement('button'); menuItem.setAttribute('role', 'menuitem');
+    const label = document.createElement('span'); menuItem.append(label); menu.append(menuItem); target.append(menu);
+    const menuHandler = vi.fn(); menu.addEventListener('keydown', menuHandler);
+
+    expect(press(key, {}, label).defaultPrevented).toBe(false);
+    expect(menuHandler).toHaveBeenCalledOnce();
+    expect([...useFileStore.getState().panes.p.selectedPaths]).toEqual(['C:\\initial\\a.txt']);
+    expect(useFileStore.getState().clipboard).toBeNull();
+    expect(mock.fs.openPath).not.toHaveBeenCalled();
+    expect(useUiDialogsStore.getState().confirmDeleteOpen).toBe(false);
+    expect(useFileStore.getState().panes.p.searchOpen).toBe(false);
+    expect(useFileStore.getState().previewState).toBeNull();
+  });
+
   it('undo refreshes current directory data and reports failures', async () => {
     useKeymapStore.setState({ bindings: new Map([['file.undo', combo('z', { ctrl: true })]]) });
     mock.fs.undo.mockResolvedValueOnce({ ok: true, data: { id: '1', label: '复制', timestamp: 1 } });

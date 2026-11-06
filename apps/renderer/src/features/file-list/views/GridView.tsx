@@ -5,7 +5,7 @@ import { getCachedTags } from '../../../components/context-menu/tags';
 import { FileThumb } from './FileThumb';
 import { RenameInput } from './RenameInput';
 import { computeOverlayStyle, displayName, type FileViewProps } from './shared';
-import { buildViewRows } from '../view-layout';
+import { buildViewRows, gridRowHeight } from '../view-layout';
 
 // =================== 网格视图 ====================
 
@@ -33,7 +33,7 @@ export function GridView({
   rubberBand,
 }: FileViewProps & { thumbnailSize: number; cols: number; }) {
   const parentRef = useRef<HTMLDivElement | null>(null);
-  const rows = useMemo(() => buildViewRows(entries, groupBy, cols, thumbnailSize + 48), [entries, groupBy, cols, thumbnailSize]);
+  const rows = useMemo(() => buildViewRows(entries, groupBy, cols, gridRowHeight(thumbnailSize)), [entries, groupBy, cols, thumbnailSize]);
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,

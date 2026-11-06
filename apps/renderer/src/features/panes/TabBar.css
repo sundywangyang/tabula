@@ -13,10 +13,10 @@
   display: flex;
   align-items: stretch;
   height: var(--tabbar-h);
-  background: var(--bg-overlay);
+  background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  padding: 4px 6px 0;
+  padding: 3px 6px;
   gap: var(--tab-gap);
   overflow-x: auto;
   overflow-y: hidden;
@@ -37,7 +37,7 @@
   max-width: 160px;               /* 最大宽度, tab-bar-wrap 宽于 tab 总和时按 160 排 */
   width: var(--tab-w, 160px);     /* 期望宽度, 浏览器按 flex 实际算 */
   height: var(--tab-h);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--fg-secondary);
   background: transparent;
@@ -82,24 +82,14 @@
 }
 
 .tab-chip.tab-active {
-  background: var(--bg-elevated);
+  background: var(--bg-base);
   color: var(--fg-primary);
   border-color: var(--border);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
 }
 
 /* macOS-style 顶部 accent 高亮条 */
-.tab-chip.tab-active::before {
-  content: '';
-  position: absolute;
-  top: -5px;
-  left: 8px;
-  right: 8px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 0 0 2px 2px;
-  transition: background 0.15s;
-}
+.tab-chip.tab-active::before { display: none; }
 
 .tab-chip.tab-pinned .tab-icon {
   color: var(--accent);
@@ -128,9 +118,9 @@
 /* Step 1: Pointer Events 拖动中(active 状态由 TabBar.tsx 内联 style 控制) */
 .tab-chip.is-dragging-active {
   opacity: 0.5; /* 拖动时半透明 */
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--accent);
+  box-shadow: var(--shadow-lg);
   transition: none !important; /* 拖动中禁用 transition 避免延迟 */
-  background: var(--bg-elevated);
+  background: var(--bg-base);
   /* 拖动时尺寸减半: 180px → 90px */
   width: 90px !important;
   min-width: 90px !important;
@@ -168,8 +158,6 @@
   background: var(--accent);
   border-radius: 2px;
   z-index: 3;
-  box-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
-  animation: tabDropPulse 0.8s ease-in-out infinite alternate;
 }
 
 /* P2 v2: 插入指示线 — 在 chip 右侧 */
@@ -183,8 +171,6 @@
   background: var(--accent);
   border-radius: 2px;
   z-index: 3;
-  box-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
-  animation: tabDropPulse 0.8s ease-in-out infinite alternate;
 }
 
 @keyframes tabDropPulse {
@@ -396,14 +382,14 @@
   -webkit-backdrop-filter: var(--blur-md);
   backdrop-filter: var(--blur-md);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   padding: 4px;
   animation: tabCtxFadeIn 0.1s ease;
 }
 
 @supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
-  .tab-ctx-menu { background: var(--bg-overlay); border-color: var(--border-strong); }
+  .tab-ctx-menu { background: var(--bg-toolbar); border-color: var(--border-strong); }
 }
 
 @keyframes tabCtxFadeIn {

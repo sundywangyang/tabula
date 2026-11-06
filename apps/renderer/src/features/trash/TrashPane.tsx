@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TrashEntry } from '@tabula/bridge';
+import { ChevronDown, ChevronUp, File as FileIcon, Folder, RefreshCw, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 import { useFileStore } from '../../stores/file-store';
 import './TrashPane.css';
 
@@ -173,7 +174,7 @@ export function TrashPane({ paneId }: Props) {
     return (
       <div className="trash-pane" ref={containerRef} tabIndex={0}>
         <div className="trash-pane-error">
-          <div className="error-icon">⚠</div>
+          <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
           <div className="error-message">{trashError}</div>
           <button className="trash-retry-btn" onClick={() => void loadTrash()}>重试</button>
         </div>
@@ -185,10 +186,10 @@ export function TrashPane({ paneId }: Props) {
     <div className="trash-pane" ref={containerRef} tabIndex={0}>
       {/* 工具栏 */}
       <div className="trash-toolbar">
-        <span className="trash-title">🗑 回收站</span>
+        <span className="trash-title"><Trash2 size={16} aria-hidden="true" /> 回收站</span>
         <span className="trash-count">{trashItems.length} 项</span>
         <div className="trash-toolbar-actions">
-          <button className="trash-refresh-btn" onClick={() => void loadTrash()} title="刷新(F5)">⟳</button>
+          <button className="trash-refresh-btn" onClick={() => void loadTrash()} title="刷新(F5)" aria-label="刷新回收站"><RefreshCw size={15} aria-hidden="true" /></button>
           <button
             className="trash-empty-btn"
             onClick={() => setEmptyConfirm(true)}
@@ -211,7 +212,7 @@ export function TrashPane({ paneId }: Props) {
       {/* 列表 */}
       {sortedItems.length === 0 ? (
         <div className="trash-empty">
-          <div className="trash-empty-icon">🗑</div>
+          <div className="trash-empty-icon"><Trash2 size={42} strokeWidth={1.25} aria-hidden="true" /></div>
           <div>回收站为空</div>
         </div>
       ) : (
@@ -226,7 +227,7 @@ export function TrashPane({ paneId }: Props) {
               title={`原始路径: ${item.originalPath ?? '未知'}\n回收站路径: ${item.itemPath}`}
             >
               <div className="col col-name">
-                <span className="row-icon">{item.isDirectory ? '📁' : '📄'}</span>
+                <span className="row-icon">{item.isDirectory ? <Folder size={16} aria-hidden="true" /> : <FileIcon size={16} aria-hidden="true" />}</span>
                 <span className="row-name">{item.name}</span>
               </div>
               <div className="col col-size">{item.isDirectory ? '—' : formatSize(item.size)}</div>
@@ -250,13 +251,13 @@ export function TrashPane({ paneId }: Props) {
             className="sidebar-ctxmenu-item"
             onClick={() => handleRestore(ctxMenu.itemPath)}
           >
-            ↩ 恢复
+            <RotateCcw size={14} aria-hidden="true" /> 恢复
           </button>
           <button
             className="sidebar-ctxmenu-item danger"
             onClick={() => handlePermanentDelete(ctxMenu.itemPath)}
           >
-            🗑 永久删除
+            <Trash2 size={14} aria-hidden="true" /> 永久删除
           </button>
         </div>
       )}
@@ -265,7 +266,7 @@ export function TrashPane({ paneId }: Props) {
       {emptyConfirm && (
         <div className="confirm-overlay" onMouseDown={() => setEmptyConfirm(false)}>
           <div className="confirm-dialog" role="alertdialog" aria-modal="true">
-            <div className="confirm-title">⚠ 清空回收站</div>
+            <div className="confirm-title"><TriangleAlert size={16} aria-hidden="true" /> 清空回收站</div>
             <div className="confirm-message">
               确定要永久删除回收站中的全部 {trashItems.length} 项吗？<br />
               此操作不可恢复。
@@ -295,7 +296,7 @@ function SortTh({
   className: string;
 }) {
   const active = sortBy === field;
-  const arrow = active ? (sortDir === 'asc' ? '▲' : '▼') : '';
+  const SortIcon = sortDir === 'asc' ? ChevronUp : ChevronDown;
   return (
     <button
       type="button"
@@ -303,7 +304,7 @@ function SortTh({
       onClick={() => onSort(field)}
       title={`按${label}排序`}
     >
-      {label}{arrow && <span className="sort-arrow">{arrow}</span>}
+      {label}{active && <SortIcon size={12} className="sort-arrow" aria-hidden="true" />}
     </button>
   );
 }

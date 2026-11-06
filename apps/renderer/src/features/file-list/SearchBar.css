@@ -6,9 +6,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
+  height: 38px;
   padding: 0 10px;
-  background: var(--bg-overlay);
+  background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border);
   animation: search-bar-in 0.12s ease-out;
 }
@@ -73,3 +73,6 @@
   color: var(--fg-tertiary);
   flex-shrink: 0;
 }
+
+.search-bar { flex-shrink: 0; }
+@container pane (max-width: 420px) { .search-bar-hint { display: none; } }

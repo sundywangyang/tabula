@@ -1,242 +1,70 @@
+/** 窗格工具栏：按可用空间逐步将操作收进“更多”。 */
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
-  height: 32px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  position: relative;
-  /* 滚动相关全移到 .toolbar-scroll-container */
-}
-
-/* 横向滚动容器 —真正承载 overflow 的层 */
-.toolbar-scroll-container {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
+  gap: 10px;
+  height: 44px;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;          /* Firefox */
-  -ms-overflow-style: none;       /* IE/Edge 旧版 */
-  white-space: nowrap;
-}
-
-.toolbar-scroll-container::-webkit-scrollbar {
-  display: none;                  /* Chromium 系 */
-}
-
-/* 滚动提示渐变遮罩 */
-.toolbar-scroll-container.has-overflow-left::before,
-.toolbar-scroll-container.has-overflow-right::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 28px;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.toolbar-scroll-container.has-overflow-left::before {
-  left: 0;
-  background: linear-gradient(to right, var(--bg-elevated), transparent);
-}
-
-.toolbar-scroll-container.has-overflow-right::after {
-  right: 0;
-  background: linear-gradient(to left, var(--bg-elevated), transparent);
-}
-
-/* 左右滚动箭头按钮 */
-.toolbar-scroll-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 20;
-  width: 20px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  color: var(--fg-secondary);
-  font-size: 16px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  padding: 0 10px;
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  transition: background 0.1s, color 0.1s;
+  background: var(--bg-toolbar, var(--bg-elevated));
+  border-bottom: 1px solid var(--border);
 }
-
-.toolbar-scroll-btn:hover {
-  background: var(--bg-hover);
-  color: var(--fg-primary);
-}
-
-.toolbar-scroll-left {
-  left: 8px;
-}
-
-.toolbar-scroll-right {
-  right: 8px;
-}
-
-.toolbar-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
-  margin: 0 4px;
-  flex-shrink: 0;
-}
-
+.toolbar-group { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
 .toolbar-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 24px;
-  padding: 0 8px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--fg-secondary);
-  transition: background 0.1s, color 0.1s;
-  font-size: 11px;
-  flex-shrink: 0;
-  white-space: nowrap;
+  transition: background 140ms, color 140ms;
 }
-
-.toolbar-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
+.toolbar-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--fg-primary); }
+.toolbar-btn:disabled { opacity: .35; cursor: default; }
+.toolbar-btn.active { background: var(--bg-active); color: var(--fg-primary); }
+.toolbar-btn:focus-visible, .toolbar-location:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.toolbar-location {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 30px;
+  text-align: left;
   color: var(--fg-primary);
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.toolbar-btn.active {
-  background: var(--bg-active);
-  color: var(--accent);
-}
-
-.toolbar-new {
-  background: var(--bg-active);
-  color: var(--accent);
+  font-size: 13px;
   font-weight: 600;
-}
-
-.toolbar-new:hover {
-  background: var(--bg-active);
-  color: var(--accent);
-}
-
-.toolbar-fav.active {
-  color: var(--accent);
-}
-
-/* 前进/后退按钮 */
-.toolbar-nav {
-  padding: 0 6px;
-}
-
-.toolbar-nav.disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-/* 历史菜单下拉 */
-.toolbar-history-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 200;
-  min-width: 280px;
-  max-width: 480px;
-  max-height: 400px;
-  overflow-y: auto;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  padding: 4px 0;
 }
-
-.toolbar-history-item {
-  padding: 6px 12px;
-  font-size: 12px;
-  font-family: var(--font-mono);
-  color: var(--fg-primary);
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: background 0.1s;
+.toolbar-location svg { color: var(--fg-secondary); flex-shrink: 0; }
+.toolbar-location span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar-actions { margin-left: auto; gap: 5px; }
+.toolbar-view-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-active);
 }
-
-.toolbar-history-item:hover {
-  background: var(--bg-hover);
-  color: var(--accent);
+.toolbar-view-switch .toolbar-btn { height: 24px; width: 27px; border-radius: 4px; }
+.toolbar-view-switch .toolbar-btn.active { background: var(--bg-elevated); box-shadow: var(--shadow-sm); }
+.toolbar-create, .toolbar-arrange, .toolbar-search, .toolbar-split { display: inline-flex; }
+@container pane (max-width: 620px) {
+  .toolbar-view-switch, .toolbar-arrange { display: none; }
 }
-
-/* SVG 图标(裸渲染)— 大小由 lucide 的 size prop 控制(默认 16px) */
-.toolbar-btn svg {
-  flex-shrink: 0;
-  display: block;
+@container pane (max-width: 400px) {
+  .toolbar-create, .toolbar-split { display: none; }
 }
-
-.toolbar-icon-muted {
-  opacity: 0.4;
+@container pane (max-width: 260px) {
+  .toolbar-location, .toolbar-navigation { display: none; }
+  .toolbar-actions { margin-left: auto; }
 }
-
-.toolbar-label {
-  font-size: 11px;
-  letter-spacing: 0.2px;
+@container pane (max-width: 120px) {
+  .toolbar-search { display: none; }
+  .toolbar { justify-content: flex-end; gap: 0; padding: 0 4px; }
 }
-
-/* =================== P2 v2 收口:响应式窄 pane ===================
- * .pane-view 用 CSS Container Queries 标记为 inline-size container。
- * 当 pane 宽度小于阈值时,自动隐藏 .toolbar-label 让按钮变 icon-only。
- * 这样能多显示 ~40% 的按钮。
- * 兜底:即使全 icon-only 还是不够,overflow-x: auto 让用户可以滑动。
- */
-.pane-view {
-  container-type: inline-size;
-  container-name: pane;
-}
-
-/* 窄 pane (< 480px):只显示 icon,省空间 */
-@container pane (max-width: 480px) {
-  .toolbar-label {
-    display: none;
-  }
-  .toolbar-btn {
-    padding: 0 6px;
-  }
-}
-
-/* 更窄 (< 320px):连 toolbar-divider 都省了,纯紧凑布局 */
-@container pane (max-width: 320px) {
-  .toolbar-divider {
-    display: none;
-  }
-  .toolbar {
-    gap: 2px;
-    padding: 0 4px;
-  }
-  .toolbar-btn {
-    padding: 0 4px;
-  }
-}
-.toolbar select { max-width: 150px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg-primary); background: var(--bg-elevated); padding: 6px; font-size: 12px; }

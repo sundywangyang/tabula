@@ -3,40 +3,46 @@
  * 支持 list / grid / details 三种视图模式
  */
 .file-list {
+  --file-selection-bg: var(--selection-bg);
+  --file-selection-fg: var(--selection-fg);
+  --file-grid-selection-bg: var(--accent-soft);
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  font-size: 12px;
+  font-size: 13px;
+  background: var(--bg-base);
   outline: none;
   overflow: hidden;
   position: relative; /* 使 ::after overlay 相对于此元素定位 */
 }
 
-.file-list:focus {
-  /* 让 focus 在视觉上不显眼(键盘导航靠 cursor 高亮) */
+.pane-unfocused .file-list {
+  --file-selection-bg: var(--selection-inactive-bg);
+  --file-selection-fg: var(--fg-primary);
+  --file-grid-selection-bg: var(--bg-active);
 }
 
 .file-list-header,
 .file-list-row {
   display: grid;
-  grid-template-columns: 1fr 100px 160px 100px;
+  grid-template-columns: minmax(0, 1fr) 80px 144px 80px;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 16px;
 }
 
 /* 详情视图:保持 4 列 */
 .file-list-details .file-list-header,
 .file-list-details .file-list-row {
-  grid-template-columns: 1fr 100px 160px 100px;
+  grid-template-columns: minmax(0, 1fr) 80px 144px 80px;
 }
 
 /* 列表视图:单列 */
 .file-list-list .file-list-header,
 .file-list-list .file-list-row.row-list {
   grid-template-columns: 1fr;
-  padding: 0 12px;
+  padding: 0 16px;
 }
 
 .file-list-list .col-name-full {
@@ -82,11 +88,15 @@
 }
 
 .file-list-row {
-  height: 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  height: var(--file-row-h);
+  border-bottom: 1px solid transparent;
   cursor: default;
   color: var(--fg-primary);
   outline: none;
+}
+
+.file-list-row:nth-child(even) {
+  background: color-mix(in srgb, var(--fg-primary) 2.5%, var(--bg-base));
 }
 
 .file-list-row:hover {
@@ -94,18 +104,31 @@
 }
 
 .file-list-row.selected {
-  background: rgba(99, 102, 241, 0.18);
-  color: var(--fg-primary);
+  background: var(--file-selection-bg);
+  color: var(--file-selection-fg);
 }
 
 .file-list-row.cursor {
-  background: rgba(99, 102, 241, 0.32);
+  background: var(--accent-soft-hover);
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
 .file-list-row.selected.cursor {
-  background: rgba(99, 102, 241, 0.42);
+  background: var(--file-selection-bg);
+}
+
+.file-list-row.selected .col-size,
+.file-list-row.selected .col-mtime,
+.file-list-row.selected .col-type,
+.file-list-row.selected .row-icon,
+.file-list-row.selected .row-icon svg {
+  color: inherit;
+}
+
+.pane-unfocused .file-list-row.cursor {
+  background: var(--selection-inactive-bg);
+  outline-color: transparent;
 }
 
 .col {
@@ -147,7 +170,7 @@
 .col-size,
 .col-mtime,
 .col-type {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--fg-secondary);
 }
@@ -176,7 +199,7 @@
 
 .sort-header.sort-active {
   color: var(--fg-primary);
-  background: rgba(99, 102, 241, 0.12);
+  background: transparent;
 }
 
 .sort-arrow {
@@ -198,8 +221,8 @@
 .grid-row {
   display: grid;
   grid-template-columns: repeat(var(--grid-cols, 4), minmax(0, 1fr));
-  gap: 4px;
-  padding: 0 8px;
+  gap: var(--grid-column-gap);
+  padding: 0 var(--grid-padding-inline);
 }
 
 .grid-cell {
@@ -223,17 +246,22 @@
 }
 
 .grid-cell.selected {
-  background: rgba(99, 102, 241, 0.18);
+  background: var(--file-grid-selection-bg);
 }
 
 .grid-cell.cursor {
-  background: rgba(99, 102, 241, 0.32);
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  background: var(--accent-soft-hover);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .grid-cell.selected.cursor {
-  background: rgba(99, 102, 241, 0.42);
+  background: var(--file-grid-selection-bg);
+}
+
+.pane-unfocused .grid-cell.cursor {
+  background: var(--file-grid-selection-bg);
+  outline-color: transparent;
 }
 
 .grid-icon {
@@ -265,7 +293,7 @@
 }
 
 .grid-name {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fg-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -273,6 +301,12 @@
   width: 100%;
   min-width: 0;
   padding: 0 4px;
+  border-radius: var(--radius-xs);
+}
+
+.grid-cell.selected .grid-name {
+  background: var(--file-selection-bg);
+  color: var(--file-selection-fg);
 }
 
 .row-tags-grid {
@@ -324,16 +358,17 @@
 .file-list-group-header {
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  background: var(--bg-overlay, rgba(0, 0, 0, 0.04));
-  color: var(--fg-secondary, #555);
+  height: var(--file-group-h);
+  padding: 0 16px;
+  background: var(--bg-elevated);
+  color: var(--fg-secondary);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   user-select: none;
   pointer-events: none; /* 不可点击 / 不可拖放 / 不可选中 */
-  border-top: 1px solid var(--border, #e0e0e0);
-  border-bottom: 1px solid var(--border, #e0e0e0);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .file-list-group-header:first-child {
@@ -341,7 +376,7 @@
 }
 
 .group-header-label {
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 /* 加载/空/错 */
@@ -361,7 +396,12 @@
 .file-list .file-drop-target {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-  background: rgba(99, 102, 241, 0.16);
+  background: var(--accent-soft-hover);
+  color: var(--fg-primary);
+}
+
+.file-list-row.selected.file-drop-target {
+  background: var(--accent-soft-hover);
 }
 /*
  * 拖放时覆盖整个 file-list 区域(包含所有行),
@@ -377,7 +417,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(99, 102, 241, 0.07);
+  background: var(--accent-soft);
   border: 2px dashed var(--accent);
   border-radius: var(--radius-sm);
   color: var(--accent);
@@ -418,7 +458,7 @@
   font-size: 11px;
   color: var(--accent);
   padding: 4px 10px;
-  background: rgba(99, 102, 241, 0.12);
+  background: var(--accent-soft);
   border-radius: var(--radius-sm);
   border: 1px dashed var(--accent);
 }
@@ -429,8 +469,9 @@
 
 .empty-icon,
 .error-icon {
-  font-size: 36px;
-  opacity: 0.4;
+  display: inline-flex;
+  color: var(--fg-tertiary);
+  opacity: 0.65;
 }
 
 .error-icon {
@@ -502,7 +543,7 @@
 .rubber-band-rect {
   position: absolute;
   border: 1px dashed var(--accent, #007acc);
-  background: rgba(99, 102, 241, 0.12);
+  background: var(--accent-soft);
   pointer-events: none;
   z-index: 10;
   box-sizing: border-box;
@@ -520,7 +561,38 @@
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 10px;
-  background: var(--bg-hover, #e8e8e8);
-  color: var(--text-muted, #666);
+  background: var(--bg-hover);
+  color: var(--fg-secondary);
   white-space: nowrap;
+}
+
+.file-list-row.selected .row-tag-chip {
+  color: inherit;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* 保证拆分窗格时，表头和每一行始终使用相同的列布局。 */
+@container pane (max-width: 640px) {
+  .file-list-details .file-list-header,
+  .file-list-details .file-list-row {
+    grid-template-columns: minmax(0, 1fr) 80px 144px;
+  }
+  .file-list-details .col-type { display: none; }
+}
+
+@container pane (max-width: 480px) {
+  .file-list-details .file-list-header,
+  .file-list-details .file-list-row {
+    grid-template-columns: minmax(0, 1fr) 80px;
+  }
+  .file-list-details .col-mtime { display: none; }
+}
+
+@container pane (max-width: 320px) {
+  .file-list-details .file-list-header,
+  .file-list-details .file-list-row {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 10px;
+  }
+  .file-list-details .col-size { display: none; }
 }

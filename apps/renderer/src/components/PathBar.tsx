@@ -5,6 +5,7 @@
  * 聚焦时显示历史记录下拉(最多30条)。
  */
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { FolderOpen, TriangleAlert, X } from 'lucide-react';
 import { useFileStore } from '../stores/file-store';
 import { useLayoutStore } from '../stores/layout-store';
 import type { Tab, LayoutNode } from '@tabula/bridge';
@@ -185,7 +186,7 @@ export function PathBar() {
   return (
     <div className="path-bar-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
       <div className="path-bar">
-        <span className="path-bar-prefix">📍</span>
+        <span className="path-bar-prefix"><FolderOpen size={17} aria-hidden="true" /></span>
         <div className="path-bar-input-wrapper" ref={dropdownRef}>
           <input
             ref={inputRef}
@@ -212,7 +213,7 @@ export function PathBar() {
                   onClick={handleClearHistory}
                   title="清空历史记录"
                 >
-                  ×
+                  <X size={12} aria-hidden="true" />
                 </button>
               </div>
               {uniqueHistory.map((path, idx) => (
@@ -228,7 +229,7 @@ export function PathBar() {
             </div>
           )}
         </div>
-        {error && <span className="path-bar-error" title={error}>⚠ {error}</span>}
+        {error && <span className="path-bar-error" title={error}><TriangleAlert size={14} aria-hidden="true" /> {error}</span>}
         {completions.length > 0 && !error && (
           <span className="path-bar-hint">候选 {completions.length}</span>
         )}

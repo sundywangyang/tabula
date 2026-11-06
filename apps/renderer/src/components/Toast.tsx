@@ -4,14 +4,16 @@
  * 顶栏右侧飘字 3s 自动消失。
  * 多条可堆叠。
  */
+import type { ReactNode } from 'react';
+import { Info, CircleCheck, TriangleAlert, CircleX, X } from 'lucide-react';
 import { useFileStore } from '../stores/file-store';
 import './Toast.css';
 
-const KIND_ICON: Record<string, string> = {
-  info: 'ℹ',
-  success: '✓',
-  warn: '⚠',
-  error: '✕',
+const KIND_ICON: Record<string, ReactNode> = {
+  info: <Info size={16} />,
+  success: <CircleCheck size={16} />,
+  warn: <TriangleAlert size={16} />,
+  error: <CircleX size={16} />,
 };
 
 export function ToastHost() {
@@ -25,11 +27,11 @@ export function ToastHost() {
     <div className="toast-host">
       {toasts.map((t) => (
         <div key={t.id} className={`toast toast-${t.kind}`} role="status" onClick={() => dismiss(t.id)}>
-          <span className="toast-icon">{KIND_ICON[t.kind] ?? 'ℹ'}</span>
+          <span className="toast-icon">{KIND_ICON[t.kind] ?? <Info size={16} />}</span>
           <span className="toast-message">{t.message}</span>
           {[...archiveToasts].find(([, id]) => id === t.id) && <button className="toast-cancel" onClick={event => { event.stopPropagation(); const job = [...archiveToasts].find(([, id]) => id === t.id)?.[0]; if (job) void useFileStore.getState().cancelArchive(job); }}>取消任务</button>}
           <button className="toast-close" onClick={(e) => { e.stopPropagation(); dismiss(t.id); }} title="关闭">
-            ✕
+            <X size={12} />
           </button>
         </div>
       ))}

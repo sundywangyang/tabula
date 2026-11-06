@@ -60,8 +60,8 @@ export function FileToolsDialog({ dialog, onClose }: { dialog: Dialog; onClose: 
       }
     } finally { if (generation.current === version) { setBusy(false); job.current = null; } }
   };
-  return <div className="file-tools-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}>
-    <div className="file-tools-panel" ref={panel} role="dialog" aria-modal="true" aria-label={labels[dialog.mode]} tabIndex={-1}>
+  return <div className="ui-overlay file-tools-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}>
+    <div className="ui-surface file-tools-panel" ref={panel} role="dialog" aria-modal="true" aria-label={labels[dialog.mode]} tabIndex={-1}>
       <header><h2>{labels[dialog.mode]}</h2><button aria-label="关闭文件工具" onClick={close}>✕</button></header>
       {dialog.mode !== 'network' && <label>路径<input aria-label="工具路径" value={path} onChange={e => setPath(e.target.value)} disabled={busy} /></label>}
       {(dialog.mode === 'content' || dialog.mode === 'duplicates') && <>

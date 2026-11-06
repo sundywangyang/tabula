@@ -8,11 +8,16 @@ import { useFileStore } from '../../../stores/file-store';
 import { useLayoutStore } from '../../../stores/layout-store';
 
 vi.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: ({ count }: { count: number }) => ({
-    getTotalSize: () => count * 28,
-    getVirtualItems: () => Array.from({ length: count }, (_, index) => ({ index, start: index * 28, size: 28 })),
-    measure: () => {},
-  }),
+  useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize: (index: number) => number }) => {
+    let total = 0;
+    const items = Array.from({ length: count }, (_, index) => {
+      const size = estimateSize(index);
+      const item = { index, start: total, size };
+      total += size;
+      return item;
+    });
+    return { getTotalSize: () => total, getVirtualItems: () => items, measure: () => {} };
+  },
 }));
 vi.mock('../../../perf/use-file-list-perf', () => ({ useFileListPerfReport: () => {} }));
 

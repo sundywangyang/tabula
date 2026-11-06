@@ -1,21 +1,12 @@
-/**
- * PaneView(叶子节点)专属样式
- *
- * 包含:
- * - TabBar(条)
- * - pane-toolbar(面包屑)
- * - Toolbar
- * - pane-content(FileList)
- * - P2 v2: 拖出新建窗口的虚线占位
- */
+/* Pane content and bottom path navigation, with drag feedback above both. */
 
-.pane-view .pane-toolbar {
+.pane-view .pane-pathbar {
   height: var(--breadcrumb-h);
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
   padding: 0 12px;
-  background: var(--bg-elevated);
+  background: var(--bg-toolbar);
   flex-shrink: 0;
 }
 
@@ -52,7 +43,7 @@
   pointer-events: none; /* 不挡事件,让父 onDragOver/onDrop 处理 */
   z-index: 50;
   border: 2px dashed var(--accent);
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--accent-soft);
   border-radius: 6px;
   display: flex;
   align-items: center;
