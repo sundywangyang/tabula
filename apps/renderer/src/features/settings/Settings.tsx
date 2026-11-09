@@ -11,7 +11,9 @@
  * - 语言
  * - 快捷键
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Palette, Files, MousePointer2, Globe2, Keyboard, Puzzle, Info, X } from 'lucide-react';
+import { useModal } from '../../components/use-modal';
 import { ACCENT_PRESETS, useThemeStore, type ThemeMode } from '../../stores/theme-store';
 import { useSettingsStore, type SortField, type SortDir, type Language } from '../../stores/settings-store';
 import { useFileStore } from '../../stores/file-store';
@@ -46,17 +48,17 @@ type TabId = 'appearance' | 'filelist' | 'operations' | 'language' | 'shortcuts'
 interface TabDef {
   id: TabId;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
 const TABS: TabDef[] = [
-  { id: 'appearance', label: '外观', icon: '🎨' },
-  { id: 'filelist', label: '文件列表', icon: '📄' },
-  { id: 'operations', label: '操作', icon: '⚡' },
-  { id: 'language', label: '语言', icon: '🌐' },
-  { id: 'shortcuts', label: '快捷键', icon: '⌨' },
-  { id: 'extensions', label: '扩展', icon: '🔌' },
-  { id: 'about', label: '关于', icon: 'ℹ' },
+  { id: 'appearance', label: '外观', icon: <Palette size={16} /> },
+  { id: 'filelist', label: '文件列表', icon: <Files size={16} /> },
+  { id: 'operations', label: '操作', icon: <MousePointer2 size={16} /> },
+  { id: 'language', label: '语言', icon: <Globe2 size={16} /> },
+  { id: 'shortcuts', label: '快捷键', icon: <Keyboard size={16} /> },
+  { id: 'extensions', label: '扩展', icon: <Puzzle size={16} /> },
+  { id: 'about', label: '关于', icon: <Info size={16} /> },
 ];
 
 interface ToggleProps {
@@ -131,6 +133,8 @@ interface SettingsProps {
 }
 
 export function Settings({ onClose }: SettingsProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModal(panelRef, onClose);
   const thumbnailSize = useFileStore(s => s.thumbnailSize);
   // 标签页 (P7 v1)
   const [activeTab, setActiveTab] = useState<TabId>('appearance');
@@ -196,13 +200,13 @@ export function Settings({ onClose }: SettingsProps) {
   }, [onClose]);
 
   return (
-    <div className="settings-overlay" onMouseDown={handleBackdropClick}>
-      <div className="settings-panel settings-panel-wide" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="ui-overlay settings-overlay" onMouseDown={handleBackdropClick}>
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="设置" className="ui-surface settings-panel settings-panel-wide" onMouseDown={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="settings-header">
-          <span className="settings-title">⚙ 设置</span>
+          <span className="settings-title">设置</span>
           <button className="settings-close" onClick={onClose} title="关闭 (Esc)">
-            ✕
+            <X size={15} />
           </button>
         </div>
 

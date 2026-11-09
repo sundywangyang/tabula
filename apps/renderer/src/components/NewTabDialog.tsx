@@ -67,8 +67,8 @@ export function NewTabDialog() {
   };
 
   return (
-    <div className="new-tab-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
-      <div className="new-tab-dialog" role="dialog" aria-modal="true" aria-labelledby="new-tab-title"
+    <div className="ui-overlay new-tab-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
+      <div className="ui-surface new-tab-dialog" role="dialog" aria-modal="true" aria-labelledby="new-tab-title"
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); close(); } }}>
         <div className="new-tab-heading">
           <div><h2 id="new-tab-title">新建标签页</h2><p>输入目录路径，或从最近访问中选择。</p></div>
@@ -92,8 +92,8 @@ export function NewTabDialog() {
             )) : <div className="new-tab-empty">暂无历史路径</div>}
           </div>
           <div className="new-tab-actions">
-            <button type="button" className="new-tab-button" onClick={close}>取消</button>
-            <button type="submit" className="new-tab-button primary" disabled={busy || !path.trim()}>{busy ? '正在打开…' : '打开标签页'}</button>
+            <button type="button" className="ui-control-button new-tab-button" onClick={close}>取消</button>
+            <button type="submit" className="ui-control-button new-tab-button primary" disabled={busy || !path.trim()}>{busy ? '正在打开…' : '打开标签页'}</button>
           </div>
         </form>
       </div>

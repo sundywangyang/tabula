@@ -162,12 +162,12 @@ export function BatchRenameDialog({
 
   return (
     <div
-      className="batch-rename-overlay"
+      className="ui-overlay batch-rename-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div ref={panelRef} tabIndex={-1} className="batch-rename-dialog" role="dialog" aria-modal="true" aria-label="批量重命名">
+      <div ref={panelRef} tabIndex={-1} className="ui-surface batch-rename-dialog" role="dialog" aria-modal="true" aria-label="批量重命名">
         {/* Header */}
         <div className="batch-rename-header">
           <span className="batch-rename-title">批量重命名</span>
@@ -258,14 +258,14 @@ export function BatchRenameDialog({
         {/* Actions */}
         <div className="batch-rename-actions">
           <button
-            className="batch-rename-btn batch-rename-btn-cancel"
+            className="ui-control-button batch-rename-btn batch-rename-btn-cancel"
             onClick={onClose}
             disabled={renaming}
           >
             取消
           </button>
           <button
-            className="batch-rename-btn batch-rename-btn-primary"
+            className="ui-control-button batch-rename-btn batch-rename-btn-primary"
             onClick={handleRename}
             disabled={renaming}
           >

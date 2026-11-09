@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import type { WindowBounds } from '@tabula/bridge';
 import { getWindowProvider } from '../providers/window';
 import { getConfig, setConfig } from '../store/config';
+import { getWindowAppearance } from '../providers/window/appearance';
 
 export interface CreateWindowOptions {
   initialPath?: string;
@@ -63,7 +64,7 @@ export class WindowManager {
       show: false,            // 先隐藏,准备好再显示(避免白闪)
       frame: false,           // 自定义标题栏(现代化)
       titleBarStyle: winProvider.getTitleBarStyle(),
-      backgroundColor: '#1a1a1f',
+      backgroundColor: getWindowAppearance().background,
       autoHideMenuBar: winProvider.getAutoHideMenuBar(),
       icon: platformIcon,
       webPreferences: {

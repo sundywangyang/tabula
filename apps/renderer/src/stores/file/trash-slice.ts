@@ -28,13 +28,19 @@ export const createTrashSlice: FileSlice<Actions> = (set, get) => ({
     if (!itemPaths.length) return { ok: true };
     const items = get().trashItems;
     let failed = 0;
+    let firstError: string | null = null;
     for (const itemPath of itemPaths) {
       const item = items.find((x) => x.itemPath === itemPath);
       const res = await window.tabula.fs.trashRestore(itemPath, item?.originalPath ?? undefined);
-      if (!res.ok) failed++;
+      if (!res.ok) {
+        failed++;
+        firstError ??= res.error.message;
+      }
     }
     if (failed > 0) {
-      get().showToast(`恢复完成，${failed} 项失败`, 'warn', 3000);
+      const restored = itemPaths.length - failed;
+      const summary = restored === 0 ? `恢复失败（${failed} 项）` : `已恢复 ${restored} 项，${failed} 项失败`;
+      get().showToast(`${summary}: ${firstError}`, restored === 0 ? 'error' : 'warn', 5000);
     } else {
       get().showToast(`已恢复 ${itemPaths.length} 项`, 'success', 2000);
     }

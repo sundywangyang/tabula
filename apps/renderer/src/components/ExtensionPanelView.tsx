@@ -61,8 +61,8 @@ export function ExtensionPanelView() {
   };
 
   return (
-    <div className="ext-panel-overlay" role="dialog" aria-label="扩展面板">
-      <div className="ext-panel-window">
+    <div className="ui-overlay ext-panel-overlay" role="dialog" aria-label="扩展面板">
+      <div className="ui-surface ext-panel-window">
         <div className="ext-panel-header">
           <span className="ext-panel-title">{last.extensionId}</span>
           <span className="ext-panel-subtitle">·  {last.panelId}</span>

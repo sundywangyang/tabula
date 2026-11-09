@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { SortField } from '../../../stores/file/types';
 
 export function SortHeader({
@@ -16,7 +17,7 @@ export function SortHeader({
   className: string;
 }) {
   const active = currentField === field && currentDir !== null;
-  const arrow = currentField === field ? (currentDir === 'asc' ? '▲' : currentDir === 'desc' ? '▼' : '') : '';
+  const SortIcon = currentDir === 'asc' ? ChevronUp : ChevronDown;
   return (
     <button
       type="button"
@@ -25,7 +26,7 @@ export function SortHeader({
       title={`按${label}排序`}
     >
       {label}
-      {arrow && <span className="sort-arrow">{arrow}</span>}
+      {active && <SortIcon size={12} className="sort-arrow" aria-hidden="true" />}
     </button>
   );
 }

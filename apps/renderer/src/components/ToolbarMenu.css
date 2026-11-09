@@ -1,0 +1,45 @@
+/** 工具栏共享菜单表面，不依赖窗格 overflow。 */
+.toolbar-menu {
+  position: fixed;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  width: min(300px, calc(100vw - 16px));
+  max-height: min(640px, calc(100vh - 16px));
+  padding: 5px;
+  overflow: auto;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--bg-translucent-elevated, var(--bg-elevated));
+  backdrop-filter: var(--blur-md);
+  box-shadow: var(--shadow-lg);
+  animation: toolbar-menu-appear 140ms ease-out;
+}
+.toolbar-menu > .tooltip-wrap { display: flex; width: 100%; flex-shrink: 0; line-height: inherit; }
+.toolbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--fg-primary);
+  outline: none;
+}
+.toolbar-menu-item:hover:not(:disabled), .toolbar-menu-item:focus-visible { background: var(--selection-bg); color: var(--selection-fg); }
+.toolbar-menu-item:disabled { color: var(--fg-tertiary); opacity: .5; cursor: default; }
+.toolbar-menu-item.danger { color: var(--danger); }
+.toolbar-menu-item.danger:hover:not(:disabled), .toolbar-menu-item.danger:focus-visible { color: var(--selection-fg); }
+.toolbar-menu-icon { display: flex; align-items: center; justify-content: center; width: 17px; flex-shrink: 0; color: inherit; }
+.toolbar-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar-menu-shortcut { color: var(--fg-tertiary); font-size: 10px; font-family: var(--font-sans); flex-shrink: 0; }
+.toolbar-menu-item:hover:not(:disabled) .toolbar-menu-shortcut, .toolbar-menu-item:focus-visible .toolbar-menu-shortcut { color: inherit; opacity: .8; }
+.toolbar-menu-chevron { margin-left: auto; flex-shrink: 0; }
+.toolbar-menu-separator { flex-shrink: 0; height: 1px; background: var(--border); margin: 5px 4px; }
+.toolbar-menu-heading { padding: 5px 8px; font-size: 10px; line-height: 1.5; color: var(--fg-tertiary); }
+.toolbar-menu-back { font-weight: 600; }
+@keyframes toolbar-menu-appear { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }

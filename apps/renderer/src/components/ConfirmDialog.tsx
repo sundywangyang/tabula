@@ -5,6 +5,7 @@
  * 渲染一个简单的模态框。
  */
 import { useEffect, useRef } from 'react';
+import { TriangleAlert } from 'lucide-react';
 import './ConfirmDialog.css';
 
 export interface ConfirmDialogProps {
@@ -42,25 +43,25 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="confirm-overlay"
+      className="ui-overlay confirm-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+      <div className="ui-surface confirm-dialog" role="alertdialog" aria-modal="true">
         <div className="confirm-title">
-          {danger && <span className="confirm-icon">⚠</span>}
+          {danger && <span className="confirm-icon"><TriangleAlert size={18} /></span>}
           {title}
         </div>
         <div className="confirm-message">{message}</div>
         {warning && <div className="confirm-warning">{warning}</div>}
         <div className="confirm-actions">
-          <button className="confirm-btn" onClick={onCancel}>
+          <button className="ui-control-button confirm-btn" onClick={onCancel}>
             {cancelLabel}
           </button>
           <button
             ref={okRef}
-            className={`confirm-btn ${danger ? 'confirm-btn-danger' : 'confirm-btn-primary'}`}
+            className={`ui-control-button confirm-btn ${danger ? 'confirm-btn-danger' : 'confirm-btn-primary'}`}
             onClick={onOk}
           >
             {okLabel}

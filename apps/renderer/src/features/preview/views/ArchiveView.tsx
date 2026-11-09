@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { decodeTar } from '@tabula/core/tar';
+import { File as FileIcon, Folder, TriangleAlert } from 'lucide-react';
 
 // =================== 压缩包列表 ===================
 
@@ -111,7 +112,7 @@ export function ArchiveView({ url, name, ext }: { url: string; name: string; ext
   if (error) {
     return (
       <div className="preview-error">
-        <div className="error-icon">⚠</div>
+        <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
         <div className="error-message">压缩包解析失败: {error}</div>
         <div className="preview-error-meta">
           {ext === '.7z' || ext === '.rar'
@@ -137,7 +138,7 @@ export function ArchiveView({ url, name, ext }: { url: string; name: string; ext
       <div className="preview-archive-list">
         {entries.map((e, i) => (
           <div key={i} className={`preview-archive-row ${e.isDir ? 'is-dir' : ''}`}>
-            <span className="preview-archive-icon">{e.isDir ? '📁' : '📄'}</span>
+            <span className="preview-archive-icon">{e.isDir ? <Folder size={16} aria-hidden="true" /> : <FileIcon size={16} aria-hidden="true" />}</span>
             <span className="preview-archive-name" title={e.name}>{e.name}</span>
             <span className="preview-archive-size">{e.isDir ? '—' : formatArchiveSize(e.size)}</span>
             {e.preview !== undefined && e.preview !== null && (

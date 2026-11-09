@@ -1,42 +1,13 @@
-/**
- * 工具栏
- *
- * 视图模式切换 + 显示选项(隐藏文件 / 隐藏扩展名)
- * 路径按钮 + 刷新
- * P3: 新建文件夹/文件按钮(顶在最左)
- *
- * P2: openPathBar 需要 paneId(每个 pane 独立打开路径栏,这里取 active pane)
- *
- * 图标:lucide-react SVG; 提示:自定义 Tooltip 气泡
- */
-import { useMemo, useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+/** Finder 风格窗格工具栏：常用操作直达，其余操作通过菜单访问。 */
+import { useState, type ReactNode } from 'react';
+import type { FileTypeCategory, LayoutNode } from '@tabula/bridge';
 import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  Plus,
-  Copy,
-  Scissors,
-  Clipboard,
-  Link2,
-  Trash2,
-  Pencil,
-  MapPin,
-  RotateCw,
-  Star,
-  Eye,
-  EyeOff,
-  Type,
-  Columns2,
-  LayoutList,
-  LayoutGrid,
-  List,
-  ChevronLeft,
-  ChevronRight,
-  Terminal,
-  Layers,
+  ArrowDownUp, ArrowLeft, ArrowRight, ArrowUp, Clipboard, Columns2, Copy, Eye,
+  FilePlus2, Filter, Folder, FolderPlus, LayoutGrid, LayoutList, Link2, List,
+  MapPin, MoreHorizontal, PanelTop, Pencil, Plus, RotateCw, Scissors, Search,
+  Star, Terminal, Trash2, Type, Wrench,
 } from 'lucide-react';
-import { useFileStore, type ViewMode, type GroupByMode } from '../stores/file-store';
+import { useFileStore, type GroupByMode, type SortField, type ViewMode } from '../stores/file-store';
 import { useUiDialogsStore } from '../stores/ui-dialogs-store';
 import { useFavoritesStore } from '../stores/favorites-store';
 import { useLayoutStore } from '../stores/layout-store';
@@ -45,585 +16,225 @@ import { getCachedPlatform } from '../platform-cache';
 import { shortcutLabel } from '../shortcut-label';
 import { parentPath } from '../stores/file/paths';
 import { Tooltip } from './Tooltip';
-import type { Tab } from '@tabula/bridge';
+import { ToolbarMenu, type ToolbarMenuEntry } from './ToolbarMenu';
 import './Toolbar.css';
 
-// 右键历史菜单最大条目数
-const MAX_HISTORY_MENU_ITEMS = 20;
-
-interface ViewModeDef {
-  mode: ViewMode;
-  icon: ReactNode;
-  label: string;
-}
-
-const VIEW_MODES: ViewModeDef[] = [
+const EMPTY_SET = new Set<string>();
+const VIEW_MODES: { mode: ViewMode; icon: ReactNode; label: string }[] = [
+  { mode: 'details', icon: <LayoutList size={16} />, label: '详情' },
   { mode: 'list', icon: <List size={16} />, label: '列表' },
   { mode: 'grid', icon: <LayoutGrid size={16} />, label: '网格' },
-  { mode: 'details', icon: <LayoutList size={16} />, label: '详情' },
 ];
+const SORT_FIELDS: { field: SortField; label: string }[] = [
+  { field: 'name', label: '名称' }, { field: 'size', label: '大小' },
+  { field: 'mtime', label: '修改时间' }, { field: 'type', label: '类型' },
+];
+const GROUPS: { mode: GroupByMode; label: string }[] = [
+  { mode: 'none', label: '不分组' }, { mode: 'type', label: '按类型分组' },
+  { mode: 'date', label: '按日期分组' }, { mode: 'size', label: '按大小分组' },
+];
+const FILE_TYPES: { value: FileTypeCategory; label: string }[] = [
+  { value: 'all', label: '全部类型' }, { value: 'folder', label: '文件夹' },
+  { value: 'image', label: '图片' }, { value: 'document', label: '文档' },
+  { value: 'code', label: '代码' }, { value: 'archive', label: '压缩包' },
+  { value: 'audio', label: '音频' }, { value: 'video', label: '视频' },
+];
+type ToolMode = NonNullable<ReturnType<typeof useUiDialogsStore.getState>['toolsDialog']>['mode'];
+const FILE_TOOLS: { mode: ToolMode; label: string }[] = [
+  { mode: 'content', label: '全文内容搜索' }, { mode: 'duplicates', label: '查找重复文件' },
+  { mode: 'history', label: '文件历史时间线' }, { mode: 'network', label: '连接服务器' },
+  { mode: 'links', label: '链接管理' }, { mode: 'icons', label: '文件夹图标' },
+  { mode: 'associations', label: '默认应用' },
+];
+type MenuKind = 'new' | 'arrange' | 'more' | 'back' | 'forward';
 
-// 模块级常量，避免 selector 每次渲染创建新引用
-const EMPTY_PATH = '';
-const EMPTY_SET = Object.freeze(new Set<string>());
-
-/** 从 Tab 获取历史（去重，过滤 null/undefined） */
-function getTabHistory(tab: Tab): string[] {
-  return (tab.history ?? []).filter((p): p is string => Boolean(p));
+function findPane(node: LayoutNode, paneId: string): Extract<LayoutNode, { type: 'pane' }> | null {
+  if (node.type === 'pane') return node.id === paneId ? node : null;
+  for (const child of node.children) {
+    const pane = findPane(child, paneId);
+    if (pane) return pane;
+  }
+  return null;
 }
 
 export function Toolbar({ paneId }: { paneId: string }) {
   const bindings = useKeymapStore((s) => s.bindings);
-  const shortcut = (...ids: string[]) => ids.map((id) => shortcutLabel(bindings.get(id), getCachedPlatform())).filter(Boolean).join(' / ') || '无快捷键';
-  // 数据切片（值类型，不创建新引用）
   const viewMode = useFileStore((s) => s.panes[paneId]?.viewMode ?? 'details');
   const groupBy = useFileStore((s) => s.panes[paneId]?.groupBy ?? 'none');
-  const fileType = useFileStore(s => s.panes[paneId]?.fileType ?? 'all');
+  const fileType = useFileStore((s) => s.panes[paneId]?.fileType ?? 'all');
   const showHidden = useFileStore((s) => s.showHidden);
   const showExtensions = useFileStore((s) => s.showExtensions);
-  const currentPath = useFileStore((s) => s.panes[paneId]?.currentPath ?? EMPTY_PATH);
-  // selectedPaths 必须是稳定引用——用 Object.freeze 的空 Set 而非 new Set()
+  const searchOpen = useFileStore((s) => s.panes[paneId]?.searchOpen ?? false);
+  const currentPath = useFileStore((s) => s.panes[paneId]?.currentPath ?? '');
   const selectedPaths = useFileStore((s) => s.panes[paneId]?.selectedPaths ?? EMPTY_SET);
   const cursorPath = useFileStore((s) => s.panes[paneId]?.cursorPath ?? null);
   const clipboard = useFileStore((s) => s.clipboard);
-
-  // 前进/后退状态：从 layout-store 取 active tab 的 history 信息
-  const [historyMenuOpen, setHistoryMenuOpen] = useState<'back' | 'forward' | null>(null);
-  const historyMenuRef = useRef<HTMLDivElement>(null);
-
-  // 获取 active tab
+  const sortBy = useFileStore((s) => s.panes[paneId]?.sortBy ?? s.sortBy);
+  const sortDir = useFileStore((s) => s.panes[paneId]?.sortDir !== undefined ? s.panes[paneId].sortDir : s.sortDir);
   const rootLayout = useLayoutStore((s) => s.rootLayout);
-  const activeTab = useMemo(() => {
-    const root = rootLayout;
-    const paneNode = findPaneNode(root, paneId);
-    if (!paneNode || paneNode.type !== 'pane' || !paneNode.activeTabId) return null;
-    return paneNode.tabs.find((t) => t.id === paneNode.activeTabId) ?? null;
-  }, [paneId, rootLayout]);
-
-  const history = useMemo(() => activeTab ? getTabHistory(activeTab) : [], [activeTab]);
+  const favorites = useFavoritesStore((s) => s.favorites);
+  const pane = findPane(rootLayout, paneId);
+  const activeTab = pane?.tabs.find((tab) => tab.id === pane.activeTabId);
+  const history = (activeTab?.history ?? []).filter(Boolean);
   const historyIndex = activeTab?.historyIndex ?? -1;
   const canGoBack = historyIndex > 0;
-  const canGoForward = historyIndex < history.length - 1;
+  const canGoForward = historyIndex >= 0 && historyIndex < history.length - 1;
   const parent = /^\\\\[^\\/]+[\\/][^\\/]+[\\/]?$/.test(currentPath) ? '' : parentPath(currentPath);
-
-  // 关闭历史菜单的 effect
-  useEffect(() => {
-    if (!historyMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (historyMenuRef.current && !historyMenuRef.current.contains(e.target as Node)) {
-        setHistoryMenuOpen(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [historyMenuOpen]);
-
-  // 前进/后退 handlers
-  const handleGoBack = () => {
-    useLayoutStore.getState().pane.goBack(paneId);
-  };
-
-  const handleGoForward = () => {
-    useLayoutStore.getState().pane.goForward(paneId);
-  };
-
-  // 右键打开历史菜单
-  const handleNavMouseDown = (dir: 'back' | 'forward') => (e: React.MouseEvent) => {
-    if (e.button === 2) {
-      e.preventDefault();
-      setHistoryMenuOpen(dir);
-    }
-  };
-
-  // 从历史菜单跳转
-  const handleHistoryJump = (path: string) => {
-    setHistoryMenuOpen(null);
-    useLayoutStore.getState().pane.navigate(paneId, path);
-  };
-
-  // 阻止默认右键菜单
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-  };
-
-  // 历史菜单数据
-  const backHistory = useMemo(() => history.slice(0, historyIndex).reverse().slice(0, MAX_HISTORY_MENU_ITEMS), [history, historyIndex]);
-  const forwardHistory = useMemo(() => history.slice(historyIndex + 1).slice(0, MAX_HISTORY_MENU_ITEMS), [history, historyIndex]);
-  const menuItems = historyMenuOpen === 'back' ? backHistory : forwardHistory;
-
-  // 所有 action 用 getState() 获取（避免 selector 返回函数导致 getSnapshot 缓存失效）
-  const { setViewMode, setGroupBy, openPathBar, refresh, showToast } = useFileStore.getState();
-  const toggleShowHidden = useFileStore.getState().toggleShowHidden;
-  const toggleShowExtensions = useFileStore.getState().toggleShowExtensions;
-  const copySelected = useFileStore.getState().copySelected;
-  const cutSelected = useFileStore.getState().cutSelected;
-  const pasteToPane = useFileStore.getState().pasteToPane;
-  const beginRename = useFileStore.getState().beginRename;
-
-  // P5: 收藏
-  const isFavorite = useMemo(
-    () => (currentPath ? useFavoritesStore.getState().favorites.some((f) => f.path === currentPath) : false),
-    [currentPath],
-  );
-  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
-  const handleToggleFavorite = () => {
-    if (!currentPath) {
-      showToast('当前未选择目录,无法收藏', 'warn', 1800);
-      return;
-    }
-    const nowFav = toggleFavorite(currentPath);
-    showToast(
-      nowFav ? `已收藏: ${currentPath}` : '已从收藏移除',
-      'success',
-      1500,
-    );
-  };
-
-  // P3: 新建按钮
-  const handleNewFolder = () => {
-    // 触发 app-level 弹窗
-    window.dispatchEvent(
-      new CustomEvent('tabula:new-folder', { detail: { paneId } }),
-    );
-  };
-  const handleNewFile = () => {
-    window.dispatchEvent(
-      new CustomEvent('tabula:new-file', { detail: { paneId } }),
-    );
-  };
-
-  // 在当前目录打开 PowerShell 终端
-  const handleOpenShell = async () => {
-    if (!currentPath) {
-      showToast('当前未选择目录,无法打开终端', 'warn', 1800);
-      return;
-    }
-    const result = await window.tabula.shell.openTerminal(currentPath);
-    if (!result.ok) {
-      showToast(`打开终端失败: ${result.error.message}`, 'error', 2500);
-    }
-  };
-
-  // P3: 文件操作按钮
+  const isFavorite = favorites.some((favorite) => favorite.path === currentPath);
+  const folderName = currentPath.split(/[\\/]/).filter(Boolean).pop() || currentPath || '文件夹';
   const hasSelection = selectedPaths.size > 0;
-  const hasClipboard = clipboard !== null && clipboard.paths.length > 0;
-
-  const handleCopy = () => copySelected(paneId);
-  const handleCut = () => cutSelected(paneId);
-  const handlePaste = () => { void pasteToPane(paneId); };
-  const handleCopyPath = async () => {
-    const paths = selectedPaths.size > 0 ? Array.from(selectedPaths) : (cursorPath ? [cursorPath] : []);
-    if (paths.length > 0) {
-      await window.tabula.fs.writeClipboard(paths.join('\n'));
-      showToast('路径已复制', 'success', 1500);
+  const hasClipboard = Boolean(clipboard?.paths.length);
+  const [openMenu, setOpenMenu] = useState<{ kind: MenuKind; anchor: HTMLButtonElement } | null>(null);
+  const shortcut = (...ids: string[]) => ids.map((id) => shortcutLabel(bindings.get(id), getCachedPlatform())).filter(Boolean).join(' / ') || '无快捷键';
+  const file = useFileStore.getState();
+  const closeMenu = (restoreFocus = true) => {
+    if (restoreFocus && openMenu?.anchor.isConnected) openMenu.anchor.focus({ preventScroll: true });
+    setOpenMenu(null);
+  };
+  const toggleMenu = (kind: MenuKind, anchor: HTMLButtonElement) => {
+    useLayoutStore.getState().pane.focusPane(paneId);
+    setOpenMenu((previous) => previous?.kind === kind ? null : { kind, anchor });
+  };
+  const newFolder = () => window.dispatchEvent(new CustomEvent('tabula:new-folder', { detail: { paneId } }));
+  const newFile = () => window.dispatchEvent(new CustomEvent('tabula:new-file', { detail: { paneId } }));
+  const goBack = () => useLayoutStore.getState().pane.goBack(paneId);
+  const goForward = () => useLayoutStore.getState().pane.goForward(paneId);
+  const openSearch = () => file.openSearch(paneId);
+  const openTools = (mode: ToolMode) => {
+    const path = ['content', 'duplicates', 'history', 'network'].includes(mode)
+      ? currentPath : selectedPaths.size === 1 ? [...selectedPaths][0] : currentPath;
+    useUiDialogsStore.getState().openTools(mode, paneId, path);
+  };
+  const toggleFavorite = () => {
+    const added = useFavoritesStore.getState().toggleFavorite(currentPath);
+    file.showToast(added ? `已收藏: ${currentPath}` : '已从收藏移除', 'success', 1500);
+  };
+  const openTerminal = async () => {
+    try {
+      const result = await window.tabula.shell.openTerminal(currentPath);
+      if (!result.ok) file.showToast(`打开终端失败: ${result.error.message}`, 'error', 2500);
+    } catch (error) {
+      file.showToast(`打开终端失败: ${String(error)}`, 'error', 2500);
     }
   };
-  const handleDelete = () => {
-    if (selectedPaths.size === 0) return;
-    window.dispatchEvent(
-      new CustomEvent('tabula:confirm-delete', {
-        detail: { paneId, count: selectedPaths.size },
-      }),
-    );
+  const copyPath = async () => {
+    const paths = hasSelection ? [...selectedPaths] : cursorPath ? [cursorPath] : [];
+    try {
+      await window.tabula.fs.writeClipboard(paths.join('\n'));
+      file.showToast('路径已复制', 'success', 1500);
+    } catch (error) {
+      file.showToast(`复制路径失败: ${String(error)}`, 'error', 2500);
+    }
   };
-  const handleRename = () => {
-    if (selectedPaths.size === 0 && !cursorPath) return;
+  const rename = () => {
     if (selectedPaths.size > 1) {
-      showToast('重命名仅支持单选', 'warn', 1500);
+      file.showToast('重命名仅支持单选', 'warn', 1500);
       return;
     }
-    const target = cursorPath ?? Array.from(selectedPaths)[0];
-    if (target) beginRename(paneId, target);
+    const target = cursorPath ?? [...selectedPaths][0];
+    if (target) file.beginRename(paneId, target);
   };
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [scrollState, setScrollState] = useState({ left: false, right: false });
-
-  // 滚轮横滚支持（同时按住 Shift 时竖滚 = 横滚）
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const handler = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // 浏览器原生横滚
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
-  }, []);
-
-  // 溢出状态感知
-  const updateScrollState = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setScrollState({ left: el.scrollLeft > 4, right: el.scrollLeft < el.scrollWidth - el.clientWidth - 4 });
-  }, []);
-
-  useEffect(() => {
-    updateScrollState();
-    const el = scrollRef.current;
-    if (!el) return;
-    el.addEventListener('scroll', updateScrollState, { passive: true });
-    window.addEventListener('resize', updateScrollState);
-    return () => {
-      el.removeEventListener('scroll', updateScrollState);
-      window.removeEventListener('resize', updateScrollState);
-    };
-  }, [updateScrollState]);
-
-  const scrollBy = (delta: number) => scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
-
-  // 禁用 toolbar 滚动容器自身的右键 context menu
-  // (子按钮上的右键不受影响 — 它们自己处理或冒泡)
-  const handleScrollContainerContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-  };
-
-  const scrollClass = [
-    'toolbar-scroll-container',
-    scrollState.left ? 'has-overflow-left' : '',
-    scrollState.right ? 'has-overflow-right' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const newItems: ToolbarMenuEntry[] = [
+    { id: 'new-folder', label: '新建文件夹', icon: <FolderPlus size={16} />, shortcut: shortcut('file.new-folder', 'file.new-folder-quick'), disabled: !currentPath, action: newFolder },
+    { id: 'new-file', label: '新建文件', icon: <FilePlus2 size={16} />, disabled: !currentPath, action: newFile },
+  ];
+  const viewItems: ToolbarMenuEntry[] = VIEW_MODES.map(({ mode, label, icon }) => ({
+    id: `view-${mode}`, label: `${label}视图`, icon, checked: viewMode === mode, action: () => file.setViewMode(paneId, mode),
+  }));
+  const arrangeItems: ToolbarMenuEntry[] = [
+    { type: 'heading', id: 'sort-heading', label: '排序方式 · 再次选择切换方向' },
+    ...SORT_FIELDS.map(({ field, label }) => ({
+      id: `sort-${field}`, label: `${label}${sortBy === field && sortDir ? sortDir === 'asc' ? ' ↑' : ' ↓' : ''}`,
+      checked: sortBy === field && sortDir !== null, action: () => file.cycleSort(field, paneId),
+    })),
+    { type: 'separator', id: 'group-separator' },
+    ...GROUPS.map(({ mode, label }) => ({ id: `group-${mode}`, label, checked: groupBy === mode, action: () => file.setGroupBy(paneId, mode) })),
+  ];
+  const splitItems: ToolbarMenuEntry[] = [
+    { id: 'split-horizontal', label: '左右分屏', icon: <Columns2 size={16} />, shortcut: shortcut('pane.split-horizontal'), action: () => useLayoutStore.getState().pane.splitPane(paneId, 'horizontal') },
+    { id: 'split-vertical', label: '上下分屏', icon: <PanelTop size={16} />, shortcut: shortcut('pane.split-vertical'), action: () => useLayoutStore.getState().pane.splitPane(paneId, 'vertical') },
+  ];
+  const moreItems: ToolbarMenuEntry[] = [
+    { id: 'back', label: '后退', icon: <ArrowLeft size={16} />, disabled: !canGoBack, action: goBack },
+    { id: 'forward', label: '前进', icon: <ArrowRight size={16} />, disabled: !canGoForward, action: goForward },
+    { type: 'separator', id: 'edit-separator' },
+    { id: 'copy', label: '复制', icon: <Copy size={16} />, shortcut: shortcut('file.copy'), disabled: !hasSelection, action: () => file.copySelected(paneId) },
+    { id: 'cut', label: '剪切', icon: <Scissors size={16} />, shortcut: shortcut('file.cut'), disabled: !hasSelection, action: () => file.cutSelected(paneId) },
+    { id: 'paste', label: '粘贴', icon: <Clipboard size={16} />, shortcut: shortcut('file.paste'), disabled: !hasClipboard, action: () => { void file.pasteToPane(paneId); } },
+    { id: 'rename', label: '重命名', icon: <Pencil size={16} />, shortcut: shortcut('file.rename'), disabled: !hasSelection && !cursorPath, action: rename },
+    { id: 'copy-path', label: '复制路径', icon: <Link2 size={16} />, disabled: !hasSelection && !cursorPath, action: () => { void copyPath(); } },
+    { id: 'delete', label: '移到回收站', icon: <Trash2 size={16} />, shortcut: shortcut('file.delete'), disabled: !hasSelection, danger: true, action: () => window.dispatchEvent(new CustomEvent('tabula:confirm-delete', { detail: { paneId, count: selectedPaths.size } })) },
+    { type: 'separator', id: 'folder-separator' },
+    { id: 'new', label: '新建', icon: <Plus size={16} />, children: newItems },
+    { id: 'path', label: '转到路径', icon: <MapPin size={16} />, shortcut: shortcut('file.path-bar'), action: () => file.openPathBar(paneId) },
+    { id: 'refresh', label: '刷新', icon: <RotateCw size={16} />, shortcut: shortcut('file.refresh'), disabled: !currentPath, action: () => { void file.refresh(paneId); } },
+    { id: 'favorite', label: isFavorite ? '从收藏移除' : '收藏当前目录', icon: <Star size={16} />, checked: isFavorite, disabled: !currentPath, action: toggleFavorite },
+    { id: 'terminal', label: '在当前目录打开终端', icon: <Terminal size={16} />, disabled: !currentPath, action: () => { void openTerminal(); } },
+    { type: 'separator', id: 'display-separator' },
+    { id: 'view', label: '视图', icon: <LayoutList size={16} />, children: viewItems },
+    { id: 'arrange', label: '排序与分组', icon: <ArrowDownUp size={16} />, children: arrangeItems },
+    { id: 'filter', label: `文件类型：${FILE_TYPES.find((item) => item.value === fileType)?.label ?? '全部类型'}`, icon: <Filter size={16} />, children: FILE_TYPES.map(({ value, label }) => ({ id: `filter-${value}`, label, checked: fileType === value, action: () => file.setFileType(paneId, value) })) },
+    { id: 'hidden', label: '显示隐藏文件', icon: <Eye size={16} />, checked: showHidden, action: file.toggleShowHidden },
+    { id: 'extensions', label: '显示扩展名', icon: <Type size={16} />, checked: showExtensions, action: file.toggleShowExtensions },
+    { id: 'search', label: '搜索当前目录', icon: <Search size={16} />, shortcut: shortcut('search.focus'), action: openSearch },
+    { id: 'split', label: '分屏', icon: <Columns2 size={16} />, children: splitItems },
+    { id: 'tools', label: '文件工具', icon: <Wrench size={16} />, children: FILE_TOOLS.map(({ mode, label }) => ({ id: `tool-${mode}`, label, disabled: mode !== 'network' && !currentPath, action: () => openTools(mode) })) },
+  ];
+  const historyItems: ToolbarMenuEntry[] = (openMenu?.kind === 'back'
+    ? history.slice(0, historyIndex).reverse()
+    : history.slice(historyIndex + 1)).slice(0, 20).map((path, index) => ({
+    id: `history-${index}`, label: path, action: () => useLayoutStore.getState().pane.navigate(paneId, path),
+  }));
+  const menuItems = openMenu?.kind === 'new' ? newItems : openMenu?.kind === 'arrange' ? arrangeItems
+    : openMenu?.kind === 'more' ? moreItems : historyItems;
+  const menuLabel = openMenu?.kind === 'new' ? '新建' : openMenu?.kind === 'arrange' ? '排序与分组'
+    : openMenu?.kind === 'more' ? '更多操作' : '浏览历史';
 
   return (
-    <div className="toolbar" data-no-context-menu onContextMenu={handleScrollContainerContextMenu}>
-      {/* 左滚动按钮 */}
-      {scrollState.left && (
-        <button className="toolbar-scroll-btn toolbar-scroll-left" onClick={() => scrollBy(-80)} aria-label="向左滚动" title="向左滚动（无快捷键）">
-          <ChevronLeft size={14} />
-        </button>
-      )}
-      {/* 横向滚动容器 */}
-      <div
-        className={scrollClass}
-        ref={scrollRef}
-        data-no-context-menu
-        onContextMenu={handleScrollContainerContextMenu}
-      >
-      {/* 前进/后退按钮组 */}
-      <div className="toolbar-group">
-        <Tooltip label="后退" shortcut="无快捷键">
-          <button
-            className={`toolbar-btn toolbar-nav ${canGoBack ? '' : 'disabled'}`}
-            onClick={handleGoBack}
-            onMouseDown={handleNavMouseDown('back')}
-            onContextMenu={handleContextMenu}
-            disabled={!canGoBack}
-          >
-            <ArrowLeft size={16} />
-          </button>
-        </Tooltip>
-        <Tooltip label="前进" shortcut="无快捷键">
-          <button
-            className={`toolbar-btn toolbar-nav ${canGoForward ? '' : 'disabled'}`}
-            onClick={handleGoForward}
-            onMouseDown={handleNavMouseDown('forward')}
-            onContextMenu={handleContextMenu}
-            disabled={!canGoForward}
-          >
-            <ArrowRight size={16} />
-          </button>
-        </Tooltip>
+    <div className="toolbar" role="toolbar" aria-label="文件夹工具栏" data-no-context-menu onContextMenu={(event) => event.preventDefault()}>
+      <div className="toolbar-navigation toolbar-group">
+        {([{ direction: 'back', label: '后退', icon: <ArrowLeft size={17} />, enabled: canGoBack, action: goBack },
+          { direction: 'forward', label: '前进', icon: <ArrowRight size={17} />, enabled: canGoForward, action: goForward }] as const).map(({ direction, label, icon, enabled, action }) => (
+          <Tooltip key={direction} label={`${label}（右键查看历史）`} shortcut="无快捷键">
+            <button className="toolbar-btn" aria-label={label} disabled={!enabled} onClick={action} onContextMenu={(event) => { event.preventDefault(); if (enabled) toggleMenu(direction, event.currentTarget); }}>{icon}</button>
+          </Tooltip>
+        ))}
         <Tooltip label="向上一级" shortcut={shortcut('navigation.parent')}>
-          <button className="toolbar-btn toolbar-nav" aria-label="向上一级" disabled={!parent}
+          <button className="toolbar-btn" aria-label="向上一级" disabled={!parent}
             onClick={() => { if (parent) void useLayoutStore.getState().pane.navigate(paneId, parent); }}>
-            <ArrowUp size={16} />
+            <ArrowUp size={17} />
           </button>
         </Tooltip>
       </div>
-
-      {/* 历史菜单下拉 */}
-      {historyMenuOpen && menuItems.length > 0 && (
-        <div className="toolbar-history-menu" ref={historyMenuRef}>
-          {menuItems.map((path, i) => (
-            <div
-              key={i}
-              className="toolbar-history-item"
-              onClick={() => handleHistoryJump(path)}
-            >
-              {path}
-            </div>
-          ))}
+      <button className="toolbar-location" title={currentPath || '转到路径'} aria-label={`当前目录：${folderName}，转到路径`} onClick={() => file.openPathBar(paneId)}>
+        <Folder size={17} /><span>{folderName}</span>
+      </button>
+      <div className="toolbar-actions toolbar-group">
+        <span className="toolbar-create">
+          <Tooltip label="新建文件夹或文件（右键新建文件）" shortcut={shortcut('file.new-folder', 'file.new-folder-quick')}>
+            <button className="toolbar-btn" aria-label="新建" aria-haspopup="menu" aria-expanded={openMenu?.kind === 'new'} onClick={(event) => toggleMenu('new', event.currentTarget)} onContextMenu={(event) => { event.preventDefault(); if (currentPath) newFile(); }}><Plus size={18} /></button>
+          </Tooltip>
+        </span>
+        <div className="toolbar-view-switch" role="group" aria-label="视图模式">
+          {VIEW_MODES.map(({ mode, icon, label }) => <Tooltip key={mode} label={`${label}视图`}>
+            <button className={`toolbar-btn ${viewMode === mode ? 'active' : ''}`} aria-label={`${label}视图`} aria-pressed={viewMode === mode} onClick={() => file.setViewMode(paneId, mode)}>{icon}</button>
+          </Tooltip>)}
         </div>
-      )}
-
-      <div className="toolbar-divider" />
-
-      <div className="toolbar-group">
-        <Tooltip label="新建文件夹（右键新建文件）" shortcut={shortcut('file.new-folder', 'file.new-folder-quick')}>
-          <button
-            className="toolbar-btn toolbar-new"
-            onClick={handleNewFolder}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              handleNewFile();
-            }}
-          >
-            <Plus size={16} />
-            <span className="toolbar-label">新建</span>
-          </button>
-        </Tooltip>
-        <Tooltip label="在当前目录打开终端" shortcut="无快捷键">
-          <button
-            className="toolbar-btn"
-            onClick={() => { void handleOpenShell(); }}
-            disabled={!currentPath}
-          >
-            <Terminal size={16} />
-            <span className="toolbar-label">终端</span>
-          </button>
+        <span className="toolbar-arrange"><Tooltip label="排序与分组">
+          <button className="toolbar-btn" aria-label="排序与分组" aria-haspopup="menu" aria-expanded={openMenu?.kind === 'arrange'} onClick={(event) => toggleMenu('arrange', event.currentTarget)}><ArrowDownUp size={17} /></button>
+        </Tooltip></span>
+        <span className="toolbar-search"><Tooltip label="搜索当前目录" shortcut={shortcut('search.focus')}>
+          <button className={`toolbar-btn ${searchOpen ? 'active' : ''}`} aria-label="搜索当前目录" onClick={openSearch}><Search size={17} /></button>
+        </Tooltip></span>
+        <span className="toolbar-split"><Tooltip label="左右分屏" shortcut={shortcut('pane.split-horizontal')}>
+          <button className="toolbar-btn" aria-label="左右分屏" onClick={() => useLayoutStore.getState().pane.splitPane(paneId, 'horizontal')}><Columns2 size={17} /></button>
+        </Tooltip></span>
+        <Tooltip label="更多操作">
+          <button className={`toolbar-btn toolbar-more ${openMenu?.kind === 'more' ? 'active' : ''}`} aria-label="更多操作" aria-haspopup="menu" aria-expanded={openMenu?.kind === 'more'} onClick={(event) => toggleMenu('more', event.currentTarget)}><MoreHorizontal size={19} /></button>
         </Tooltip>
       </div>
-
-      <div className="toolbar-divider" />
-
-      {/* P3: 文件操作按钮 */}
-      <div className="toolbar-group">
-        <Tooltip label="复制" shortcut={shortcut('file.copy')}>
-          <button
-            className="toolbar-btn"
-            onClick={handleCopy}
-            disabled={!hasSelection}
-          >
-            <Copy size={16} />
-            <span className="toolbar-label">复制</span>
-          </button>
-        </Tooltip>
-        <Tooltip label="剪切" shortcut={shortcut('file.cut')}>
-          <button
-            className="toolbar-btn"
-            onClick={handleCut}
-            disabled={!hasSelection}
-          >
-            <Scissors size={16} />
-            <span className="toolbar-label">剪切</span>
-          </button>
-        </Tooltip>
-        <Tooltip label="粘贴" shortcut={shortcut('file.paste')}>
-          <button
-            className="toolbar-btn"
-            onClick={handlePaste}
-            disabled={!hasClipboard}
-          >
-            <Clipboard size={16} />
-            <span className="toolbar-label">粘贴</span>
-          </button>
-        </Tooltip>
-        <Tooltip label="复制路径" shortcut="无快捷键">
-          <button
-            className="toolbar-btn"
-            onClick={handleCopyPath}
-            disabled={!hasSelection && !cursorPath}
-          >
-            <Link2 size={16} />
-          </button>
-        </Tooltip>
-        <Tooltip label="删除" shortcut={shortcut('file.delete')}>
-          <button
-            className="toolbar-btn"
-            onClick={handleDelete}
-            disabled={!hasSelection}
-          >
-            <Trash2 size={16} />
-          </button>
-        </Tooltip>
-        <Tooltip label="重命名" shortcut={shortcut('file.rename')}>
-          <button
-            className="toolbar-btn"
-            onClick={handleRename}
-            disabled={!hasSelection && !cursorPath}
-          >
-            <Pencil size={16} />
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className="toolbar-divider" />
-
-      <div className="toolbar-group">
-        <Tooltip label="转到路径" shortcut={shortcut('file.path-bar')}>
-          <button
-            className="toolbar-btn"
-            onClick={() => openPathBar(paneId)}
-          >
-            <MapPin size={16} />
-            <span className="toolbar-label">路径</span>
-          </button>
-        </Tooltip>
-        <Tooltip label="刷新" shortcut={shortcut('file.refresh')}>
-          <button className="toolbar-btn" onClick={() => void refresh(paneId)}>
-            <RotateCw size={16} />
-          </button>
-        </Tooltip>
-        <Tooltip label={isFavorite ? '从收藏移除' : '收藏当前目录'} shortcut="无快捷键">
-          <button
-            className={`toolbar-btn toolbar-fav ${isFavorite ? 'active' : ''}`}
-            onClick={handleToggleFavorite}
-            disabled={!currentPath}
-          >
-            <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className="toolbar-divider" />
-
-      <div className="toolbar-group">
-        <Tooltip label={`视图: ${VIEW_MODES.find((m) => m.mode === viewMode)?.label ?? '详情'}`} shortcut="无快捷键">
-          <button
-            className="toolbar-btn"
-            onClick={() => cycleViewMode(paneId, viewMode, setViewMode)}
-          >
-            {VIEW_MODES.find((m) => m.mode === viewMode)?.icon ?? <LayoutList size={16} />}
-            <span className="toolbar-label">{VIEW_MODES.find((m) => m.mode === viewMode)?.label ?? '详情'}</span>
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className="toolbar-divider" />
-
-      {/* G007: 分组切换 (none → type → date → size → none 循环) */}
-      <Tooltip label="按文件类型筛选" shortcut="无快捷键"><select aria-label="按文件类型筛选" value={fileType} onChange={e => useFileStore.getState().setFileType(paneId, e.target.value as import('@tabula/bridge').FileTypeCategory)}>
-        {Object.entries({ all: '全部类型', folder: '文件夹', image: '图片', document: '文档', code: '代码', archive: '压缩包', audio: '音频', video: '视频' }).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-      </select></Tooltip>
-      <Tooltip label="文件工具" shortcut="无快捷键"><select aria-label="文件工具" value="" onChange={e => {
-        const mode = e.target.value as NonNullable<ReturnType<typeof useUiDialogsStore.getState>['toolsDialog']>['mode'];
-        if (mode) useUiDialogsStore.getState().openTools(mode, paneId, ['content', 'duplicates', 'history', 'network'].includes(mode) ? currentPath : selectedPaths.size === 1 ? [...selectedPaths][0] : currentPath);
-      }}>
-        <option value="">文件工具</option><option value="content">全文内容搜索</option><option value="duplicates">查找重复文件</option><option value="history">文件历史时间线</option><option value="network">连接服务器</option><option value="links">链接管理</option><option value="icons">文件夹图标</option><option value="associations">默认应用</option>
-      </select></Tooltip>
-      <div className="toolbar-group">
-        <Tooltip label={`分组: ${groupByLabel(groupBy)}`} shortcut="无快捷键">
-          <button
-            className={`toolbar-btn ${groupBy !== 'none' ? 'active' : ''}`}
-            onClick={() => cycleGroupBy(paneId, groupBy, setGroupBy)}
-          >
-            <Layers size={16} />
-            <span className="toolbar-label">{groupByShort(groupBy)}</span>
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className="toolbar-divider" />
-
-      {/* 左右分屏 */}
-      <div className="toolbar-group">
-        <Tooltip label="左右分屏" shortcut={shortcut('pane.split-horizontal')}>
-          <button
-            className="toolbar-btn"
-            onClick={() => {
-              useLayoutStore.getState().pane.splitPane(paneId, 'horizontal');
-            }}
-          >
-            <Columns2 size={16} />
-            <span className="toolbar-label">分屏</span>
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className="toolbar-divider" />
-
-      <div className="toolbar-group">
-        <Tooltip label={showHidden ? '隐藏隐藏文件' : '显示隐藏文件'} shortcut="无快捷键">
-          <button
-            className={`toolbar-btn ${showHidden ? 'active' : ''}`}
-            onClick={toggleShowHidden}
-          >
-            {showHidden ? <Eye size={16} /> : <EyeOff size={16} />}
-            <span className="toolbar-label">.{showHidden ? '已显' : '隐藏'}</span>
-          </button>
-        </Tooltip>
-        <Tooltip label={showExtensions ? '隐藏扩展名' : '显示扩展名'} shortcut="无快捷键">
-          <button
-            className={`toolbar-btn ${showExtensions ? 'active' : ''}`}
-            onClick={toggleShowExtensions}
-          >
-            <Type size={16} />
-            <span className="toolbar-label">{showExtensions ? '扩展名:开' : '扩展名:关'}</span>
-          </button>
-        </Tooltip>
-      </div>
-      </div>
-      {/* 右滚动按钮 */}
-      {scrollState.right && (
-        <button className="toolbar-scroll-btn toolbar-scroll-right" onClick={() => scrollBy(80)} aria-label="向右滚动" title="向右滚动（无快捷键）">
-          <ChevronRight size={14} />
-        </button>
-      )}
+      {openMenu && <ToolbarMenu key={openMenu.kind} anchor={openMenu.anchor} label={menuLabel} items={menuItems} paneId={paneId} onClose={closeMenu} />}
     </div>
   );
-}
-
-// =================== 辅助函数 ===================
-
-import type { LayoutNode } from '@tabula/bridge';
-
-/** G007: Group By 循环顺序 */
-const GROUP_BY_CYCLE: GroupByMode[] = ['none', 'type', 'date', 'size'];
-
-/** 视图模式循环顺序 */
-const VIEW_MODE_CYCLE: ViewMode[] = ['details', 'list', 'grid'];
-
-/** 循环切换 pane 的视图模式 */
-function cycleViewMode(
-  paneId: string,
-  current: ViewMode,
-  setViewMode: (paneId: string, mode: ViewMode) => void,
-): void {
-  const idx = VIEW_MODE_CYCLE.indexOf(current);
-  const next = VIEW_MODE_CYCLE[(idx + 1) % VIEW_MODE_CYCLE.length] ?? 'details';
-  setViewMode(paneId, next);
-}
-
-/** 循环切换 pane 的分组模式 */
-function cycleGroupBy(
-  paneId: string,
-  current: GroupByMode,
-  setGroupBy: (paneId: string, mode: GroupByMode) => void,
-): void {
-  const idx = GROUP_BY_CYCLE.indexOf(current);
-  const next = GROUP_BY_CYCLE[(idx + 1) % GROUP_BY_CYCLE.length] ?? 'none';
-  setGroupBy(paneId, next);
-}
-
-/** Group By 完整标签(tooltip 用) */
-function groupByLabel(mode: GroupByMode): string {
-  switch (mode) {
-    case 'none':
-      return '未分组';
-    case 'type':
-      return '按类型分组';
-    case 'date':
-      return '按日期分组';
-    case 'size':
-      return '按大小分组';
-  }
-}
-
-/** Group By 短标签(按钮内显示) */
-function groupByShort(mode: GroupByMode): string {
-  switch (mode) {
-    case 'none':
-      return '分组';
-    case 'type':
-      return '类型';
-    case 'date':
-      return '日期';
-    case 'size':
-      return '大小';
-  }
-}
-
-/** 在布局树中查找 pane 节点 */
-function findPaneNode(node: LayoutNode, paneId: string): LayoutNode | null {
-  if (node.type === 'pane') {
-    return node.id === paneId ? node : null;
-  }
-  for (const child of node.children) {
-    const hit = findPaneNode(child, paneId);
-    if (hit) return hit;
-  }
-  return null;
 }

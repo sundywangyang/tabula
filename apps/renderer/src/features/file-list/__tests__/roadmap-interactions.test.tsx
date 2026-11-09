@@ -11,7 +11,18 @@ import { parseArchive } from '../../preview/PreviewPanel';
 import { encodeTar } from '@tabula/core';
 import { gzipSync, strToU8, zipSync } from 'fflate';
 import type { FsEntry, TabulaAPI, DirSizeProgress } from '@tabula/bridge';
-vi.mock('@tanstack/react-virtual', () => ({ useVirtualizer: (options: any) => ({ getTotalSize: () => options.count * 28, getVirtualItems: () => Array.from({ length: options.count }, (_, index) => ({ index, key: index, start: index * 28, size: options.estimateSize(index) })), scrollToIndex() { }, measure() { } }) }));
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: (options: { count: number; estimateSize: (index: number) => number }) => {
+    let total = 0;
+    const items = Array.from({ length: options.count }, (_, index) => {
+      const size = options.estimateSize(index);
+      const item = { index, key: index, start: total, size };
+      total += size;
+      return item;
+    });
+    return { getTotalSize: () => total, getVirtualItems: () => items, scrollToIndex() { }, measure() { } };
+  },
+}));
 vi.mock('../../../perf/use-file-list-perf', () => ({ useFileListPerfReport() { } }));
 const entry = (name: string, mode = 0o644): FsEntry => ({ name, path: 'C:/fixtures/' + name, mode, ext: '.txt', isDirectory: false, isFile: true, isSymlink: false, size: 5, mtime: 1, atime: 1, ctime: 1, birthtime: 1 });
 let root: Root; let container: HTMLDivElement; let bridge: any;
@@ -26,6 +37,49 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 describe('roadmap interaction regressions', () => {
+  it.each(['details', 'list'] as const)('%s renders 32px entries below 28px group headers', async viewMode => {
+    const entries = [entry('a.txt'), entry('b.txt')];
+    useFileStore.setState({ panes: { p: { entries, currentPath: 'C:/fixtures', breadcrumb: [], loading: false, error: null, selectedPaths: new Set(), cursorPath: null, lastClickedPath: null, renameTarget: null, searchQuery: '', searchOpen: false, viewMode, groupBy: 'type' } } });
+    await act(async () => root.render(<FileList paneId="p" onOpenEntry={() => { }} />));
+    const header = container.querySelector<HTMLElement>('.file-list-group-header')!;
+    const rows = [...container.querySelectorAll<HTMLElement>('[data-entry-path]')];
+    expect(header.style.height).toBe('28px');
+    expect(rows.map(row => [row.style.transform, row.style.height])).toEqual([
+      ['translateY(28px)', '32px'], ['translateY(60px)', '32px'],
+    ]);
+    expect(container.querySelector<HTMLElement>('.file-list')!.style.getPropertyValue('--file-row-h')).toBe('32px');
+  });
+
+  it('grid geometry follows thumbnail changes and keeps group headers compact', async () => {
+    const entries = [entry('a.txt'), entry('b.txt')];
+    useFileStore.setState({ panes: { p: { entries, currentPath: 'C:/fixtures', breadcrumb: [], loading: false, error: null, selectedPaths: new Set(), cursorPath: null, lastClickedPath: null, renameTarget: null, searchQuery: '', searchOpen: false, viewMode: 'grid', groupBy: 'type' } } });
+    await act(async () => root.render(<FileList paneId="p" onOpenEntry={() => { }} />));
+    expect(container.querySelector<HTMLElement>('.grid-row')!.style.height).toBe('112px');
+    await act(async () => useFileStore.setState({ thumbnailSize: 128 }));
+    expect(container.querySelector<HTMLElement>('.file-list-group-header')!.style.height).toBe('28px');
+    expect(container.querySelector<HTMLElement>('.grid-row')!.style.height).toBe('176px');
+    expect(container.querySelector<HTMLElement>('.grid-row')!.style.transform).toBe('translateY(28px)');
+  });
+
+  it.each([
+    { viewMode: 'details' as const, height: 320, thumbnailSize: 64, nextIndex: 9 },
+    { viewMode: 'list' as const, height: 320, thumbnailSize: 64, nextIndex: 9 },
+    { viewMode: 'grid' as const, height: 528, thumbnailSize: 128, nextIndex: 6 },
+  ])('$viewMode pages by the visible rows at the current thumbnail size', async ({ viewMode, height, thumbnailSize, nextIndex }) => {
+    const entries = Array.from({ length: 30 }, (_, index) => entry(`${String(index).padStart(2, '0')}.txt`));
+    useFileStore.setState({ panes: { p: { entries, currentPath: 'C:/fixtures', breadcrumb: [], loading: false, error: null, selectedPaths: new Set(), cursorPath: null, lastClickedPath: null, renameTarget: null, searchQuery: '', searchOpen: false, viewMode, groupBy: 'none' } } });
+    await act(async () => root.render(<FileList paneId="p" onOpenEntry={() => { }} />));
+    const fileList = container.querySelector<HTMLElement>('.file-list')!;
+    const body = container.querySelector<HTMLElement>('.file-list-body')!;
+    Object.defineProperty(fileList, 'clientWidth', { value: 600 });
+    Object.defineProperties(body, { clientHeight: { value: height }, clientWidth: { value: 600 } });
+    await act(async () => { useFileStore.setState({ thumbnailSize }); useFileStore.getState().selectOne('p', entries[0].path); });
+    await act(async () => fileList.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'PageDown' })));
+    expect(useFileStore.getState().panes.p.cursorPath).toBe(entries[nextIndex].path);
+    await act(async () => fileList.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'PageUp' })));
+    expect(useFileStore.getState().panes.p.cursorPath).toBe(entries[0].path);
+  });
+
   it.each(['list', 'grid'] as const)('%s keeps grouped order, range selection and live filtering', async viewMode => {
     const entries = [entry('a.txt'), { ...entry('b.js'), ext: '.js' }, entry('c.txt')];
     useFileStore.setState({ panes: { p: { entries, currentPath: 'C:/fixtures', breadcrumb: [], loading: false, error: null, selectedPaths: new Set(), cursorPath: null, lastClickedPath: null, renameTarget: null, searchQuery: '', searchOpen: false, viewMode, groupBy: 'type' } } });

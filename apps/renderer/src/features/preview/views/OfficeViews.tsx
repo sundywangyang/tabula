@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
 
 // =================== Excel 表格 (xlsx) ===================
 
@@ -64,7 +65,7 @@ export function XlsxView({ url, ext }: { url: string; ext: string; }) {
   if (error) {
     return (
       <div className="preview-error">
-        <div className="error-icon">⚠</div>
+        <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
         <div className="error-message">xlsx 解析失败: {error}</div>
         <div className="preview-error-meta">支持格式: xlsx, xls, xlsm, xlsb, ods, csv</div>
       </div>
@@ -190,7 +191,7 @@ export function PptxView({ url }: { url: string; }) {
   if (error) {
     return (
       <div className="preview-error">
-        <div className="error-icon">⚠</div>
+        <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
         <div className="error-message">pptx 解析失败: {error}</div>
         <div className="preview-error-meta">当前仅提取文本 + slide 切换, 不渲染版式/动画/图片/母版</div>
       </div>
@@ -270,7 +271,7 @@ export function DocxView({ url }: { url: string; }) {
   if (error) {
     return (
       <div className="preview-error">
-        <div className="error-icon">⚠</div>
+        <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
         <div className="error-message">docx 解析失败: {error}</div>
       </div>
     );

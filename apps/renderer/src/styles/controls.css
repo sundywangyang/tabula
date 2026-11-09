@@ -1,0 +1,6 @@
+/* Shared window surfaces and controls; feature styles only define their layout. */
+:where(.ui-overlay) { background: var(--scrim); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+:where(.ui-surface) { background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); }
+:where(.ui-menu) { background: var(--bg-translucent-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 5px; }
+:where(.ui-control-button) { min-height: 30px; border-radius: var(--radius-sm); background: var(--bg-elevated); border: 1px solid var(--border-strong); box-shadow: var(--shadow-sm); color: var(--fg-primary); font-size: 12px; transition: background var(--motion-fast), border-color var(--motion-fast); }
+:where(.ui-control-button):disabled { opacity: .45; }

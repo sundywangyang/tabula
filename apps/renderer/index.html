@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;" />
     <title>Tabula</title>
+    <style>
+      /* 主题载入前透出已匹配系统/用户偏好的原生窗口底色。 */
+      :root:not([data-theme]) { background: transparent; }
+      :root:not([data-theme]) body { visibility: hidden; background: transparent; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

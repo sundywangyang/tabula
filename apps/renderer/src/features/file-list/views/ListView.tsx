@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { getCachedTags } from '../../../components/context-menu/tags';
 import { FileThumb } from './FileThumb';
@@ -36,9 +36,10 @@ export function ListView({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 28,
+    estimateSize: index => rows[index].height,
     overscan: 12,
   });
+  useEffect(() => { rowVirtualizer.measure(); }, [rows]);
 
   const overlayStyle = rubberBand
     ? computeOverlayStyle(parentRef.current, rubberBand)

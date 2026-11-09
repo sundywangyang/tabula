@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useFileStore } from '../stores/file-store';
+import { TriangleAlert } from 'lucide-react';
 import './ConflictDialog.css';
 
 export function ConflictDialog() {
@@ -31,7 +32,7 @@ export function ConflictDialog() {
 
   return (
     <div
-      className="conflict-overlay"
+      className="ui-overlay conflict-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           // 视为跳过当前
@@ -39,9 +40,9 @@ export function ConflictDialog() {
         }
       }}
     >
-      <div className="conflict-dialog" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
+      <div className="ui-surface conflict-dialog" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
         <div className="conflict-header">
-          <span className="conflict-icon">⚠</span>
+          <span className="conflict-icon"><TriangleAlert size={18} /></span>
           <span id="conflict-title" className="conflict-title">{verb}时发生名称冲突</span>
         </div>
 
@@ -85,28 +86,28 @@ export function ConflictDialog() {
 
         <div className="conflict-actions">
           <button
-            className="conflict-btn"
+            className="ui-control-button conflict-btn"
             onClick={() => void resolve('skip')}
             title="跳过这个文件,继续下一个"
           >
             跳过
           </button>
           <button
-            className="conflict-btn"
+            className="ui-control-button conflict-btn"
             onClick={() => void resolve('rename', renameValue)}
             title="使用新名称保留两个文件"
           >
             重命名
           </button>
           <button
-            className="conflict-btn conflict-btn-warn"
+            className="ui-control-button conflict-btn conflict-btn-warn"
             onClick={() => void resolve('overwrite')}
             title="覆盖目标(不可恢复)"
           >
             覆盖
           </button>
           <button
-            className="conflict-btn conflict-btn-danger"
+            className="ui-control-button conflict-btn conflict-btn-danger"
             onClick={() => void resolve('cancelAll')}
             title="取消整批粘贴"
           >

@@ -28,16 +28,34 @@ export function findShortcutCommand(
   return null;
 }
 
+function isShortcutModalOpen(): boolean {
+  const dialogs = useUiDialogsStore.getState();
+  const file = useFileStore.getState();
+  return Boolean(dialogs.newTabPaneId || dialogs.toolsDialog || dialogs.settingsOpen || dialogs.newFolderOpen || dialogs.newFileOpen || dialogs.confirmDeleteOpen
+    || dialogs.confirmPermanentDeleteOpen || dialogs.batchRename.open || dialogs.propertiesPanel.open || file.pendingConflicts || file.globalSearch.open);
+}
+
+function isTextInput(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
+/** Native menu accelerators must respect the same editing and modal context as keydown. */
+export function handleNativeCloseTabCommand(): void {
+  const file = useFileStore.getState();
+  if (isShortcutModalOpen() || isCommandPaletteOpen() || isTextInput(document.activeElement)
+    || file.pathBarOpen || file.previewState) return;
+  runCommandById('tab.close');
+}
+
 /** Capture before component handlers, so a key executes exactly one command. */
 export function handleShortcutKeyDown(event: KeyboardEvent): void {
   if (event.defaultPrevented || event.isComposing) return;
+  // Portal menus own navigation and Escape; never dispatch file commands behind them.
+  if (event.target instanceof Element && event.target.closest('[role="menu"]')) return;
   // The open context menu owns Escape; let its handler close it without clearing selection.
   if (event.key === 'Escape' && document.querySelector('.context-menu')) return;
-  const dialogs = useUiDialogsStore.getState();
-  if (dialogs.newTabPaneId || dialogs.toolsDialog || dialogs.settingsOpen || dialogs.newFolderOpen || dialogs.newFileOpen || dialogs.confirmDeleteOpen
-    || dialogs.confirmPermanentDeleteOpen || dialogs.batchRename.open || dialogs.propertiesPanel.open) return;
+  if (isShortcutModalOpen()) return;
   const file = useFileStore.getState();
-  if (file.pendingConflicts || file.globalSearch.open) return;
   const command = findShortcutCommand(event, useKeymapStore.getState().bindings, getCachedPlatform());
   if (command === 'command-palette.toggle') {
     event.preventDefault(); event.stopPropagation();
@@ -45,8 +63,7 @@ export function handleShortcutKeyDown(event: KeyboardEvent): void {
     return;
   }
   if (isCommandPaletteOpen()) return;
-  const target = event.target as HTMLElement | null;
-  if (target?.closest('input, textarea, select, [contenteditable="true"]') || file.pathBarOpen) return;
+  if (isTextInput(event.target) || file.pathBarOpen) return;
   if (event.key === 'Escape') {
     event.preventDefault(); event.stopPropagation();
     if (file.previewState) file.closePreview();

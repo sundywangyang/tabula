@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Clock3, Ruler } from 'lucide-react';
 
 // =================== 视频/音频 (MediaView) ===================
 
@@ -131,10 +132,10 @@ export function MediaView({ url, kind }: { url: string; kind: 'video' | 'audio';
     <div className="preview-media-wrap">
       <div className="preview-media-meta">
         {meta.duration !== undefined && (
-          <span className="preview-media-stat">⏱ {formatDuration(meta.duration)}</span>
+          <span className="preview-media-stat"><Clock3 size={13} aria-hidden="true" /> {formatDuration(meta.duration)}</span>
         )}
         {kind === 'video' && meta.width && meta.height && (
-          <span className="preview-media-stat">📐 {meta.width}×{meta.height}</span>
+          <span className="preview-media-stat"><Ruler size={13} aria-hidden="true" /> {meta.width}×{meta.height}</span>
         )}
         {kind === 'video' && meta.width && meta.height && meta.duration && (
           <span className="preview-media-stat preview-media-stat-dim">

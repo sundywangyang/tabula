@@ -11,6 +11,7 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
 import { WindowManager } from './window/window-manager';
+import { updateApplicationMenu } from './window/application-menu';
 import { registerIpcHandlers } from './ipc';
 import { getWindowProvider } from './providers/window';
 import { loadConfig } from './store/config';
@@ -93,14 +94,15 @@ async function bootstrap() {
     : join(process.resourcesPath, 'resources', 'Tabula.icns');
   getWindowProvider().setDockIcon(dockIcon);
 
+  // 在创建任何窗口前读取主题,避免浅色启动时先显示深色启动屏。
+  const config = await loadConfig();
+
   // P7: 启动屏(splash)
   // 必须在主窗口创建之前,这样用户不会看到空白
   createSplash();
   setSplashMessage('正在准备 Tabula…');
 
-  // 加载配置
-  setSplashProgress(15, '正在读取用户配置…');
-  const config = await loadConfig();
+  setSplashProgress(15, '用户配置已就绪…');
 
   // 初始化扩展宿主(后台进程)
   setSplashProgress(35, '正在发现扩展…');
@@ -129,6 +131,7 @@ async function bootstrap() {
   // 实际 registerShortcutsHandlers 内部已读 store,所以这里读时机一致)
   // 注意:initKeymap() 内部会用内置命令目录,不传 specs 也行
   initKeymap();
+  updateApplicationMenu();
 
   // 监听主窗口 ready-to-show → 关闭 splash
   let splashClosed = false;

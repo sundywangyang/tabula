@@ -1,18 +1,14 @@
-/**
- * 自定义标题栏 (macOS 风格)
- *
- * 渲染内容 (最少化):
- *  - macOS: 只留 drag region, 系统 traffic lights 在窗口最左侧自动渲染
- *  - Win/Linux: drag region + 右侧自定义窗口控制按钮 (min/max/close)
- *
- * logo / version / sidebar toggle / settings / DevTools 全部移到 status-bar。
- * 见 StatusBar.tsx。
- */
+/** Platform window controls and global navigation in a draggable title bar. */
 import { useState, useEffect } from 'react';
+import { PanelLeft, Settings, PanelsTopLeft } from 'lucide-react';
 import { getCachedPlatform } from '../platform-cache';
 import './TitleBar.css';
 
-export function TitleBar() {
+export function TitleBar({ sidebarVisible, onToggleSidebar, onSettingsOpen }: {
+  sidebarVisible: boolean;
+  onToggleSidebar: () => void;
+  onSettingsOpen: () => void;
+}) {
   const [isMaximized, setIsMaximized] = useState(false);
   const isMac = getCachedPlatform() === 'macos';
 
@@ -32,7 +28,17 @@ export function TitleBar() {
 
   return (
     <div className={`title-bar ${isMac ? 'is-mac' : 'is-win'}`}>
-      <div className="title-bar-drag" />
+      <div className="title-bar-drag">
+        <button className="title-bar-action" onClick={onToggleSidebar}
+          title={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
+          aria-label={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'} aria-pressed={sidebarVisible}>
+          <PanelLeft size={17} strokeWidth={1.7} />
+        </button>
+        <span className="title-bar-brand"><PanelsTopLeft size={15} strokeWidth={1.7} /> Tabula</span>
+      </div>
+      <button className="title-bar-action title-bar-settings" onClick={onSettingsOpen} title="设置" aria-label="设置">
+        <Settings size={16} strokeWidth={1.7} />
+      </button>
       {!isMac && (
         <div className="title-bar-window-controls">
           <button

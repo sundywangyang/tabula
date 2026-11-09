@@ -199,3 +199,7 @@
   cursor: pointer;
   font-size: 12px;
 }
+
+.trash-title, .trash-empty-icon { display: inline-flex; align-items: center; gap: 8px; }
+.trash-empty-icon { justify-content: center; color: var(--fg-tertiary); }
+.trash-toolbar { background: var(--bg-toolbar); }

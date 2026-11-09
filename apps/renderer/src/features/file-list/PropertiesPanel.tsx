@@ -7,6 +7,7 @@
  * - done=true 时取消订阅,显示结果;组件卸载时也取消订阅
  */
 import { useEffect, useRef, useState } from 'react';
+import { Folder, File, Link2 } from 'lucide-react';
 import type { FsEntry } from '@tabula/bridge';
 import './PropertiesPanel.css';
 import { useModal } from '../../components/use-modal';
@@ -119,17 +120,17 @@ export function PropertiesPanel({ paneId, entry, onClose }: PropertiesPanelProps
     void window.tabula.fs.showInFolder(entry.path);
   };
 
-  const icon = entry.isDirectory ? '📁' : entry.isSymlink ? '🔗' : '📄';
+  const icon = entry.isDirectory ? <Folder size={36} strokeWidth={1.4} /> : entry.isSymlink ? <Link2 size={36} strokeWidth={1.4} /> : <File size={36} strokeWidth={1.4} />;
 
   return (
     <div
-      className="properties-overlay"
+      className="ui-overlay properties-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="properties-panel"
+        className="ui-surface properties-panel"
         ref={panelRef}
         tabIndex={-1}
         role="dialog"

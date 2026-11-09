@@ -10,18 +10,17 @@
   position: fixed;
   inset: 0;
   z-index: 9500;
-  background: rgba(0, 0, 0, 0.3);
+
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 14vh;
-  -webkit-backdrop-filter: var(--blur-md);
-  backdrop-filter: var(--blur-md);
+
   animation: cp-fade-in 0.12s ease-out;
 }
 
 @supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
-  .cp-overlay { background: rgba(0, 0, 0, 0.5); }
+  .cp-overlay {  }
 }
 
 @keyframes cp-fade-in {
@@ -36,12 +35,7 @@
 .cp-panel {
   width: min(640px, 92vw);
   max-height: 70vh;
-  background: var(--bg-translucent-elevated);
-  -webkit-backdrop-filter: var(--blur-md);
-  backdrop-filter: var(--blur-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -49,7 +43,7 @@
 }
 
 @supports not ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
-  .cp-panel { background: var(--bg-elevated); border-color: var(--border-strong); }
+  .cp-panel {  border-color: var(--border-strong); }
 }
 
 @keyframes cp-pop-in {
@@ -131,13 +125,13 @@
 }
 
 .cp-row-selected {
-  background: rgba(99, 102, 241, 0.18);
+  background: var(--accent-soft);
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
 .cp-row-selected:hover {
-  background: rgba(99, 102, 241, 0.22);
+  background: var(--accent-soft);
 }
 
 .cp-row-category {
@@ -189,3 +183,9 @@
   color: var(--fg-tertiary);
   font-size: 11px;
 }
+
+.cp-header, .cp-footer { background: var(--bg-toolbar); }
+.cp-list { padding: 6px; }
+.cp-row { border-radius: var(--radius-sm); margin: 1px 0; min-height: 36px; }
+.cp-row-selected, .cp-row-selected:hover { background: var(--selection-bg); color: var(--selection-fg); }
+.cp-row-selected * { color: inherit; }

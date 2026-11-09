@@ -624,7 +624,7 @@ export const useFileStore = create<FileStore>((set, get, store) => {
           return;
         }
         if (dirs.length === 1) {
-          set({ pathBarValue: dirs[0] + '\\', pathBarCompletions: dirs, pathBarError: null });
+          set({ pathBarValue: joinPath(dirs[0]!, ''), pathBarCompletions: dirs, pathBarError: null });
           return;
         }
         const names = dirs.map((p) => basename(p));

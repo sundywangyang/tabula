@@ -191,12 +191,12 @@ export function CommandPalette() {
 
   return (
     <div
-      className="cp-overlay"
+      className="ui-overlay cp-overlay"
       onClick={onBackdropClick}
       role="presentation"
       data-testid="command-palette"
     >
-      <div className="cp-panel" role="dialog" aria-label="命令面板">
+      <div className="ui-surface cp-panel" role="dialog" aria-label="命令面板">
         <div className="cp-header">
           <span className="cp-icon" aria-hidden="true">⌘</span>
           <input

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import type { FsEntry } from '@tabula/bridge';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -43,9 +43,10 @@ export function DetailsView({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 28,
+    estimateSize: index => rows[index].height,
     overscan: 12,
   });
+  useEffect(() => { rowVirtualizer.measure(); }, [rows]);
 
   // rubber-band overlay 几何:与 FileList.tsx 里 computeEntriesInRect 同样的转换逻辑
   const overlayStyle = rubberBand

@@ -4,7 +4,6 @@
   inset: 0;
   z-index: 5000;
   pointer-events: auto;
-  background: rgba(0, 0, 0, 0.35);
 }
 
 .properties-panel {
@@ -15,10 +14,9 @@
   max-height: calc(100vh - 48px);
   overflow: auto;
   width: min(520px, calc(100vw - 32px));
-  border-radius: 12px;
-  background: var(--bg-elevated);
+
   border-left: 1px solid var(--border-strong);
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
+
   display: flex;
   flex-direction: column;
   pointer-events: auto;
@@ -170,7 +168,7 @@
 }
 
 .properties-calc-btn:hover:not(:disabled) {
-  background: rgba(99, 102, 241, 0.2);
+  background: var(--accent-soft);
 }
 
 .properties-calc-btn:disabled {
@@ -195,7 +193,7 @@
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   border: 1px solid var(--accent);
 }
 
@@ -214,3 +212,6 @@
   background: var(--bg-active);
   border-color: var(--accent);
 }
+
+.properties-header { background: var(--bg-toolbar); }
+.properties-icon { color: var(--accent); display: inline-flex; }

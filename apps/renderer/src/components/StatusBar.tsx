@@ -12,19 +12,13 @@ import { useFileStore } from '../stores/file-store';
 import { useLayoutStore } from '../stores/layout-store';
 import { ThemeToggle } from './ThemeToggle';
 import { TransferPanel } from './TransferPanel';
-import { PanelLeft, PanelLeftClose, Settings, Terminal } from 'lucide-react';
+import { Copy, Scissors, Search, LoaderCircle, Terminal, X } from 'lucide-react';
 
 const SORT_LABELS: Record<SortField, string> = {
   name: '名称',
   size: '大小',
   mtime: '修改时间',
   type: '类型',
-};
-
-const VIEW_LABELS = {
-  list: '列表',
-  grid: '网格',
-  details: '详情',
 };
 
 export function StatusBar({
@@ -35,9 +29,6 @@ export function StatusBar({
   sortDir,
   paneCount,
   activePaneIndex,
-  sidebarVisible,
-  onToggleSidebar,
-  onSettingsOpen,
 }: {
   count: number;
   version: string;
@@ -46,35 +37,16 @@ export function StatusBar({
   sortDir: 'asc' | 'desc' | null;
   paneCount: number;
   activePaneIndex: number;
-  sidebarVisible: boolean;
-  onToggleSidebar: () => void;
-  onSettingsOpen?: () => void;
 }) {
   const sortDirText = sortDir === 'asc' ? '↑' : sortDir === 'desc' ? '↓' : '(无)';
   const clipboard = useFileStore((s) => s.clipboard);
   const progress = useFileStore((s) => s.progress);
   const activePaneId = useLayoutStore((s) => s.activePaneId);
-  const viewMode = useFileStore((s) => s.panes[activePaneId]?.viewMode ?? 'details');
   const searchQuery = useFileStore((s) => s.panes[activePaneId]?.searchQuery ?? '');
   const clearSearch = useFileStore((s) => s.clearSearch);
   return (
     <div className="status-bar">
       <div className="status-left">
-        <div className="status-logo">
-          <span className="logo-mark">▣</span>
-          <span className="logo-text">Tabula</span>
-          {version && <span className="logo-version">v{version}</span>}
-        </div>
-        <button
-          type="button"
-          className="status-sidebar-toggle"
-          onClick={onToggleSidebar}
-          title={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
-          aria-label={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
-        >
-          {sidebarVisible ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
-        </button>
-        <span className="status-divider">·</span>
         <span className="status-item">
           {count} 项{selectedCount > 0 ? <strong className="status-selected"> · 已选 {selectedCount}</strong> : null}
         </span>
@@ -85,13 +57,13 @@ export function StatusBar({
               className="status-item status-filter"
               title={`当前目录过滤: ${searchQuery}`}
             >
-              🔍 过滤: <strong>{searchQuery}</strong>
+              <Search size={12} /> 过滤: <strong>{searchQuery}</strong>
               <button
                 className="status-filter-clear"
                 onClick={() => clearSearch(activePaneId)}
                 title="清空过滤"
               >
-                ✕
+                <X size={11} />
               </button>
             </span>
           </>
@@ -109,7 +81,7 @@ export function StatusBar({
                   : `已复制 ${clipboard.paths.length} 项(可粘贴)`
               }
             >
-              {clipboard.mode === 'cut' ? '✂ 将粘贴' : '⎘ 已复制'} {clipboard.paths.length} 项
+              {clipboard.mode === 'cut' ? <Scissors size={12} /> : <Copy size={12} />} {clipboard.mode === 'cut' ? '将粘贴' : '已复制'} {clipboard.paths.length} 项
             </span>
           </>
         )}
@@ -117,24 +89,13 @@ export function StatusBar({
           <>
             <span className="status-divider">·</span>
             <span className="status-item status-progress" title={progress.message}>
-              ⏳ {progress.message}
+              <LoaderCircle size={12} /> {progress.message}
             </span>
           </>
         )}
       </div>
       <div className="status-right">
         <TransferPanel />
-        <span
-          className="status-item status-hint"
-          title="按 Ctrl+P 打开全局模糊搜索"
-        >
-          <kbd>Ctrl</kbd>+<kbd>P</kbd> 全局搜索
-        </span>
-        <span className="status-divider">·</span>
-        <span className="status-item" title={`视图:${VIEW_LABELS[viewMode]}`}>
-          👁 {VIEW_LABELS[viewMode]}
-        </span>
-        <span className="status-divider">·</span>
         <span className="status-item" title={`排序:${SORT_LABELS[sortBy]} ${sortDirText}`}>
           排序: {SORT_LABELS[sortBy]} {sortDirText}
         </span>
@@ -143,16 +104,9 @@ export function StatusBar({
           className="status-item"
           title={`active pane #${activePaneIndex} / ${paneCount} panes`}
         >
-          layout: [{activePaneIndex}] / [{paneCount}]
+          窗格 {activePaneIndex} / {paneCount}
         </span>
         <span className="status-divider">·</span>
-        <button
-          className="status-icon-btn"
-          onClick={onSettingsOpen}
-          title="设置 (Ctrl+,)"
-        >
-          <Settings size={12} />
-        </button>
         <button
           className="status-icon-btn"
           onClick={() => window.tabula.app.openDevTools()}
@@ -161,6 +115,7 @@ export function StatusBar({
           <Terminal size={12} />
         </button>
         <span className="status-divider">·</span>
+        {version && <span className="status-version" title={`Tabula ${version}`}>v{version}</span>}
         <ThemeToggle />
       </div>
     </div>

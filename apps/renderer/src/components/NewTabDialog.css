@@ -5,8 +5,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
 }
 
 .new-tab-dialog {
@@ -14,10 +12,7 @@
   max-height: 85vh;
   overflow-y: auto;
   padding: 22px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow-xl);
+
   color: var(--fg-primary);
 }
 
@@ -43,7 +38,7 @@
 .new-tab-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .new-tab-button { min-height: 32px; padding: 0 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-overlay); }
 .new-tab-button:hover:not(:disabled) { background: var(--bg-active); }
-.new-tab-button.primary { border-color: var(--accent); background: var(--accent); color: white; }
+.new-tab-button.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); }
 .new-tab-button.primary:hover:not(:disabled) { background: var(--accent-hover); }
 .new-tab-button:disabled, .new-tab-history-item:disabled { opacity: 0.5; cursor: not-allowed; }
 .new-tab-dialog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

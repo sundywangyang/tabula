@@ -2,21 +2,17 @@
 .batch-rename-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 7000;
-  backdrop-filter: blur(2px);
 }
 
 .batch-rename-dialog {
   width: min(520px, 90vw);
   max-height: 80vh;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -232,7 +228,7 @@
 
 .batch-rename-btn-primary {
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   border: 1px solid var(--accent);
 }
 

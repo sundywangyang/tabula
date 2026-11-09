@@ -3,6 +3,7 @@
  * P3: 每个路径段作为拖放目标
  */
 import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { FolderOpen } from 'lucide-react';
 import './Breadcrumb.css';
 import { useFileStore } from '../stores/file-store';
 import type { BreadcrumbSegment } from '../stores/file-store';
@@ -64,7 +65,7 @@ export function Breadcrumb({
   return (
     <div className="breadcrumb">
       <button className="breadcrumb-picker" onClick={onOpenPicker} title="打开文件夹 (Ctrl+O)">
-        📁
+        <FolderOpen size={14} strokeWidth={1.6} />
       </button>
       <div
         className="breadcrumb-path"

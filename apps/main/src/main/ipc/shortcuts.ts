@@ -11,6 +11,7 @@ import { ipcMain } from 'electron';
 import { IpcChannels } from '@tabula/bridge';
 import type { KeyCombo } from '@tabula/bridge';
 import { getKeymapManager } from '../keymap/keymap-manager';
+import { updateApplicationMenu } from '../window/application-menu';
 
 export function registerShortcutsHandlers(): void {
   const km = getKeymapManager();
@@ -22,11 +23,14 @@ export function registerShortcutsHandlers(): void {
   ipcMain.handle(
     IpcChannels.SHORTCUTS_SET_BINDING,
     (_e, commandId: string, combo: KeyCombo | null) => {
-      return km.setBinding(commandId, combo);
+      const result = km.setBinding(commandId, combo);
+      if (result.ok) updateApplicationMenu();
+      return result;
     },
   );
 
   ipcMain.handle(IpcChannels.SHORTCUTS_RESET_ALL, () => {
     km.resetAll();
+    updateApplicationMenu();
   });
 }

@@ -28,7 +28,7 @@ import { ContextMenu } from './components/ContextMenu';
 import { ExtensionPanelView } from './components/ExtensionPanelView';
 import { CommandPalette } from './features/command-palette/CommandPalette';
 import { runCommandById } from './command-dispatcher';
-import { handleShortcutKeyDown } from './keyboard-shortcuts';
+import { handleNativeCloseTabCommand, handleShortcutKeyDown } from './keyboard-shortcuts';
 import { IpcChannels } from '@tabula/bridge';
 import { LayoutView } from './features/panes/PaneContainer';
 import { PerfPanel } from './features/perf/PerfPanel';
@@ -148,7 +148,6 @@ export function App() {
 
   // P5
   const hydrateFavorites = useFavoritesStore((s) => s.hydrate);
-  const hydrateTheme = useThemeStore((s) => s.hydrate);
   const hydrateSettings = useSettingsStore((s) => s.hydrate);
   const recordVisit = useFavoritesStore((s) => s.recordVisit);
   const themeSetEffective = useThemeStore((s) => s.setEffective);
@@ -207,8 +206,7 @@ export function App() {
       // 平台信息缓存 (同步供 onKey handler 使用)
       await initPlatformCache();
       void useFileStore.getState().syncFileClipboard();
-      // P5: 先 hydrate 主题(影响整体样式),再 hydrate favorites / settings / file-config / layout
-      await hydrateTheme();
+      // 主题已在首次 render 前完成初始化,这里继续加载工作区配置。
       await hydrateSettings();
       await hydrateFavorites();
       await hydrateFromConfig();
@@ -320,7 +318,8 @@ export function App() {
       IpcChannels.COMMANDS_RUN_COMMAND,
       (payload) => {
         if (payload && typeof payload.commandId === 'string') {
-          runCommandById(payload.commandId);
+          if (payload.commandId === 'tab.close') handleNativeCloseTabCommand();
+          else runCommandById(payload.commandId);
         }
       },
     );
@@ -382,7 +381,7 @@ export function App() {
 
   return (
     <div className="app-root">
-      <TitleBar />
+      <TitleBar sidebarVisible={sidebarVisible} onToggleSidebar={() => setSidebarVisible((v) => !v)} onSettingsOpen={() => setSettingsOpen(true)} />
 
       <div className="app-body">
         {sidebarVisible && (
@@ -410,9 +409,6 @@ export function App() {
         sortDir={sortDir}
         paneCount={paneCount}
         activePaneIndex={activePaneIndex}
-        sidebarVisible={sidebarVisible}
-        onToggleSidebar={() => setSidebarVisible((v) => !v)}
-        onSettingsOpen={() => setSettingsOpen(true)}
       />
 
       {/* P3: 全局 dialog / toast */}
