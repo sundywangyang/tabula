@@ -115,9 +115,8 @@ export function ArchiveView({ url, name, ext }: { url: string; name: string; ext
         <div className="error-icon"><TriangleAlert size={36} strokeWidth={1.5} aria-hidden="true" /></div>
         <div className="error-message">压缩包解析失败: {error}</div>
         <div className="preview-error-meta">
-          {ext === '.7z' || ext === '.rar'
-            ? <span>当前不支持 7z / rar 格式 (fflate 不支持)</span>
-            : null}
+          {ext === '.rar' && <span>暂不支持预览此格式，可尝试通过右键菜单解压或使用其他应用打开</span>}
+          {ext === '.7z' && <span>暂不支持预览或解压此格式，可通过右键菜单使用其他应用打开</span>}
         </div>
       </div>
     );

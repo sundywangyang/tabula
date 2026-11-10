@@ -5,6 +5,8 @@
  */
 import { ipcMain, dialog, shell, app, clipboard, BrowserWindow, nativeImage } from 'electron';
 import { chmod } from 'node:fs/promises';
+import { openWindowsApplicationChooser } from '../services/open-with';
+import { getArchiveApplications, openWithArchiveApplication } from '../services/archive-applications';
 import { rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { IpcChannels } from '@tabula/bridge';
@@ -215,8 +217,14 @@ export function registerIpcHandlers(ctx: IpcContext) {
   });
 
   // =================== Open With (new) ===================
-  ipcMain.handle(IpcChannels.FS_OPEN_WITH_DIALOG, async (_e, p: string) => {
-    const win = ctx.windowManager.getMainWindow();
+  ipcMain.handle(IpcChannels.FS_ARCHIVE_APPLICATIONS, (_event, path: string) => getArchiveApplications(path));
+  ipcMain.handle(IpcChannels.FS_OPEN_WITH_ARCHIVE_APPLICATION, (event, path: string, id: string) =>
+    openWithArchiveApplication(path, id, error => {
+      if (!event.sender.isDestroyed()) event.sender.send(IpcChannels.FS_OPEN_WITH_ARCHIVE_ERROR, error.message);
+    }));
+  ipcMain.handle(IpcChannels.FS_OPEN_WITH_DIALOG, async (event, p: string) => {
+    if (process.platform === 'win32') return openWindowsApplicationChooser(p);
+    const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
 
     const result = await dialog.showOpenDialog(win, {

@@ -205,6 +205,13 @@ const api: TabulaAPI = {
     },
     writeClipboard: (text) => ipcRenderer.invoke(IpcChannels.FS_WRITE_CLIPBOARD, text),
     openWithDialog: (p) => ipcRenderer.invoke(IpcChannels.FS_OPEN_WITH_DIALOG, p),
+    getArchiveApplications: (p) => ipcRenderer.invoke(IpcChannels.FS_ARCHIVE_APPLICATIONS, p),
+    openWithArchiveApplication: (p, id) => ipcRenderer.invoke(IpcChannels.FS_OPEN_WITH_ARCHIVE_APPLICATION, p, id),
+    onOpenWithArchiveError: listener => {
+      const wrapped = (_e: IpcRendererEvent, message: string) => listener(message);
+      ipcRenderer.on(IpcChannels.FS_OPEN_WITH_ARCHIVE_ERROR, wrapped);
+      return () => ipcRenderer.removeListener(IpcChannels.FS_OPEN_WITH_ARCHIVE_ERROR, wrapped);
+    },
     saveDialog: (opts) => ipcRenderer.invoke(IpcChannels.FS_SAVE_DIALOG, opts ?? {}),
     setPermissions: (req: FsSetPermissionsRequest) =>
       ipcRenderer.invoke(IpcChannels.FS_SET_PERMISSIONS, req),

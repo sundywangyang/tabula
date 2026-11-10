@@ -4,16 +4,18 @@
 import type { ArchiveProvider } from './types';
 import { ZipArchiveProvider } from './zip-provider';
 import { TarArchiveProvider, isTarPath } from './tar-provider';
+import { RarArchiveProvider } from './rar-provider';
 
 class ArchiveRouter implements ArchiveProvider {
   private zip = new ZipArchiveProvider();
   private tar = new TarArchiveProvider();
-  list(path: string) { return (isTarPath(path) ? this.tar : this.zip).list(path); }
+  private rar = new RarArchiveProvider();
+  list(path: string) { return (/\.rar$/i.test(path) ? this.rar : isTarPath(path) ? this.tar : this.zip).list(path); }
   compress(request: import('@tabula/bridge').CompressRequest) { return (isTarPath(request.destination) ? this.tar : this.zip).compress(request); }
-  extract(request: import('@tabula/bridge').ExtractRequest) { return (isTarPath(request.archive) ? this.tar : this.zip).extract(request); }
-  async getJob(id: string) { const result = await this.tar.getJob(id); return result.ok ? result : this.zip.getJob(id); }
-  async cancelJob(id: string) { const result = await this.tar.getJob(id); return result.ok ? this.tar.cancelJob(id) : this.zip.cancelJob(id); }
-  onJobUpdate(listener: Parameters<ArchiveProvider['onJobUpdate']>[0]) { const a = this.zip.onJobUpdate(listener), b = this.tar.onJobUpdate(listener); return () => { a(); b(); }; }
+  extract(request: import('@tabula/bridge').ExtractRequest) { return (/\.rar$/i.test(request.archive) ? this.rar : isTarPath(request.archive) ? this.tar : this.zip).extract(request); }
+  async getJob(id: string) { for (const provider of [this.rar, this.tar, this.zip]) { const result = await provider.getJob(id); if (result.ok) return result; } return { ok: false as const, error: { code: 'JOB_NOT_FOUND' as const, message: '找不到任务' } }; }
+  async cancelJob(id: string) { for (const provider of [this.rar, this.tar, this.zip]) { if ((await provider.getJob(id)).ok) return provider.cancelJob(id); } return { ok: false as const, error: { code: 'JOB_NOT_FOUND' as const, message: '找不到任务' } }; }
+  onJobUpdate(listener: Parameters<ArchiveProvider['onJobUpdate']>[0]) { const stops = [this.zip, this.tar, this.rar].map(provider => provider.onJobUpdate(listener)); return () => stops.forEach(stop => stop()); }
 }
 
 let _instance: ArchiveProvider | null = null;

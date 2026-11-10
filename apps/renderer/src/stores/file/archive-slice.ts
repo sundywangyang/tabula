@@ -12,7 +12,7 @@ type SetFileState = Parameters<FileSlice<Actions>>[0];
 function registerJob(set: SetFileState, jobId: string, toastId: string, sourcePaneId?: string): void {
   set(state => {
     const jobs = new Map(state.archiveJobs);
-    jobs.set(jobId, { jobId, phase: 'pending', processed: 0, total: -1 });
+    if (!jobs.has(jobId)) jobs.set(jobId, { jobId, phase: 'pending', processed: 0, total: -1 });
     const toasts = new Map(state.archiveToasts);
     toasts.set(jobId, toastId);
     const paneIds = new Map(state.archivePaneIds);
@@ -61,6 +61,14 @@ export const createArchiveSlice: FileSlice<Actions> = (set, get) => ({
     const jobId = result.data.jobId;
     const toastId = get().showToast(`正在压缩 ${defaultName}…`, 'info', 0);
     registerJob(set, jobId, toastId, sourcePaneId);
+    // A short job can finish before its IPC response reaches the renderer.
+    const latest = get().archiveJobs.get(jobId);
+    if (latest && ['done', 'error', 'cancelled'].includes(latest.phase)) get().updateArchiveJob(latest);
+    else if (typeof window.tabula.archive.getJob === 'function') {
+      void window.tabula.archive.getJob(jobId).then(result => {
+        if (result.ok && ['done', 'error', 'cancelled'].includes(result.data.phase) && get().archiveToasts.has(jobId)) get().updateArchiveJob(result.data);
+      }).catch(() => {});
+    }
     return { ok: true };
   },
 
@@ -91,6 +99,13 @@ export const createArchiveSlice: FileSlice<Actions> = (set, get) => ({
     const jobId = result.data.jobId;
     const toastId = get().showToast(`正在解压 ${archiveName}…`, 'info', 0);
     registerJob(set, jobId, toastId, sourcePaneId);
+    const latest = get().archiveJobs.get(jobId);
+    if (latest && ['done', 'error', 'cancelled'].includes(latest.phase)) get().updateArchiveJob(latest);
+    else if (typeof window.tabula.archive.getJob === 'function') {
+      void window.tabula.archive.getJob(jobId).then(result => {
+        if (result.ok && ['done', 'error', 'cancelled'].includes(result.data.phase) && get().archiveToasts.has(jobId)) get().updateArchiveJob(result.data);
+      }).catch(() => {});
+    }
     return { ok: true };
   },
 
@@ -109,6 +124,7 @@ export const createArchiveSlice: FileSlice<Actions> = (set, get) => ({
     // 2. 更新对应 toast
     const toastId = get().archiveToasts.get(jobId);
     if (!toastId) return;
+    if (['done', 'error', 'cancelled'].includes(phase)) set(s => { const toasts = new Map(s.archiveToasts); toasts.delete(jobId); return { archiveToasts: toasts }; });
     if (phase === 'done') {
       get().dismissToast(toastId);
       // 完成后自动刷新触发该操作的 pane

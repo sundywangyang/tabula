@@ -5,6 +5,8 @@ import type {
   AppConfig,
   WindowSessionSnapshot,
   AppWindowState,
+  ArchiveApplication,
+  ArchiveApplicationOpenResult,
   ArchiveError,
   ArchiveInfo,
   ArchiveProgress,
@@ -199,8 +201,12 @@ export interface TabulaAPI {
     onDirSizeProgress(listener: (progress: DirSizeProgress) => void): () => void;
     /** 写文本到系统剪贴板 */
     writeClipboard(text: string): Promise<void>;
-    /** 显示 Windows「打开方式」对话框并用用户选择的程序打开文件 */
+    /** Windows 显示系统「打开方式」；其他平台选择程序打开文件。 */
     openWithDialog(path: string): Promise<void>;
+    /** 查询 Windows 为文件类型注册的应用；程序身份保留在主进程。 */
+    getArchiveApplications(path: string): Promise<ArchiveApplication[]>;
+    openWithArchiveApplication(path: string, applicationId: string): Promise<ArchiveApplicationOpenResult>;
+    onOpenWithArchiveError(listener: (message: string) => void): () => void;
     /**
      * 弹系统「另存为」对话框,用户选路径后返回;取消返回 null。
      * 用于压缩时让用户指定输出文件名和位置。

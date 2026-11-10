@@ -69,6 +69,16 @@ describe('archive operations through the composed file store', () => {
     expect(useFileStore.getState().toasts[0]).toMatchObject({ kind: 'warn', message: '目标已存在,解压取消:a.txt exists' });
   });
 
+  it('handles a RAR job that finishes before its start response', async () => {
+    archive.extract.mockImplementationOnce(async () => {
+      useFileStore.getState().updateArchiveJob({ jobId: 'fast-rar', phase: 'done', processed: 1, total: 1 });
+      return { ok: true, data: { jobId: 'fast-rar' } };
+    });
+    await useFileStore.getState().startExtract('C:\\archive\\a.rar', 'C:\\output', 'p');
+    expect(useFileStore.getState().toasts).toEqual([expect.objectContaining({ message: '归档完成', kind: 'success' })]);
+    expect(useFileStore.getState().archiveToasts.has('fast-rar')).toBe(false);
+  });
+
   it('refreshes the originating pane on completion and leaves other jobs active', async () => {
     await useFileStore.getState().startCompress(['C:\\initial\\a.txt'], 'p');
     await useFileStore.getState().startExtract('C:\\archive\\b.tgz', 'C:\\output', 'p');

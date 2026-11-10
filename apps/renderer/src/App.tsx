@@ -374,6 +374,10 @@ export function App() {
     return () => window.removeEventListener('focus', updateClipboard);
   }, []);
 
+  useEffect(() => {
+    return window.tabula.fs.onOpenWithArchiveError?.(message => useFileStore.getState().showToast(message, 'error', 4000));
+  }, []);
+
   const renderLayout = useMemo(() => {
     if (!hydrated) return null;
     return rootLayout;

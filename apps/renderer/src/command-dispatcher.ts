@@ -294,12 +294,12 @@ export function runCommandById(commandId: string): boolean {
       const data = file.panes[activePaneId];
       const selected = Array.from(data?.selectedPaths ?? []);
       if (selected.length === 0) {
-        showToast('请先选中 ZIP、TAR 或 TGZ 归档', 'warn');
+        showToast('请先选中 ZIP、RAR、TAR 或 TGZ 归档', 'warn');
         return true;
       }
       const archive = selected[0];
-      if (!/\.(zipx?|tar|tgz|tar\.gz)$/i.test(archive)) {
-        showToast('请选中 ZIP、TAR 或 TGZ 归档', 'warn');
+      if (!/\.(zipx?|rar|tar|tgz|tar\.gz)$/i.test(archive)) {
+        showToast('请选中 ZIP、RAR、TAR 或 TGZ 归档', 'warn');
         return true;
       }
       void file.startExtract(archive, undefined, activePaneId);

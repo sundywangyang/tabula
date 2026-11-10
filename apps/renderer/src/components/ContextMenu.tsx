@@ -27,6 +27,7 @@ import {
 } from './context-menu/state';
 import { subscribeTagsCache, addTagForPath, removeTagForPath, loadTagsForPath } from './context-menu/tags';
 import { buildMenuItems } from './context-menu/menu-items';
+import { useArchiveApplications } from './context-menu/use-archive-applications';
 export { buildMenuItems } from './context-menu/menu-items';
 export { getCachedTags, setCachedTags, subscribeTagsCache, loadTagsForPath } from './context-menu/tags';
 
@@ -62,6 +63,7 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
   const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
   // 二级菜单位置(portal 模式)— 从父 item 的 getBoundingClientRect 派生
   const [submenuPos, setSubmenuPos] = useState<{ top: number; left: number; } | null>(null);
+  const applications = useArchiveApplications(globalState.visible && globalState.entry && !globalState.entry.isDirectory ? globalState.entry.path : null);
   // 父 item refs 字典,onMouseEnter 时读 rect
   const itemRefs = useRef(new Map<number, HTMLDivElement>());
 
@@ -103,6 +105,7 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
   }, []);
 
   const menuRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
 
   // 第一次 mount 注册全局 listener(只挂一次,全生命周期不卸载)
   useEffect(() => {
@@ -207,6 +210,17 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
     }
   }, [globalState.pos.x, globalState.pos.y]);
 
+  useLayoutEffect(() => {
+    const panel = submenuRef.current;
+    if (!panel || openSubmenu === null || !submenuPos) return;
+    panel.style.left = `${submenuPos.left}px`;
+    panel.style.top = `${submenuPos.top}px`;
+    const rect = panel.getBoundingClientRect();
+    const anchor = itemRefs.current.get(openSubmenu)?.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 6) panel.style.left = `${Math.max(6, (anchor?.left ?? submenuPos.left) - rect.width)}px`;
+    if (rect.bottom > window.innerHeight - 6) panel.style.top = `${Math.max(6, window.innerHeight - rect.height - 6)}px`;
+  }, [openSubmenu, submenuPos, globalState.visible, applications]);
+
   // early return 必须放在所有 hooks 之后,否则 hooks 顺序会被破坏
   // G008 fix: 菜单关闭但 dialog 已开,仍要渲染 InputDialog,否则 hideGlobalMenu 后
   // 与 setTagDialog 一起被批量 setState 抹掉,用户看到「下次右键才弹」的现象。
@@ -246,6 +260,9 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
       currentPath,
       clipboard,
       actions,
+      archiveApplications: applications?.apps,
+      archiveApplicationsLoading: applications?.loading,
+      archiveApplicationsError: applications?.error,
     })
     : [];
 
@@ -385,6 +402,7 @@ export function ContextMenu(_props: ContextMenuProps = {}) {
             {/* 二级面板用 portal 渲染到 body 避免被父 overflow 裁切 */}
             {hasSub && isOpen && submenuPos && createPortal(
               <div
+                ref={submenuRef}
                 className="submenu-panel"
                 style={{ position: 'fixed', top: submenuPos.top, left: submenuPos.left }}
               >

@@ -1,4 +1,4 @@
-import type { FsEntry } from '@tabula/bridge';
+import type { ArchiveApplication, FsEntry } from '@tabula/bridge';
 import { createElement } from 'react';
 import {
   Archive, ArrowRightLeft, Calculator, ChartNoAxesCombined, ClipboardPaste,
@@ -14,6 +14,7 @@ import { isReadOnly } from '../../utils/permissions';
 import { getCachedReadonly, resolveLockMenuLabel, setCachedReadonly } from '../readonly-cache';
 import { getCachedTags, addTagForPath, removeTagForPath } from './tags';
 import { hideGlobalMenu } from './state';
+import { isArchiveFile } from './use-archive-applications';
 
 function menuIcon(Icon: LucideIcon) {
   return createElement(Icon, { size: 15, strokeWidth: 1.75, 'aria-hidden': true });
@@ -37,8 +38,11 @@ export function buildMenuItems(args: {
   currentPath: string;
   clipboard: ReturnType<typeof useFileStore.getState>['clipboard'];
   actions: ReturnType<typeof useFileStore.getState>;
+  archiveApplications?: ArchiveApplication[];
+  archiveApplicationsLoading?: boolean;
+  archiveApplicationsError?: boolean;
 }): MenuItem[] {
-  const { paneId, targetEntry, isEmptySpace, selectedPaths, currentPath, clipboard, actions } = args;
+  const { paneId, targetEntry, isEmptySpace, selectedPaths, currentPath, clipboard, actions, archiveApplications, archiveApplicationsLoading, archiveApplicationsError } = args;
   const items: MenuItem[] = [];
 
   if (isEmptySpace) {
@@ -379,30 +383,42 @@ export function buildMenuItems(args: {
         },
       });
       for (const format of ['tar', 'tgz'] as const) archiveSubmenu.push({ label: `压缩为 ${format.toUpperCase()}…`, icon: menuIcon(Archive), action: () => { void useFileStore.getState().startCompress([...selectedPaths], paneId, format); hideGlobalMenu(); } });
-      const hasZip = Array.from(selectedPaths).some((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
-      if (hasZip && targetEntry && !targetEntry.isDirectory) {
+      const archivePath = targetEntry && !targetEntry.isDirectory && /\.(zipx?|rar|tar|tgz|tar\.gz)$/i.test(targetEntry.path) ? targetEntry.path : null;
+      if (archivePath) {
         archiveSubmenu.push({
           label: '解压到…',
           icon: menuIcon(PackageOpen),
           action: () => {
-            const zipPath = Array.from(selectedPaths).find((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
-            if (zipPath) {
-              void useFileStore.getState().startExtract(zipPath, undefined, paneId);
-            }
+            void useFileStore.getState().startExtract(archivePath, undefined, paneId);
             hideGlobalMenu();
           },
         });
-        const extractHereZipPath = Array.from(selectedPaths).find((p) => /\.(zipx?|tar|tgz|tar\.gz)$/i.test(p));
-        if (extractHereZipPath && currentPath) {
+        if (currentPath) {
           archiveSubmenu.push({
             label: '解压到此处',
             icon: menuIcon(FolderOpen),
             action: () => {
-              void useFileStore.getState().startExtract(extractHereZipPath, currentPath, paneId);
+              void useFileStore.getState().startExtract(archivePath, currentPath, paneId);
               hideGlobalMenu();
             },
           });
         }
+      }
+      if (targetEntry && !targetEntry.isDirectory && isArchiveFile(targetEntry.path)) {
+        archiveSubmenu.push({ label: '', divider: true });
+        if (archiveApplicationsLoading) archiveSubmenu.push({ label: '正在查询系统应用…', disabled: true });
+        else if (archiveApplicationsError) archiveSubmenu.push({ label: '无法读取系统应用', disabled: true });
+        else if (archiveApplications?.length === 0) archiveSubmenu.push({ label: '未找到系统关联的应用', disabled: true });
+        for (const app of archiveApplications ?? []) archiveSubmenu.push({ label: `使用 ${app.name} 打开`, icon: menuIcon(ExternalLink), action: () => {
+          void window.tabula.fs.openWithArchiveApplication(targetEntry.path, app.id).then(result => {
+            if (result?.method === 'system-chooser') actions.showToast('请在系统窗口中选择应用并按提示确认', 'info', 5000);
+          }).catch(error => actions.showToast(`打开失败: ${String(error)}`, 'error', 4000));
+          hideGlobalMenu();
+        } });
+        archiveSubmenu.push({ label: '使用其他应用打开…', icon: menuIcon(ExternalLink), action: () => {
+          void window.tabula.fs.openWithDialog(targetEntry.path).catch(error => actions.showToast(`打开方式失败: ${String(error)}`, 'error', 4000));
+          hideGlobalMenu();
+        } });
       }
       items.push({
         label: '压缩/解压',

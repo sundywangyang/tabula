@@ -712,6 +712,10 @@ export interface UndoStackSnapshot {
 
 // =================== Archive (压缩 / 解压) ===================
 
+/** 已检测到、可打开指定压缩文件的本机应用。 */
+export interface ArchiveApplication { id: string; name: string }
+export type ArchiveApplicationOpenResult = { method: 'application' | 'system-chooser' };
+
 /** 当前支持的归档格式 (v1: 仅 zip) */
 export type ArchiveFormat = 'zip' | 'tar' | 'tgz';
 
